@@ -1,0 +1,35 @@
+import { PERMISSIONS } from "./permission.constant";
+
+//📌 ADMIN có full quyền
+//📌 Các role khác chỉ lấy phần cần
+export const ROLE_PERMISSIONS: Record<string, string[]> = {
+  //ADMIN có full quyền
+  ADMIN: [...Object.values(PERMISSIONS), "SYSTEM_ADMIN"],
+ //Phân quyền của từng role theo các chức năng
+  IT: [
+    // PERMISSIONS.DOCUMENT_VIEW,
+    PERMISSIONS.DOCUMENT_CREATE,
+    PERMISSIONS.DOCUMENT_UPDATE,
+    PERMISSIONS.DOCUMENT_VIEW_DETAIL,
+    PERMISSIONS.AUDIT_VIEW,
+    //Quyền về phòng ban
+    PERMISSIONS.DEPARTMENT_VIEW,
+    PERMISSIONS.DEPARTMENT_VIEW_DETAIL,
+    PERMISSIONS.DEPARTMENT_CREATE,
+    PERMISSIONS.DEPARTMENT_UPDATE,
+    PERMISSIONS.DEPARTMENT_DELETE, 
+    //Quyền về user
+    PERMISSIONS.USER_CHANGE_PASSWORD,
+    // PERMISSIONS.USER_VIEW_DETAIL,
+  ],
+  
+  //Nơi cấp quyền nếu token trả về role check đk trong này
+  USER:[
+    PERMISSIONS.DOCUMENT_CREATE,
+    PERMISSIONS.DOCUMENT_VIEW_DETAIL,
+    PERMISSIONS.DOCUMENT_DELETE,
+    PERMISSIONS.DOCUMENT_UPDATE,
+    PERMISSIONS.DOCUMENT_VIEW,
+    PERMISSIONS.USER_CHANGE_PASSWORD,
+  ]
+};
