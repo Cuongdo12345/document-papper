@@ -4,9 +4,11 @@ import { createDocumentService,
         updateDocumentService,
         deleteDocumentService,
         getReportsByProposalService, 
-        restoreDocumentService} 
+        restoreDocumentService
+        } 
         from "../services/documents.service";
 import { Request, Response } from "express";
+
 
 
 /**
@@ -195,6 +197,7 @@ export const getReportsByProposals = async (req:Request, res:Response) => {
   }
 };
 
+// PATCH /api/documents/:id/restore
 export const restoreDocuments = async (req: Request, res: Response, next: any) => {
   try {
     const result = await restoreDocumentService({
@@ -208,6 +211,48 @@ export const restoreDocuments = async (req: Request, res: Response, next: any) =
     next(err);
   }
 };
+
+
+// /**
+//  *  EXPORT DOCUMENTS TO EXCEL
+//  *  // Endpoint này cho phép người dùng xuất danh sách tài liệu ra file Excel, có thể áp dụng các bộ lọc như phòng ban, trạng thái tài liệu, khoảng thời gian tạo tài liệu, v.v. Kết quả trả về sẽ là một file Excel được tải xuống hoặc một URL để tải file.
+//  * // Lưu ý: Do việc xuất file Excel có thể mất thời gian, nên endpoint này có thể được thiết kế để trả về một job ID và người dùng sẽ sử dụng job ID đó để kiểm tra trạng thái và tải file khi đã sẵn sàng, thay vì giữ kết nối HTTP mở trong suốt quá trình tạo file.
+//  * @param req 
+//  * @param res 
+//  * @returns 
+//  */
+// export const exportDocumentsExcel = async (
+//   req: Request,
+//   res: Response
+// ) => {
+//   try {
+//     const fileName = await exportDocumentsExcelPRO(req.query, res);
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Export file thành công",
+//       downloadUrl: `../Export/document/${fileName}`,
+//     });
+
+//   } catch (error: any) {
+//     console.error("❌ EXPORT ERROR:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: error.message || "Export thất bại",
+//     });
+//   }
+// };
+
+
+
+
+
+
+
+
+
+
 
 // import { Request, Response } from "express";
 // import {

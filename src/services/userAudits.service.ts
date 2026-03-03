@@ -90,7 +90,7 @@ export const getAuditDashboardService = async (
     if (fromDate) match.createdAt.$gte = new Date(fromDate);
     if (toDate) match.createdAt.$lte = new Date(toDate);
   }
-  
+
   // Dùng Promise.all để chạy song song 3 query thống kê theo action, theo ngày và đếm tổng số logs
   const [byAction, byDay, total] = await Promise.all([
 

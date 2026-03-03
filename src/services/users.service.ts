@@ -127,6 +127,7 @@ export class UserService {
     };
   }
 
+
   /**
    * GET USER BY ID
    */
@@ -317,4 +318,63 @@ export class UserService {
 
     return true;
   }
-}
+
+  /**
+   *  GET ME
+   * Kiểm tra user tồn tại và isActive
+   * Trả về thông tin user (không bao gồm password)
+   * Nếu user không tồn tại hoặc bị vô hiệu hóa => 404
+   * @param userId 
+   * @returns 
+   */
+  static async getMeService(userId: any) {
+
+    const user = await User.findById(userId)
+      .select("-password -__v");
+
+    if (!user || !user.isActive) {
+      throw new Error("User not found or inactive");
+    }
+
+    return user;
+  }
+
+  /**
+   *  UPDATE ME
+   * Kiểm tra user tồn tại và isActive
+   * Không cho update các field nhạy cảm như role, department, password, email, isActive
+   * Cập nhật thông tin user
+   * Trả về user đã cập nhật (không bao gồm password)
+   * Nếu user không tồn tại hoặc bị vô hiệu hóa => 404
+   * @param userId 
+   * @param payload 
+   * @returns 
+   */
+
+  static async updateMeService(userId: string, payload: any) {
+    const allowedFields = ["fullName", "username"];
+
+    const updates = Object.keys(payload)
+      .filter(key => allowedFields.includes(key))
+      .reduce((obj: any, key) => {
+        obj[key] = payload[key];
+        return obj;
+      }, {});
+
+    if (!Object.keys(updates).length) {
+      throw ApiError.badRequest("Không có trường hợp hợp lệ để cập nhật");
+    }
+
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: userId, isActive: true },
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).select("-password -__v");
+
+    if (!updatedUser) {
+      throw ApiError.notFound("User không tồn tại hoặc đã bị vô hiệu hóa");
+    }
+
+    return updatedUser;
+  }
+};

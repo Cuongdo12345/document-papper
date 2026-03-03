@@ -108,7 +108,45 @@ export const resetPasswordByAdmin = async (req: Request, res: Response) => {
   }
 };
 
+// GET ME
+export const getMe = async (req: Request, res: Response, next: any) => {
+  try {
 
+    const userId = req.user!.id;
+
+    const user = await UserService.getMeService(userId);
+
+    res.json({
+      success: true,
+      data: user
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+// UPDATE ME
+export const updateMe = async (req: Request, res: Response, next: any) => {
+  try {
+
+    const userId = req.user!.id;
+
+    const updatedUser = await UserService.updateMeService(
+      userId,
+      req.body
+    );
+
+    res.json({
+      success: true,
+      message: "Profile updated successfully",
+      data: updatedUser
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
 
 
 // ==============================================================================================================

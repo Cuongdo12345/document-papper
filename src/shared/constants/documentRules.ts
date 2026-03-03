@@ -18,6 +18,8 @@ export const DOCUMENT_RULES: Record<
 
   CONFIRM_STATUS: {
     category: DocumentCategory.REPORT,
+    requireReference: true,
+    referenceSubType: DocumentSubType.PROPOSE_INK,
   },
 
   // ===== ĐỀ XUẤT =====

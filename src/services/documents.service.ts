@@ -5,7 +5,6 @@ import { DOCUMENT_RULES } from "../shared/constants/documentRules";
 import ApiError from "../shared/errors/ApiError";
 import { Types } from "mongoose";
 
-
 // Xây dựng service tạo document mới với các bước:
 // 1. Check rule: Kiểm tra xem subtype có hợp lệ không, subtype đó thuộc category nào, có yêu cầu reference không
 // 2. Check reference: Nếu subtype yêu cầu reference thì kiểm tra document tham chiếu có tồn tại không, có cùng khoa không, có cùng loại không, nếu có yêu cầu subtype tham chiếu thì kiểm tra subtype của document tham chiếu có đúng không
@@ -199,7 +198,7 @@ export const getAllDocumentsService = async (query: any) => {
     Document.find(filter)
       .populate("department", "code name")
       .populate("createdBy", "username fullName")
-      .populate("referenceTo", "documentCode subType")
+      .populate("referenceTo", "subType")
       .sort(sort)
       .skip(skip)
       .limit(limitNum)
@@ -567,3 +566,143 @@ export const restoreDocumentService = async ({
     data: document,
   };
 };
+
+
+
+// /**
+//  *  Xuất Excel danh sách document
+//  *  Cho phép người dùng xuất danh sách document ra file Excel, có thể lọc theo tháng và năm tạo document. File Excel sẽ bao gồm các thông tin chi tiết như mã document, loại, phòng ban, tiêu đề, ngày tạo, thiết bị liên quan (nếu có), số lượng, ghi chú, ngày bảo trì và chi phí thực tế (nếu có). Điều này giúp người dùng dễ dàng lưu trữ và phân tích dữ liệu ngoài hệ thống.
+//  * // Lưu ý: Đảm bảo rằng bạn đã cài đặt thư viện ExcelJS và có thư mục Export/document để lưu trữ file Excel được tạo ra. Trước khi thực hiện các truy vấn, chúng ta sẽ kiểm tra tính hợp lệ của departmentId để đảm bảo rằng nó là một ObjectId hợp lệ. Nếu không, chúng ta sẽ trả về lỗi Bad Request. Sau đó, chúng ta sẽ kiểm tra xem khoa có tồn tại hay không. Nếu không tìm thấy khoa, chúng ta sẽ trả về lỗi Not Found.
+
+//  * @param query 
+//  * @param res 
+//  */
+// export const exportDocumentsExcelPRO = async (
+//   query: any,
+//   res?: any
+// ) => {
+//   try {
+//     console.log("🚀 EXPORT START");
+
+//     const { month, year } = query;
+
+//     const filter: any = {
+//       isActive: true,
+//       $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+//     };
+
+//     // ===== SAFE DATE FILTER =====
+//     if (
+//       month &&
+//       year &&
+//       !isNaN(Number(month)) &&
+//       !isNaN(Number(year))
+//     ) {
+//       const start = new Date(Number(year), Number(month) - 1, 1);
+//       const end = new Date(Number(year), Number(month), 0, 23, 59, 59);
+
+//       filter.createdAt = { $gte: start, $lte: end };
+//     }
+    
+//     const fileName = `Danh-sach-vat-tu_${Date.now()}.xlsx`;
+//     const filePath = path.join(__dirname, `../Export/document/${fileName}`);
+
+//     // ===== SET HEADER =====
+//     res.setHeader(
+//       "Content-Type",
+//       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+//     );
+
+//     res.setHeader(
+//       "Content-Disposition",
+//       `attachment; filename=${fileName}`
+//     );
+
+//     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
+//       // stream: res,
+//       filename: filePath,
+//       useStyles: true,
+//       useSharedStrings: true,
+//     });
+
+//      const worksheet = workbook.addWorksheet("Document Export", {
+//             views: [{ state: "frozen", ySplit: 1 }],
+//   });
+     
+//       worksheet.autoFilter = {
+//       from: "A1",
+//       to: "K1",
+//     };
+
+//     worksheet.columns = [
+//       { header: "Mã giấy", key: "documentCode", width: 25 },
+//       // { header: "Category", key: "category", width: 15 },
+//       { header: "Loại giấy", key: "subType", width: 20 },
+//       { header: "Khoa", key: "department", width: 25 },
+//       { header: "Tiêu đề", key: "title", width: 35 },
+//       { header: "Created Date", key: "createdAt", width: 15 },
+//       { header: "Tên thiết bị", key: "deviceName", width: 30 },
+//       { header: "Số lượng", key: "quantity", width: 10 },
+//       { header: "Ghi chú", key: "note", width: 40 },
+//       { header: "Ngày sửa chữa", key: "serviceDate", width: 18 },
+//       // { header: "Actual Cost", key: "actualCost", width: 18 },
+//     ];
+
+//     const cursor = Document.find(filter)
+//       .populate("department", "name")
+//       .lean()
+//       .cursor();
+
+//     for await (const doc of cursor as any) {
+//       const baseData = {
+//         documentCode: doc.documentCode || "",
+//         category: doc.category || "",
+//         subType: doc.subType || "",
+//         department: doc.department?.name || "",
+//         title: doc.title || "",
+//         createdAt: doc.createdAt
+//           ? new Date(doc.createdAt).toLocaleDateString("vi-VN")
+//           : "",
+//       };
+
+//       if (
+//         doc.subType === "PROPOSE_REPAIR" &&
+//         doc.meta?.items?.length
+//       ) {
+//         for (const item of doc.meta.items) {
+//           const row = worksheet.addRow({
+//             ...baseData,
+//             deviceName: item.deviceName || "",
+//             quantity: item.quantity || "",
+//             note: item.note || "",
+//             serviceDate: "",
+//             actualCost: "",
+//           });
+
+//           row.eachCell((cell: any) => {
+//             cell.alignment = { wrapText: true };
+//           });
+
+//           row.commit();
+//         }
+//       } else {
+//         worksheet.addRow({
+//           ...baseData,
+//         }).commit();
+//       }
+//     }
+
+//     await workbook.commit();
+//     console.log("✅ EXPORT DONE");
+    
+//     return res.status(200).json({
+//       success: true,
+//       message: "Export thành công",
+//       downloadUrl: `../Export/document/${fileName}`,
+//     });
+
+//   } catch (error) {
+//     console.error("❌ EXPORT SERVICE ERROR:", error);
+//     throw error;
+//   }
+// };

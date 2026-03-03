@@ -76,6 +76,7 @@ USER	Chỉ sửa document do mình tạo & chưa duyệt
 
 
 //Lệnh cài đặt packeg npm i --save-dev @types/compression
+//npm create vite@latest frontend lệnh tạo froned
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -106,12 +107,13 @@ Giấy đề xuất sửa chửa
 POST /api/documents
 Authorization: Bearer <token>
 
+Mẫu đề xuất sửa chữa thiết bị
 {
   "category": "PROPOSAL",
   "subType": "PROPOSE_REPAIR",
   "title": "Giấy đề xuất sửa chữa thiết bị",
   "department": "64ff...",
-  "referenceTo": "documentId_bien_ban",
+  "referenceTo": "",
   "meta": {
     "items": [
       {
@@ -129,9 +131,36 @@ Mẫu đề xuất thay mực
   "subType": "PROPOSE_INK",
   "title": "Đề xuất thay mực máy in",
   "meta": {
+    "items": [
+      {
+        "deviceName": "Máy vi tính",
+        "quantity": 1,
+        "note": "Hỏng nguồn, CPU"
+      }
+    ]
+  }
+}
+
+Biên bản xác nhận tình trang thay mực
+{
+  "category": "REPORT",
+  "subType": "CONFIRM_STATUS",
+  "title": "Biên bản xác nhận tình trạng thiết bị",
+  "department": "depId",
+  "createdBy": "userId",
+  "meta": {
+    "checkDate": "2026-02-03",
+    "location": "Khoa Nội Cơ Xương Khớp",
+    "representatives": {
+      "departmentRep": "Trần Thị Ngọc Hạnh",
+      "inspector": "Đỗ Mạnh Cường"
+    },
     "device": {
-      "name": "Hộp mực HP",
+      "name": "Hộp mực máy in",
+      "relatedDevice": "Máy in HP",
       "quantity": 1
-    }
+    },
+    "inspectionResult": "Khi in giấy bị đen đường dọc",
+    "proposedSolution": "Thay drum và gạt lớn hộp mực"
   }
 }

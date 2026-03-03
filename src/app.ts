@@ -4,6 +4,7 @@ import helmet from "helmet";
 import compression from "compression";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
+import cookieParser from "cookie-parser";
 
 import documentRoutes from "./routes/document.route";
 import departmentRoutes from "./routes/department.routes";
@@ -11,6 +12,8 @@ import authRoutes from "./routes/auth.routes";
 import userRoutes from "./routes/user.routes";
 import userAuditRoutes from "./routes/userAudit.routes";
 import performanceRoutes from "./routes/performance.routes";
+import dashboardRoutes from "./routes/dashboard.route";
+import exportRoutes from "./routes/export-excel.route"
 
 import { performanceMiddleware } from "./middlewares/performance.middleware";
 import { errorHandler } from "./middlewares/error.middleware";
@@ -25,7 +28,7 @@ app.use(helmet());
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    origin: process.env.CLIENT_URL,
     methods: ["GET", "POST", "PATCH", "DELETE", "PUT"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
@@ -36,7 +39,7 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 // Nén response để cải thiện hiệu suất
 app.use(compression());
-
+app.use(cookieParser());
 
 // Ghi log chi tiết trong development
 if (process.env.NODE_ENV === "development") {
@@ -71,6 +74,8 @@ app.use("/api/auths", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/user-audits", userAuditRoutes);
 app.use("/api/performances", performanceRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/export", exportRoutes);
 
 /* ===============================
    ❌ GLOBAL ERROR HANDLER

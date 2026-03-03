@@ -53,20 +53,20 @@ export class AuthService {
     // );
 
     const accessToken = generateAccessToken({
-        id: user._id.toString(),
-        role: user.role,
-        department: user.department
-      });
+      id: user._id.toString(),
+      role: user.role,
+      department: user.department
+    });
 
     const refreshToken = generateRefreshToken(user._id.toString());
-    
+
     // Lưu refresh token vào database để quản lý (có thể thêm trường revoked để thu hồi token khi cần)
     await RefreshToken.create({
       user: user._id,
       token: refreshToken,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     });
-    
+
     // Ghi log audit
     await UserAudit.create({
       user: user._id,
@@ -203,7 +203,7 @@ export class AuthService {
     }
 
     await PasswordResetToken.deleteMany({ user: user._id });
-    
+
     const rawToken = generateResetToken();
     const hashedToken = hashResetToken(rawToken);
     // const rawToken = crypto.randomBytes(32).toString("hex");

@@ -53,7 +53,7 @@ export const performanceMiddleware = (req: Request, res: Response, next: NextFun
     };
 
     // 🔹 log console
-    console.log("API PERF", data);
+    // console.log("API PERF", data);
 
     // 🔹 lưu DB async (không await)
     ApiPerformanceModel.create(data).catch(() => {});

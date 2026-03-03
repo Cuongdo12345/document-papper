@@ -41,6 +41,10 @@ export interface IDocument {
   /** Dữ liệu động theo từng loại giấy */
   meta: Record<string, any>;
 
+  serviceDate?: Date;
+  actualCost?: number;
+  repairStatus?: "PENDING" | "IN_PROGRESS" | "DONE";
+
   signedBy?: {
     role: string;
     user?: Types.ObjectId;
@@ -88,7 +92,7 @@ const DocumentSchema = new Schema<IDocument>(
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      // required: true,
     },
 
     updatedBy:{
@@ -102,6 +106,22 @@ const DocumentSchema = new Schema<IDocument>(
     },
 
     deletedAt: {type: Date, default: undefined},
+
+    serviceDate: {
+      type: Date,
+      index: true,
+    },
+
+    actualCost: {
+      type: Number,
+    },
+
+    repairStatus: {
+      type: String,
+      enum: ["PENDING", "IN_PROGRESS", "DONE"],
+      default: "PENDING",
+      index: true,
+    },
 
     // status: {
     //   type: String,
@@ -130,6 +150,7 @@ const DocumentSchema = new Schema<IDocument>(
         signedAt: Date,
       },
     ],
+    
     createdAt: { type: Date, default: Date.now() },
     updatedAt: { type: Date, default: Date.now() }, 
   },
@@ -158,8 +179,8 @@ DocumentSchema.index({ referenceTo: 1 });
  */
 DocumentSchema.index({
   department: 1,
-  subtype: 1,
-  status: 1,
+  subType: 1,
+  // status: 1,
   createdAt: -1,
 });
 

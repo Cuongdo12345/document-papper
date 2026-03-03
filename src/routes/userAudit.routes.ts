@@ -10,12 +10,7 @@ import {performanceMiddleware} from "../middlewares/performance.middleware";
 const router = Router();
 
 // router.get("/:userId",authenticate,authorize("ADMIN"), getUserAudit);
-router.get(
-  "/",
-  authenticate,
-  authorizePermission("AUDIT_VIEW"),
-  getAuditLogs
-);
+router.get("/", authenticate, authorizePermission("AUDIT_VIEW"), getAuditLogs);
 router.get("/dashboard",authenticate, authorizePermission("AUDIT_VIEW_DASHBOARD"), getAuditDashboard);
 
 export default router;

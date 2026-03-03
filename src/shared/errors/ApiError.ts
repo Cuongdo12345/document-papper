@@ -45,15 +45,14 @@ export default class ApiError extends Error {
   static conflict(message = "Conflict") {
     return new ApiError(409, message, "CONFLICT");
   }
-//✅ Thêm phương thức 429 Too Many Requests
+//✅ Thêm phương thức 500 Internal Server Error
   static internal(message = "Internal server error", details?: any) {
     return new ApiError(500, message, "INTERNAL_ERROR", details);
   }
 
-  // ✅ THÊM CÁI NÀY
+  // ✅ Thêm phương thức 429 Too Many Requests
   static tooManyRequests(message = "Too many requests") {
     return new ApiError(429, message);
   }
 
-    // ✅ THÊM CÁI NÀY
 }
