@@ -737,6 +737,365 @@ Repair Workflow System
 
 ---
 
+Tuyệt 👍 Sau khi đọc structure backend của bạn, mình sẽ làm **3 phần giá trị nhất cho dự án** dựa **trực tiếp trên code architecture bạn đang có**, không phải lý thuyết chung.
+
+Mình sẽ làm:
+
+1️⃣ **ERD Database chuẩn từ code thật**
+2️⃣ **Document Workflow Engine Diagram chuẩn hệ thống của bạn**
+3️⃣ **Admin UI Architecture (match 100% backend)**
+
+---
+
+# 1️⃣ ERD Database (chuẩn theo code project)
+
+Dựa trên các model bạn có:
+
+* user.model
+* department.model
+* document.model
+* userAudit.model
+* refreshToken.model
+* passwordResetToken.model
+* counter.model
+* apiPerformance.model
+
+Sơ đồ ERD:
+
+```
+                           ┌────────────────────┐
+                           │     Departments    │
+                           │────────────────────│
+                           │ _id                │
+                           │ name               │
+                           │ code               │
+                           │ createdAt          │
+                           └─────────┬──────────┘
+                                     │
+                                     │
+                                     ▼
+                           ┌────────────────────┐
+                           │       Users        │
+                           │────────────────────│
+                           │ _id                │
+                           │ name               │
+                           │ email              │
+                           │ password           │
+                           │ role               │
+                           │ permissions[]      │
+                           │ departmentId       │
+                           │ createdAt          │
+                           └─────────┬──────────┘
+                                     │
+                                     │ createdBy
+                                     ▼
+                           ┌───────────────────────────┐
+                           │        Documents          │
+                           │───────────────────────────│
+                           │ _id                       │
+                           │ documentCode              │
+                           │ category                  │
+                           │ subType                   │
+                           │ departmentId              │
+                           │ createdBy                 │
+                           │ repairStatus              │
+                           │ signedBy[]                │
+                           │ referenceTo               │
+                           │ meta                      │
+                           │ createdAt                 │
+                           └───────────┬───────────────┘
+                                       │
+                                       │ referenceTo
+                                       ▼
+                           ┌───────────────────────────┐
+                           │        Documents          │
+                           │        (Report)           │
+                           └───────────────────────────┘
+
+
+                 ┌──────────────────────────┐
+                 │       UserAudits         │
+                 │──────────────────────────│
+                 │ userId                   │
+                 │ action                   │
+                 │ endpoint                 │
+                 │ method                   │
+                 │ ipAddress                │
+                 │ timestamp                │
+                 └──────────────┬───────────┘
+                                │
+                                ▼
+                           ┌──────────────┐
+                           │     Users    │
+                           └──────────────┘
+
+
+        ┌───────────────────────┐
+        │     RefreshTokens     │
+        │───────────────────────│
+        │ userId                │
+        │ token                 │
+        │ expiresAt             │
+        └──────────────┬────────┘
+                       │
+                       ▼
+                     Users
+
+
+        ┌──────────────────────────┐
+        │   PasswordResetTokens    │
+        │──────────────────────────│
+        │ userId                   │
+        │ token                    │
+        │ expiresAt                │
+        └──────────────┬───────────┘
+                       │
+                       ▼
+                     Users
+
+
+        ┌──────────────────────────┐
+        │        Counters          │
+        │──────────────────────────│
+        │ key                      │
+        │ seq                      │
+        └──────────────────────────┘
+
+
+        ┌──────────────────────────┐
+        │     ApiPerformance       │
+        │──────────────────────────│
+        │ endpoint                 │
+        │ method                   │
+        │ duration                 │
+        │ timestamp                │
+        └──────────────────────────┘
+```
+
+---
+
+# 2️⃣ Document Workflow Engine (core system)
+
+Workflow thật của hệ thống bạn:
+
+```
+                    ┌────────────────────────────┐
+                    │      CREATE PROPOSAL       │
+                    │────────────────────────────│
+                    │ PROPOSE_REPAIR             │
+                    │ PROPOSE_INK                │
+                    │ PROPOSE_PROCUREMENT        │
+                    └───────────────┬────────────┘
+                                    │
+                                    │ stored in
+                                    ▼
+                           ┌──────────────────┐
+                           │     DOCUMENT     │
+                           │    (Proposal)    │
+                           └────────┬─────────┘
+                                    │
+                                    │ generate report
+                                    ▼
+                    ┌────────────────────────────┐
+                    │          REPORT            │
+                    │────────────────────────────│
+                    │ CHECK_DAMAGE               │
+                    │ CONFIRM_STATUS             │
+                    │ referenceTo = proposalId   │
+                    └───────────────┬────────────┘
+                                    │
+                                    ▼
+                    ┌────────────────────────────┐
+                    │       REPAIR WORKFLOW      │
+                    │────────────────────────────│
+                    │ repairStatus               │
+                    │                            │
+                    │  PENDING                   │
+                    │  IN_PROGRESS               │
+                    │  DONE                      │
+                    └───────────────┬────────────┘
+                                    │
+                                    ▼
+                    ┌────────────────────────────┐
+                    │        CONFIRMATION        │
+                    │────────────────────────────│
+                    │ signedBy[]                 │
+                    │ inspectionResult           │
+                    │ repair completed           │
+                    └────────────────────────────┘
+```
+
+Key logic bạn đã build:
+
+```
+Proposal
+   ↓
+Report
+   ↓
+Repair workflow
+   ↓
+Confirmation
+```
+
+---
+
+# 3️⃣ Admin UI Architecture (match backend)
+
+Dựa trên **routes + services bạn có**, UI admin nên như sau.
+
+## Admin Layout
+
+```
+Admin Dashboard
+│
+├ Dashboard
+│
+├ Document Management
+│   ├ Proposals
+│   │   ├ Repair Proposals
+│   │   ├ Ink Proposals
+│   │   └ Procurement Proposals
+│   │
+│   ├ Reports
+│   │   ├ Check Damage
+│   │   └ Confirm Status
+│   │
+│   └ Repair Tracking
+│
+├ Departments
+│
+├ Users
+│
+├ Audit Logs
+│
+├ Performance Monitoring
+│
+└ Excel Export
+```
+
+---
+
+## Dashboard UI
+
+```
+Dashboard
+│
+├ Total Repair Requests
+├ Total Ink Requests
+├ Total Procurement Requests
+│
+├ Monthly Statistics
+│
+├ Repair Status Chart
+│
+└ Department Statistics
+```
+
+---
+
+## Document Workflow UI
+
+```
+Documents
+│
+├ Create Proposal
+│
+├ Proposal List
+│
+├ Proposal Detail
+│
+│    Proposal Info
+│    Related Report
+│
+├ Create Report
+│
+├ Repair Status
+│
+└ Sign Confirmation
+```
+
+---
+
+## User Management UI
+
+```
+Users
+│
+├ User List
+├ Create User
+├ Update User
+├ Assign Role
+├ Assign Permissions
+```
+
+---
+
+## Department Management
+
+```
+Departments
+│
+├ Department List
+├ Create Department
+├ Update Department
+└ Sync From Excel
+```
+
+---
+
+## Audit Log UI
+
+```
+Audit Logs
+│
+├ User
+├ Endpoint
+├ Action
+├ IP
+└ Timestamp
+```
+
+---
+
+# 4️⃣ Full System Flow (toàn bộ hệ thống)
+
+```
+User
+  │
+  ▼
+Login
+  │
+  ▼
+JWT Auth
+  │
+  ▼
+API Request
+  │
+  ▼
+Middleware Layer
+  │
+  ▼
+Controller
+  │
+  ▼
+Service
+  │
+  ▼
+MongoDB
+  │
+  ▼
+Document Workflow Engine
+  │
+  ▼
+Repair Lifecycle
+  │
+  ▼
+Dashboard Analytics
+  │
+  ▼
+Excel Export
+```
+
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
