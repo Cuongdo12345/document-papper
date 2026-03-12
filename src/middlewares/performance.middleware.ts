@@ -22,11 +22,15 @@ declare global {
  * - Xác định API chậm nếu tổng thời gian > 800ms
  * - Lưu thông tin vào MongoDB (không await để tránh ảnh hưởng hiệu năng)
  * - Log chi tiết ra console để dễ dàng theo dõi
- * @param req 
- * @param res 
- * @param next 
+ * @param req
+ * @param res
+ * @param next
  */
-export const performanceMiddleware = (req: Request, res: Response, next: NextFunction) => {
+export const performanceMiddleware = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   req.perf = {
     start: Date.now(),
     dbTime: 0,

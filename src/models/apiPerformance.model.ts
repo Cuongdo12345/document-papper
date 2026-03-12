@@ -16,7 +16,7 @@ const ApiPerformanceSchema = new Schema(
 
     isSlow: Boolean,
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 ApiPerformanceSchema.index({ endpoint: 1 });
@@ -24,5 +24,5 @@ ApiPerformanceSchema.index({ createdAt: -1 });
 
 export const ApiPerformanceModel = model(
   "ApiPerformance",
-  ApiPerformanceSchema
+  ApiPerformanceSchema,
 );

@@ -6,7 +6,7 @@ import RefreshToken from "../models/refreshToken.model";
 import { createUserSchema } from "../dtos/user.dto";
 import ApiError from "../shared/errors/ApiError";
 
-export class UserService {
+// export class UserService {
 
   /**
    * CREATE USER
@@ -19,16 +19,16 @@ export class UserService {
    * Nếu department không tồn tại => 404
    * 
    */
-  static async create(data: any, performedBy: string) {
-    const { username, password, fullName, role, department } =
-      createUserSchema.parse(data);
+  export const create = async (data: any, performedBy: string) => {
+    const { username, password, fullName, role, department } = data;
+      // createUserSchema.parse(data);
 
     const exists = await User.findOne({ username });
     if (exists) {
       throw new ApiError(409, "Username đã tồn tại");
     }
 
-    if (role === "DEPARTMENT") {
+    if (role === "USER") {
       if (!department) throw ApiError.badRequest("User khoa phải gắn khoa");
 
       const dept = await Department.findById(department);
@@ -64,7 +64,7 @@ export class UserService {
    * Nếu department filter không tồn tại => 404
    *  
    */
-  static async getList(query: any) {
+  export const getList = async(query: any) => {
     const {
       page = "1",
       limit = "10",
@@ -131,7 +131,7 @@ export class UserService {
   /**
    * GET USER BY ID
    */
-  static async getById(id: any) {
+  export const getById = async (id: any) => {
     const user = await User.findById(id)
       .select("-password")
       .populate("department", "code name");
@@ -149,10 +149,10 @@ export class UserService {
    * Trả về user đã cập nhật (không bao gồm password)
    * Nếu user không tồn tại => 404
    */
-  static async update(id: any, data: any, performedBy: any) {
+  export const update = async (id: any, data: any, performedBy: any) => {
     const { fullName, role, department, username } = data;
 
-    if (role === "DEPARTMENT" && department) {
+    if (role === "USER" && department) {
       const dept = await Department.findById(department);
       if (!dept) throw ApiError.notFound("Khoa không tồn tại");
     }
@@ -187,7 +187,7 @@ export class UserService {
    * Nếu user đã bị vô hiệu hóa => 400
    * Nếu cố gắng vô hiệu hóa ADMIN => 400
    */
-  static async disable(id: any, performedBy: any) {
+  export const disable = async (id: any, performedBy: any) => {
     const user = await User.findById(id);
     if (!user) throw ApiError.notFound("User không tồn tại");
 
@@ -218,7 +218,7 @@ export class UserService {
    * Nếu user đã được khôi phục => 400
    * Nếu cố gắng khôi phục ADMIN => 400
    */
-  static async restore(id: any, performedBy: any) {
+  export const restore = async(id: any, performedBy: any) => {
     const user = await User.findById(id);
     if (!user) throw ApiError.notFound("User không tồn tại");
 
@@ -248,11 +248,11 @@ export class UserService {
    * Nếu user đã bị vô hiệu hóa => 400
    * Nếu mật khẩu cũ không đúng => 400
    */
-  static async changePassword(
+  export const changePassword = async(
     userId: any,
     oldPassword: string,
     newPassword: string
-  ) {
+  ) => {
     const user = await User.findById(userId).select("+password");
 
     if (!user || !user.isActive) throw new ApiError(400, "User không hợp lệ");
@@ -291,11 +291,11 @@ export class UserService {
    * Thu hồi tất cả refresh token hiện tại của user để buộc đăng nhập lại với mật khẩu mới
    * Ghi log audit
    */
-  static async resetPassword(
+  export const resetPassword = async(
     targetUserId: any,
     newPassword: string,
     performedBy: any
-  ) {
+  ) => {
     const user = await User.findById(targetUserId);
 
     if (!user) throw ApiError.notFound("User không tồn tại");
@@ -327,7 +327,7 @@ export class UserService {
    * @param userId 
    * @returns 
    */
-  static async getMeService(userId: any) {
+  export const getMeService = async(userId: any) => {
 
     const user = await User.findById(userId)
       .select("-password -__v");
@@ -351,7 +351,7 @@ export class UserService {
    * @returns 
    */
 
-  static async updateMeService(userId: string, payload: any) {
+  export const updateMeService = async(userId: string, payload: any) => {
     const allowedFields = ["fullName", "username"];
 
     const updates = Object.keys(payload)
@@ -377,4 +377,4 @@ export class UserService {
 
     return updatedUser;
   }
-};
+// };

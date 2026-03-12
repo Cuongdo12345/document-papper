@@ -12,7 +12,7 @@ import { ROLE_PERMISSIONS } from "../shared/constants/rolePermission.map";
 export const authenticate = (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     //kiểm tra token
@@ -20,23 +20,19 @@ export const authenticate = (
     if (!token) {
       return res.status(401).json({ message: "Chưa đăng nhập" });
     }
-    
+
     // Giải mã tokenvà lấy thông tin user
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
-    
+
     // Lấy permissions từ role + permissions riêng của user
-    const rolePermissions =
-      ROLE_PERMISSIONS[decoded.role] || [];
+    const rolePermissions = ROLE_PERMISSIONS[decoded.role] || [];
 
     // Gắn thông tin user + permissions vào req
     req.user = {
       id: decoded.id,
       role: decoded.role,
       permissions: [
-        ...new Set([
-          ...rolePermissions,
-          ...(decoded.permissions || []),
-        ]),
+        ...new Set([...rolePermissions, ...(decoded.permissions || [])]),
       ],
     };
 
@@ -45,7 +41,6 @@ export const authenticate = (
     res.status(401).json({ message: "Token không hợp lệ" });
   }
 };
-
 
 // interface JwtPayload {
 //   id: string;
@@ -91,5 +86,3 @@ export const authenticate = (
 //     });
 //   }
 // };
-
-

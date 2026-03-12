@@ -7,12 +7,11 @@ import { Request, Response, NextFunction } from "express";
  * Gộp permissions từ role + user
  * Nếu thiếu permission => 403
  * Nếu không có token => 401
- * @param permission 
- * @returns 
+ * @param permission
+ * @returns
  */
 export const authorizePermission =
-  (permission: string) =>
-  (req: Request, res: Response, next: NextFunction) => {
+  (permission: string) => (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ message: "Chưa đăng nhập" });
     }

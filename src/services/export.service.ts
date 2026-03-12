@@ -41,7 +41,7 @@ export const exportDocumentsExcelPRO = async (query: any, res?: any) => {
     }
 
     const fileName = `Danh-sach-vat-tu_${Date.now()}.xlsx`;
-    const filePath = path.join(__dirname, `../Export/document/${fileName}`);
+    const filePath = path.join(__dirname, `../export/document/${fileName}`);
 
     // ===== SET HEADER =====
     res.setHeader(
@@ -583,17 +583,18 @@ export const importDocumentsExcel = async (fileBuffer: Buffer, userId: any) => {
   for (let i = 2; i <= sheet.rowCount; i++) {
     try {
       const row = sheet.getRow(i);
-
       const subType = row.getCell(2).value?.toString().trim();
       const departmentName = row.getCell(3).value?.toString().trim();
       const title = row.getCell(4).value?.toString().trim();
       const deviceName = row.getCell(5).value?.toString().trim();
       const createdAt = parseExcelDate(row.getCell(6).value);
       const quantity = Number(row.getCell(7).value) || 0;
-      const note = row.getCell(8).value?.toString().trim();
-      const inspectionResult = row.getCell(9).value?.toString().trim();
+      const unitPrice = Number(row.getCell(8).value) || 0;
+      const note = row.getCell(9).value?.toString().trim();
+      const inspectionResult = row.getCell(10).value?.toString().trim();
 
       // ================= VALIDATE =================
+      const totalPrice = quantity * unitPrice;
 
       if (!subType || !departmentName) {
         result.errors.push({
@@ -658,9 +659,12 @@ export const importDocumentsExcel = async (fileBuffer: Buffer, userId: any) => {
               {
                 deviceName,
                 quantity,
+                unitPrice,
+                totalPrice,
                 note,
               },
             ],
+             totalAmount: totalPrice,
           },
         });
 
@@ -671,11 +675,15 @@ export const importDocumentsExcel = async (fileBuffer: Buffer, userId: any) => {
           {
             deviceName,
             quantity,
+            unitPrice,
+            totalPrice,
             note,
           },
         ];
 
+        proposal.meta.totalAmount = totalPrice;
         await proposal.save();
+        
         result.updated++;
       }
 
@@ -773,7 +781,7 @@ export const syncDepartmentFromExcel = async (fileBuffer: Buffer) => {
       result.existed++;
       continue;
     }
-
+  
     await Department.create({
       name,
       code: generateDepartmentCode(name),

@@ -2,7 +2,19 @@ import mongoose, { Schema, Document } from "mongoose";
 
 export interface IUserAudit extends Document {
   user?: mongoose.Types.ObjectId;
-  action: "CREATE" | "UPDATE" | "DISABLE" | "RESTORE"| "LOGIN" | "LOGOUT" | "RESET_PASSWORD" | "CHANGE_PASSWORD" | "FORGOT_PASSWORD" | "AUDIT_DASHBOARD_VIEW" | "VIEW_DETAIL" | "DELETE";
+  action:
+    | "CREATE"
+    | "UPDATE"
+    | "DISABLE"
+    | "RESTORE"
+    | "LOGIN"
+    | "LOGOUT"
+    | "RESET_PASSWORD"
+    | "CHANGE_PASSWORD"
+    | "FORGOT_PASSWORD"
+    | "AUDIT_DASHBOARD_VIEW"
+    | "VIEW_DETAIL"
+    | "DELETE";
   performedBy: mongoose.Types.ObjectId;
   note?: string;
   createdAt: Date;
@@ -17,20 +29,33 @@ const UserAuditSchema = new Schema<IUserAudit>(
     },
     action: {
       type: String,
-      enum: ["CREATE", "UPDATE", "DISABLE", "RESTORE", "LOGIN", "LOGOUT","RESET_PASSWORD","CHANGE_PASSWORD","FORGOT_PASSWORD","AUDIT_DASHBOARD_VIEW","VIEW_DETAIL", "DELETE"],
-      required: true
+      enum: [
+        "CREATE",
+        "UPDATE",
+        "DISABLE",
+        "RESTORE",
+        "LOGIN",
+        "LOGOUT",
+        "RESET_PASSWORD",
+        "CHANGE_PASSWORD",
+        "FORGOT_PASSWORD",
+        "AUDIT_DASHBOARD_VIEW",
+        "VIEW_DETAIL",
+        "DELETE",
+      ],
+      required: true,
     },
     performedBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: true
+      required: true,
     },
     note: String,
     createdAt: { type: Date, default: Date.now },
   },
   {
-    timestamps: { createdAt: true, updatedAt: false }
-  }
+    timestamps: { createdAt: true, updatedAt: false },
+  },
 );
 
 // UserAuditSchema.index({ performedBy: 1 });

@@ -1,7 +1,6 @@
 /**
- * 
+ * Function tự động tạo...
  */
-
 import { Counter } from "../../models/counter.model";
 
 export const getNextSequence = async (key: string): Promise<number> => {

@@ -21,39 +21,36 @@ const passwordResetTokenSchema = new Schema<IPasswordResetToken>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      index: true
+      index: true,
     },
     token: {
       type: String,
       required: true,
       unique: true,
-      index: true
+      index: true,
     },
     expiresAt: {
       type: Date,
       required: true,
-      index: true
+      index: true,
     },
     used: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
   {
-    timestamps: true
-  }
+    timestamps: true,
+  },
 );
 
 /**
  * Tự động xoá token hết hạn (TTL index)
  * MongoDB sẽ dọn sau ~60s
  */
-passwordResetTokenSchema.index(
-  { expiresAt: 1 },
-  { expireAfterSeconds: 0 }
-);
+passwordResetTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 export default model<IPasswordResetToken>(
   "PasswordResetToken",
-  passwordResetTokenSchema
+  passwordResetTokenSchema,
 );

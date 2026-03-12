@@ -5,22 +5,22 @@ const refreshTokenSchema = new Schema(
     user: {
       type: Types.ObjectId,
       ref: "User",
-      required: true
+      required: true,
     },
     token: {
       type: String,
-      required: true
+      required: true,
     },
     expiresAt: {
       type: Date,
-      required: true
+      required: true,
     },
     revoked: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 export default model("RefreshToken", refreshTokenSchema);

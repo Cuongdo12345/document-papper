@@ -1,5 +1,5 @@
 // import { Schema, model, Types } from "mongoose";
-import mongoose, { Document as MongoDoc, Schema,Types } from "mongoose";
+import mongoose, { Document as MongoDoc, Schema, Types } from "mongoose";
 
 export interface IUser extends Document {
   username: string;
@@ -20,44 +20,44 @@ const UserSchema = new Schema<IUser>(
       required: true,
       unique: true,
       // lowercase: true,
-      trim: true
+      trim: true,
     },
 
     password: {
       type: String,
-      required: true
+      required: true,
     },
 
     fullName: {
       type: String,
-      required: true
+      required: true,
     },
 
     role: {
       type: String,
       enum: ["ADMIN", "USER", "IT"],
-      default: "USER"
+      default: "USER",
     },
 
     permissions: {
-        type: [String],
-        default: [],
-},
+      type: [String],
+      default: [],
+    },
 
     department: {
       type: Types.ObjectId,
-      ref: "Department"
+      ref: "Department",
     },
 
     isActive: {
       type: Boolean,
-      default: true
+      default: true,
     },
 
     createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
+    updatedAt: { type: Date, default: Date.now },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 /**
@@ -79,7 +79,7 @@ sort createdAt	compound index
 // UserSchema.index({ role: 1 });
 // UserSchema.index({ createdAt: -1 });
 
-UserSchema.index({ username: 1 }, { unique: true }); // login
+// UserSchema.index({ username: 1 }, { unique: true }); // login
 
 UserSchema.index({ department: 1 });
 UserSchema.index({ role: 1 });
@@ -99,6 +99,5 @@ UserSchema.index({
  * Keyword search username
  */
 UserSchema.index({ username: "text" });
-
 
 export default mongoose.model<IUser>("User", UserSchema);

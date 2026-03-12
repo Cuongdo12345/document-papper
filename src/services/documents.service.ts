@@ -14,6 +14,7 @@ import { Types } from "mongoose";
 // Lưu ý: Các lỗi sẽ được throw ra để controller bắt và trả về response phù hợp
 // Service này sẽ được controller gọi khi có request tạo document mới, controller sẽ truyền payload đã được validate và đã có thông tin userId vào service này
 // Service này sẽ đảm bảo tính toàn vẹn dữ liệu và tuân thủ các quy tắc nghiệp vụ đã định nghĩa trong DOCUMENT_RULES
+
 export const createDocumentService = async (payload: {
   userId: any;
   category: DocumentCategory;
@@ -425,6 +426,40 @@ export const deleteDocumentService = async (payload: {
   await document.save();
 
   return document;
+};
+
+/**
+ * API doc delete by month
+ * @param month 
+ * @param year 
+ * @param filters 
+ * @returns 
+ */
+export const deleteDocumentsByMonthService = async (
+  month: number,
+  year: number,
+  filters: any = {}
+) => {
+  const start = new Date(year, month - 1, 1);
+
+  const end = new Date(year, month, 0, 23, 59, 59);
+
+  const query: any = {
+    createdAt: {
+      $gte: start,
+      $lte: end,
+    },
+  };
+
+  if (filters.category) query.category = filters.category;
+  if (filters.subType) query.subType = filters.subType;
+  if (filters.department) query.department = filters.department;
+
+  const result = await Document.deleteMany(query);
+
+  return {
+    deletedCount: result.deletedCount,
+  };
 };
 
 

@@ -1,10 +1,11 @@
-import { createDocumentService,
+import {createDocumentService,
         getDocumentDetailService,
         getAllDocumentsService,
         updateDocumentService,
         deleteDocumentService,
         getReportsByProposalService, 
-        restoreDocumentService
+        restoreDocumentService,
+        deleteDocumentsByMonthService
         } 
         from "../services/documents.service";
 import { Request, Response } from "express";
@@ -42,7 +43,6 @@ export const createDocuments = async (req: Request, res: Response) => {
     //   CROSS_DEPARTMENT_REFERENCE: "Biên bản khác khoa",
     //   REFERENCE_NOT_ALLOWED: "Loại giấy này không cần biên bản tham chiếu",
     // };
-
     return res.status(400).json({
       message: error.message || "Lỗi tạo document"
     });
@@ -177,6 +177,45 @@ export const deleteDocuments = async (req: Request, res: Response) => {
 
     return res.status(400).json({
       message: error.message || "Xóa tài liệu thất bại",
+    });
+  }
+};
+
+/**
+ * 
+ * @param req 
+ * @param res 
+ * @returns 
+ */
+export const deleteDocumentsByMonth = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { month, year, category, subType, department } = req.body;
+
+    if (!month || !year) {
+      return res.status(400).json({
+        success: false,
+        message: "month và year là bắt buộc",
+      });
+    }
+
+    const result = await deleteDocumentsByMonthService(
+      month,
+      year,
+      { category, subType, department }
+    );
+
+    res.json({
+      success: true,
+      message: "Xóa dữ liệu thành công",
+      data: result,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
     });
   }
 };

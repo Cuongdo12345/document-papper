@@ -71,7 +71,7 @@ const DocumentSchema = new Schema<IDocument>(
       enum: Object.values(DocumentCategory),
       required: true,
     },
-    
+
     // PROPOSAL | REPORT
     subType: {
       type: String,
@@ -95,9 +95,9 @@ const DocumentSchema = new Schema<IDocument>(
       // required: true,
     },
 
-    updatedBy:{
+    updatedBy: {
       type: Schema.Types.ObjectId,
-      ref: "User",  
+      ref: "User",
     },
 
     deletedBy: {
@@ -105,7 +105,7 @@ const DocumentSchema = new Schema<IDocument>(
       ref: "User",
     },
 
-    deletedAt: {type: Date, default: undefined},
+    deletedAt: { type: Date, default: undefined },
 
     serviceDate: {
       type: Date,
@@ -130,13 +130,13 @@ const DocumentSchema = new Schema<IDocument>(
     // },
 
     /** ⛓ CHỈ DÙNG CHO REPORT */
-   referenceTo: [
+    referenceTo: [
       {
         type: Schema.Types.ObjectId,
         ref: "Document",
         index: true,
-        default: []
-      }
+        default: [],
+      },
     ],
     meta: {
       type: Schema.Types.Mixed,
@@ -150,11 +150,11 @@ const DocumentSchema = new Schema<IDocument>(
         signedAt: Date,
       },
     ],
-    
+
     createdAt: { type: Date, default: Date.now() },
-    updatedAt: { type: Date, default: Date.now() }, 
+    updatedAt: { type: Date, default: Date.now() },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 /* ===== INDEX QUAN TRỌNG ===== */
@@ -207,6 +207,5 @@ DocumentSchema.index({ createdAt: -1 });
 //   isActive: 1,
 //   createdAt: 1,
 // });
-
 
 export const Document = model<IDocument>("Document", DocumentSchema);

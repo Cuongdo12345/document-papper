@@ -1,8 +1,5 @@
 import { Request, Response } from "express";
-import {
-  getAuditLogsService,
-  getAuditDashboardService,
-} from "../services/userAudits.service";
+import { getAuditLogsService, getAuditDashboardService } from "../services/userAudits.service";
 
 // GET USER AUDIT LOGS (ADMIN)
 // I️⃣ AUDIT LÀ GÌ TRONG BÀI TOÁN NÀY?
@@ -14,15 +11,6 @@ import {
 // Ai từ chối
 // Thời điểm
 // Trạng thái trước & sau
-// export const getUserAudit = async (req: Request, res: Response) => {
-//   const audits = await UserAudit.find({
-//     user: req.params.userId
-//   })
-//     .populate("performedBy", "username fullName role")
-//     .sort({ createdAt: -1 });
-
-//   res.json(audits);
-// };
 
 
 /**
@@ -39,6 +27,7 @@ export const getAuditLogs = async (req: Request, res: Response) => {
     });
   }
 };
+
 
 /**
  * 📊 GET AUDIT DASHBOARD
@@ -59,6 +48,15 @@ export const getAuditDashboard = async (
 };
 
 
+// export const getUserAudit = async (req: Request, res: Response) => {
+//   const audits = await UserAudit.find({
+//     user: req.params.userId
+//   })
+//     .populate("performedBy", "username fullName role")
+//     .sort({ createdAt: -1 });
+
+//   res.json(audits);
+// };
 
 
 // //Get all audit log admin

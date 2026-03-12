@@ -13,7 +13,7 @@ import userRoutes from "./routes/user.routes";
 import userAuditRoutes from "./routes/userAudit.routes";
 import performanceRoutes from "./routes/performance.routes";
 import dashboardRoutes from "./routes/dashboard.route";
-import exportRoutes from "./routes/export-excel.route"
+import exportRoutes from "./routes/export-excel.route";
 
 import { performanceMiddleware } from "./middlewares/performance.middleware";
 import { errorHandler } from "./middlewares/error.middleware";
@@ -31,12 +31,13 @@ app.use(
     origin: process.env.CLIENT_URL,
     methods: ["GET", "POST", "PATCH", "DELETE", "PUT"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true
-  })
+    credentials: true,
+  }),
 );
 
 // Tăng giới hạn kích thước body để hỗ trợ upload file lớn
 app.use(express.json({ limit: "10mb" }));
+
 // Nén response để cải thiện hiệu suất
 app.use(compression());
 app.use(cookieParser());
@@ -55,19 +56,20 @@ const authLimiter = rateLimit({
   max: 20, // giới hạn 20 request mỗi 15 phút
   message: "Too many login attempts, please try later",
 });
+
 // Chỉ áp dụng rate limit cho các route auth
 app.use("/api/auths", authLimiter);
 
 /* ===============================
    📈 PERFORMANCE TRACKING
 ================================= */
+
 // Middleware này sẽ tính thời gian xử lý của mỗi request và log ra console
 app.use(performanceMiddleware);
 
 /* ===============================
    🚀 ROUTES
 ================================= */
-
 app.use("/api/documents", documentRoutes);
 app.use("/api/departments", departmentRoutes);
 app.use("/api/auths", authRoutes);
@@ -80,6 +82,7 @@ app.use("/api/export", exportRoutes);
 /* ===============================
    ❌ GLOBAL ERROR HANDLER
 ================================= */
+
 // Middleware này sẽ bắt tất cả lỗi không được xử lý ở các route trước đó và trả về response chuẩn
 app.use(errorHandler);
 

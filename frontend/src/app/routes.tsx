@@ -12,7 +12,8 @@ import ForgotPasswordPage from "../features/auth/pages/ForgotPasswordPage"
 import ResetPasswordPage from "../features/auth/pages/ResetPasswordPage"
 
 import DashboardPage from "../features/dashboard/pages/DashboardPage"
-// import UserManagement from "../features/users/pages/UserManagement"
+import UsersPage from "../features/users/pages/UserPage"
+import UserDetailPage from "../features/users/pages/UserDetailPage"
 
 export default function AppRoutes() {
   return (
@@ -56,17 +57,12 @@ export default function AppRoutes() {
            </PrivateRoute>
         }
       >
-        { <Route path="/dashboard" element={<DashboardPage />} /> }
-
-        {/* <Route
-          path="/users"
-          element={
-            <ProtectedRoute allowedRoles={["ADMIN"]}>
-              <UserManagement />
-            </ProtectedRoute>
-          }
-        /> */}
+        {<Route path="/dashboard" element={<DashboardPage />} /> }
+        {<Route path="/users" element={<UsersPage/>}/>}
+        {<Route path="/users/:id" element={<UserDetailPage/>}/>}
       </Route>
+
+        
 
     </Routes>
   )

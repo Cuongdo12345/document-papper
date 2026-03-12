@@ -1,5 +1,14 @@
 import { Request, Response } from "express";
-import { UserService } from "../services/users.service";
+import { create, 
+  getList, 
+  getById, 
+  getMeService, 
+  update, 
+  updateMeService, 
+  disable, 
+  restore, 
+  resetPassword,
+  changePassword  } from "../services/users.service";
 
 // CONTROLLER LÀ NƠI XỬ LÝ LOGIC LIÊN QUAN ĐẾN REQUEST/RESPONSE
 // Ví dụ: validate dữ liệu đầu vào, gọi service để xử lý nghiệp vụ, trả response về client
@@ -8,7 +17,7 @@ import { UserService } from "../services/users.service";
 // ==============================================================================================================
 export const createUser = async (req: Request, res: Response) => {
   try {
-    const user = await UserService.create(req.body, req.user!.id);
+    const user = await create(req.body, req.user!.id);
 
     res.json({
       message: "Tạo user thành công",
@@ -27,7 +36,7 @@ export const createUser = async (req: Request, res: Response) => {
 // GET USERS (ADMIN)
 export const getUsers = async (req: Request, res: Response) => {
   try {
-    const result = await UserService.getList(req.query);
+    const result = await getList(req.query);
     res.json({ data: result.users, pagination: result.pagination });
   } catch (error) {
     res.status(500).json({ message: "Lỗi lấy user" });
@@ -37,7 +46,7 @@ export const getUsers = async (req: Request, res: Response) => {
 // GET USER BY ID
 export const getUserById = async (req: Request, res: Response) => {
   try {
-    const user = await UserService.getById(req.params.id);
+    const user = await getById(req.params.id);
     res.json(user);
   } catch (error: any) {
     res.status(404).json({ message: error.message });
@@ -47,7 +56,7 @@ export const getUserById = async (req: Request, res: Response) => {
 // UPDATE USER
 export const updateUser = async (req: Request, res: Response) => {
   try {
-    const updated = await UserService.update(
+    const updated = await update(
       req.params.id,
       req.body,
       req.user!.id
@@ -62,7 +71,7 @@ export const updateUser = async (req: Request, res: Response) => {
 // DELETE USER
 export const deleteUser = async (req: Request, res: Response) => {
   try {
-    await UserService.disable(req.params.id, req.user!.id);
+    await disable(req.params.id, req.user!.id);
     res.json({ message: "User đã bị vô hiệu hóa" });
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -71,7 +80,7 @@ export const deleteUser = async (req: Request, res: Response) => {
 
 export const restoreUser = async (req: Request, res: Response) => {
   try {
-    await UserService.restore(req.params.id, req.user!.id);
+    await restore(req.params.id, req.user!.id);
     res.json({ message: "Khôi phục user thành công" });
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -79,9 +88,9 @@ export const restoreUser = async (req: Request, res: Response) => {
 };
 
 // CHANGE PASSWORD
-export const changePassword = async (req: Request, res: Response) => {
+export const changePasswordUser = async (req: Request, res: Response) => {
   try {
-    await UserService.changePassword(
+    await changePassword(
       req.user!.id,
       req.body.oldPassword,
       req.body.newPassword
@@ -96,7 +105,7 @@ export const changePassword = async (req: Request, res: Response) => {
 // ADMIN RESET PASSWORD
 export const resetPasswordByAdmin = async (req: Request, res: Response) => {
   try {
-    await UserService.resetPassword(
+    await resetPassword(
       req.params.id,
       req.body.newPassword,
       req.user!.id
@@ -114,7 +123,7 @@ export const getMe = async (req: Request, res: Response, next: any) => {
 
     const userId = req.user!.id;
 
-    const user = await UserService.getMeService(userId);
+    const user = await getMeService(userId);
 
     res.json({
       success: true,
@@ -132,7 +141,7 @@ export const updateMe = async (req: Request, res: Response, next: any) => {
 
     const userId = req.user!.id;
 
-    const updatedUser = await UserService.updateMeService(
+    const updatedUser = await updateMeService(
       userId,
       req.body
     );
