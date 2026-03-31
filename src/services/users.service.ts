@@ -3,8 +3,9 @@ import User from "../models/user.model";
 import Department from "../models/department.model";
 import UserAudit from "../models/userAudit.model";
 import RefreshToken from "../models/refreshToken.model";
-import { createUserSchema } from "../dtos/user.dto";
 import ApiError from "../shared/errors/ApiError";
+
+// import { createUserSchema } from "../dtos/users/user.dto";
 
 // export class UserService {
 

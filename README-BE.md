@@ -1,4 +1,3 @@
-Mình đã **giải nén và đọc structure toàn bộ project backend của bạn**. Dự án khá đầy đủ và đúng kiểu **production backend Node.js + TypeScript + MongoDB**. Dưới đây là **phân tích kiến trúc thực tế của codebase** (không phải suy đoán nữa vì mình đã thấy cấu trúc project).
 
 ---
 
@@ -737,9 +736,6 @@ Repair Workflow System
 
 ---
 
-Tuyệt 👍 Sau khi đọc structure backend của bạn, mình sẽ làm **3 phần giá trị nhất cho dự án** dựa **trực tiếp trên code architecture bạn đang có**, không phải lý thuyết chung.
-
-Mình sẽ làm:
 
 1️⃣ **ERD Database chuẩn từ code thật**
 2️⃣ **Document Workflow Engine Diagram chuẩn hệ thống của bạn**

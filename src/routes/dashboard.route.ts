@@ -5,7 +5,8 @@ import {
     getProposalConversionByDepartment,
     getDeviceDamageTrend,
     getTopDamagedDevices,
-    getDashboardDeviceStatsData
+    getDashboardDeviceStatsData,
+    getTopDamagedInk
 } from "../controllers/dashboard.controller";
 import { authenticate } from "../middlewares/auth.middleware";
 const router = Router();
@@ -16,6 +17,7 @@ router.get("/department/:departmentId", authenticate, getDepartmentDashboard);
 router.get("/kpi/proposal-conversion", authenticate, getProposalConversionByDepartment);
 router.get("/kpi/device-damage-trend", authenticate, getDeviceDamageTrend); 
 router.get("/kpi/top-damaged-devices", authenticate, getTopDamagedDevices);
+router.get("/kpi/top-damaged-inks", authenticate, getTopDamagedInk);
 router.get("/device-stats", authenticate, getDashboardDeviceStatsData) 
 
 

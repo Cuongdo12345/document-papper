@@ -8,6 +8,8 @@ import { generateDepartmentCode } from "../shared/helpers/generate-code";
 import { parseExcelDate } from "../shared/utils/formatDate";
 import { DocumentCategory } from "../models/document.model";
 import { generateDocumentCode } from "../shared/utils/generateDocumentCode";
+import { parseInspectionJSONLike, buildInspectionText } from "../shared/helpers/parse-doc";
+import { buildMapFromReports } from "../shared/helpers/buildMapReports"
 /**
  *  Xuất Excel danh sách document
  *  Cho phép người dùng xuất danh sách document ra file Excel, có thể lọc theo tháng và năm tạo document. File Excel sẽ bao gồm các thông tin chi tiết như mã document, loại, phòng ban, tiêu đề, ngày tạo, thiết bị liên quan (nếu có), số lượng, ghi chú, ngày bảo trì và chi phí thực tế (nếu có). Điều này giúp người dùng dễ dàng lưu trữ và phân tích dữ liệu ngoài hệ thống.
@@ -15,53 +17,398 @@ import { generateDocumentCode } from "../shared/utils/generateDocumentCode";
  * @param query
  * @param res
  */
+// export const exportDocumentsExcelPRO = async (query: any, res?: any) => {
+//   try {
+//     console.log("🚀 EXPORT START");
+
+//     const { month, year } = query;
+
+//     let filter: any = {
+//       isActive: true,
+//       $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+//     };
+
+//     filter.category = "PROPOSAL";
+
+//     filter.subType = {
+//       $in: ["PROPOSE_REPAIR", "PROPOSE_INK", "PROPOSE_PROCUREMENT"],
+//     };
+
+//     // ===== SAFE DATE FILTER =====
+//     if (month && year && !isNaN(Number(month)) && !isNaN(Number(year))) {
+//       const start = new Date(Number(year), Number(month) - 1, 1);
+//       const end = new Date(Number(year), Number(month), 0, 23, 59, 59);
+
+//       filter.createdAt = { $gte: start, $lte: end };
+//     }
+
+//     const fileName = `Danh-sach-vat-tu_${Date.now()}.xlsx`;
+//     const filePath = path.join(__dirname, `../export/document/${fileName}`);
+
+//     // ===== SET HEADER =====
+//     res.setHeader(
+//       "Content-Type",
+//       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+//     );
+
+//     res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+
+//     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
+//       // stream: res,
+//       filename: filePath,
+//       useStyles: true,
+//       useSharedStrings: true,
+//     });
+
+
+//     const worksheet = workbook.addWorksheet("Document Export", {
+//       views: [{ state: "frozen", ySplit: 1 }],
+//     });
+    
+//     //Thứ tự của file excel khi export
+//     worksheet.autoFilter = {
+//       from: "A1",
+//       to: "K1",
+//     };
+
+//     worksheet.columns = [
+//       { header: "Mã giấy", key: "documentCode", width: 25 },
+//       { header: "Loại giấy", key: "subType", width: 20 },
+//       { header: "Khoa", key: "department", width: 25 },
+//       { header: "Tiêu đề", key: "title", width: 35 },
+//       { header: "Ngày tạo", key: "createdAt", width: 15 },
+//       { header: "Tên thiết bị", key: "deviceName", width: 25 },
+//       { header: "Số lượng", key: "quantity", width: 5 },
+//       { header: "Ghi chú", key: "note", width: 30 },
+//       { header: "Đơn giá", key: "unitPrice", width: 15 },
+//       { header: "Số tiền", key: "totalPrice", width: 18 },
+//       { header: "Kiểm tra", key: "inspectionResult", width: 50 },
+//       { header: "Tiền kiểm tra", key: "reportTotal", width: 15 },
+//     ];
+
+    
+//     // ===== LOAD CONFIRM_STATUS MAP =====
+//     const confirmStatusDocs = await Document.find({
+//       subType: "CONFIRM_STATUS",
+//       isActive: true,
+//     })
+//       // .select("referenceTo meta.inspectionResult")
+//       .select("referenceTo meta.items")
+//       .lean();
+
+//     // const confirmMap = new Map<string, string>();
+//     const confirmMap = new Map<string, any>();
+//     for (const report of confirmStatusDocs) {
+//       if (report.referenceTo?.length) {
+//         const proposalId = report.referenceTo[0].toString();
+//         const data = buildInspectionText(report.meta?.items || []);
+//         confirmMap.set(proposalId, data);
+//         // confirmMap.set(proposalId, report.meta?.inspectionResult || "");
+//       }
+//     }
+    
+//     //code phần array items
+//     // const confirmMap = new Map<string, any[]>();
+//     // for (const report of confirmStatusDocs) {
+//     //   if (report.referenceTo?.length) {
+//     //     const proposalId = report.referenceTo[0].toString();
+
+//     //     confirmMap.set(
+//     //       proposalId,
+//     //       report.meta?.items || []
+//     //     );
+//     //   }
+//     // }
+
+//     // ===== LOAD CHECK_DAMAGE MAP =====
+//     const checkDamageDocs = await Document.find({
+//       subType: "CHECK_DAMAGE",
+//       isActive: true,
+//     })
+//       // .select("referenceTo meta.inspectionResult")
+//       .select("referenceTo meta.items")
+//       .lean();
+
+//     // const checkDamageMap = new Map<string, string>();
+//     const checkDamageMap = new Map<string, any>();
+//     //Trường hợp 1 refernceTo
+//     for (const report of checkDamageDocs) {
+//       if (report.referenceTo?.length) {
+//         const proposalId = report.referenceTo[0].toString();
+//         const data = buildInspectionText(report.meta?.items || []);
+//         checkDamageMap.set(proposalId, data);
+//         //phần lấy 1 giá trị string
+//         // checkDamageMap.set(proposalId, report.meta?.inspectionResult || "");
+//       }
+//     }
+
+//     //Trường hợp nhiều refer
+//     //     for (const report of checkDamageDocs) {
+//     //         if (report.referenceTo?.length) {
+//     //             for (const refId of report.referenceTo) {
+//     //             inspectionMap.set(
+//     //                 refId.toString(),
+//     //                 report.meta?.inspectionResult || ""
+//     //       );
+//     //     }
+//     //   }
+//     // }
+
+//     const cursor = Document.find(filter)
+//       .sort ({createdAt: 1, department: 1, subType: 1})
+//       .populate("department", "name")
+//       .lean()
+//       .cursor();
+    
+//     //Khai báo tính tổng
+//     // let repairTotal = 0;
+//     let inkTotal = 0;
+//     let procurementTotal = 0;
+//     let reportTotal = 0;
+//     let reportGrandTotal = 0;
+
+//     for await (const doc of cursor as any) {
+//       //code dạng string ở đây
+//       let inspectionResult = "";
+//       if (doc.subType === "PROPOSE_INK") {
+//         // inspectionResult = confirmMap.get(doc._id.toString()) || "";
+//         const data = confirmMap.get(doc._id.toString());
+//                     inspectionResult = data?.text || "";
+//                     reportTotal = data?.total || 0;
+//       }
+
+//       // let confirmItems: any[] = [];
+//       // if (doc.subType === "PROPOSE_INK") {
+//       //   confirmItems = confirmMap.get(doc._id.toString()) || [];
+//       // }
+
+//       if (doc.subType === "PROPOSE_REPAIR") {
+//         // inspectionResult = checkDamageMap.get(doc._id.toString()) || "";
+//         const data = checkDamageMap.get(doc._id.toString());
+//                     inspectionResult = data?.text || "";
+//                     reportTotal = data?.total || 0;
+//       }
+//       const baseData = {
+//         documentCode: doc.documentCode || "",
+//         // category: doc.category || "",
+//         subType: doc.subType || "",
+//         department: doc.department?.name || "",
+//         title: doc.title || "",
+//         createdAt: doc.createdAt
+//           ? new Date(doc.createdAt).toLocaleDateString("vi-VN")
+//           : "",
+//         inspectionResult,
+//         // reportStatus: inspectionResult ? "Đã có report" : "Chưa có report"
+//       };
+      
+//       //Code logic lấy theo [] dạng items
+//       // let items = doc.meta?.items || [];
+//       // if (doc.subType === "PROPOSE_INK" && confirmItems.length) {
+//       //   items = confirmItems;
+//       // }
+      
+//       //kiểu lấy items array 
+//       // if (items.length) { 
+//       if(doc.meta?.items?.length){
+//         // doc.meta?.items?.length 
+//         for (const item of doc.meta.items) {
+//         // for(const item of items){
+//           const totalPrice = item.totalPrice || (item.quantity || 0) * (item.unitPrice || 0);
+//             // if (doc.subType === "PROPOSE_REPAIR") repairTotal += totalPrice;
+//             if (doc.subType === "PROPOSE_INK") inkTotal += totalPrice;
+//             if (doc.subType === "PROPOSE_PROCUREMENT") procurementTotal += totalPrice;
+
+//             reportGrandTotal += reportTotal
+
+//           const row = worksheet.addRow({
+//             ...baseData,
+//             deviceName: item.deviceName || "",
+//             quantity: item.quantity || "",
+//             unitPrice: item.unitPrice || 0,
+//             totalPrice,
+//             note: item.note || "",
+//             serviceDate: "",
+//             inspectionResult,
+//             reportTotal
+//           });
+          
+//           //format tiền VND
+//           row.getCell("reportTotal").numFmt = '#,##0 "VND"';
+//           row.getCell("unitPrice").numFmt = '#,##0 "VND"';
+//           row.getCell("totalPrice").numFmt = '#,##0 "VND"';
+
+//           row.eachCell((cell: any) => {
+//             cell.alignment = { wrapText: true };
+//           });
+
+//           row.commit();
+//         }
+//       } else {
+//         worksheet
+//           .addRow({
+//             ...baseData,
+//           })
+//           .commit();
+//       }
+//     }
+    
+//     //Thêm dòng trống
+//     worksheet.addRow([]).commit();
+    
+//     //====Tổng sửa chữa====
+//       // const repairRow = worksheet.addRow([
+//       //   "",
+//       //   "",
+//       //   "",
+//       //   "",
+//       //   "",
+//       //   "",
+//       //   "",
+//       //   "",
+//       //   "Tổng sửa chữa",
+//       //   repairTotal,
+//       // ]);
+//       // //Format vnd
+//       // repairRow.getCell(10).numFmt = '#,##0 "VND"';
+//       // repairRow.getCell(9).font = { bold: true };
+//       // repairRow.commit();
+      
+//       //====Tổng sạc mực====
+//       const inkRow = worksheet.addRow([
+//         "",
+//         "",
+//         "",
+//         "",
+//         "",
+//         "",
+//         "",
+//         "",
+//         "Tổng sạc mực",
+//         inkTotal,
+//       ]);
+//       //Format vnd
+//       inkRow.getCell(10).numFmt = '#,##0 "VND"';
+//       inkRow.getCell(9).font = { bold: true };
+//       inkRow.commit();
+      
+//       //====Tổng dự trù====
+//       const procurementRow = worksheet.addRow([
+//         "",
+//         "",
+//         "",
+//         "",
+//         "",
+//         "",
+//         "",
+//         "",
+//         "Tổng dự trù",
+//         procurementTotal,
+//       ]);
+//        //Format vnd
+//       procurementRow.getCell(10).numFmt = '#,##0 "VND"';
+//       procurementRow.getCell(9).font = { bold: true };
+//       procurementRow.commit();
+
+
+//       //====Tổng sửa chữa====
+//       const reportTotalRow = worksheet.addRow([
+//         "",
+//         "",
+//         "",
+//         "",
+//         "",
+//         "",
+//         "",
+//         "",
+//         "Tổng sửa chữa, thay thế",
+//         reportGrandTotal,
+//       ]);
+//       //Format vnd
+//       reportTotalRow.getCell(10).numFmt = '#,##0 "VND"';
+//       reportTotalRow.getCell(9).font = { bold: true };
+//       reportTotalRow.commit();
+      
+//       //====Tổng toàn bộ tiền===
+//       const grandTotal = inkTotal + procurementTotal + reportGrandTotal;
+//       const totalRow = worksheet.addRow([
+//         "",
+//         "",
+//         "",
+//         "",
+//         "",
+//         "",
+//         "",
+//         "",
+//         "TỔNG TẤT CẢ",
+//         grandTotal
+//       ]);
+//       totalRow.getCell(10).numFmt = '#,##0 "VND"';
+//       // totalRow.getCell(9).font = { bold: true, size: 12 };
+//       totalRow.eachCell((cell) => {
+//         cell.font = { bold: true };
+//         cell.fill = {
+//           type: "pattern",
+//           pattern: "solid",
+//           fgColor: { argb: "FFF2F2F2" },
+//         };
+//       });
+//       totalRow.commit();
+     
+//     await workbook.commit();
+//     console.log("✅ EXPORT DONE");
+//   } catch (error) {
+//     console.error("❌ EXPORT SERVICE ERROR:", error);
+//     throw error;
+//   }
+//     //  return res.status(200).json({
+//     //     success: true,
+//     //     message: "Export thành công"
+//     //     // downloadUrl: `../export/document/${__dirname}`,
+//     //   });
+// };
+
 export const exportDocumentsExcelPRO = async (query: any, res?: any) => {
   try {
-    console.log("🚀 EXPORT START");
-
     const { month, year } = query;
 
-    let filter: any = {
+    const filter: any = {
       isActive: true,
+      category: "PROPOSAL",
+      subType: {
+        $in: ["PROPOSE_REPAIR", "PROPOSE_INK", "PROPOSE_PROCUREMENT"],
+      },
       $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
     };
 
-    filter.category = "PROPOSAL";
-
-    filter.subType = {
-      $in: ["PROPOSE_REPAIR", "PROPOSE_INK", "PROPOSE_PROCUREMENT"],
-    };
-
-    // ===== SAFE DATE FILTER =====
-    if (month && year && !isNaN(Number(month)) && !isNaN(Number(year))) {
-      const start = new Date(Number(year), Number(month) - 1, 1);
-      const end = new Date(Number(year), Number(month), 0, 23, 59, 59);
-
+    // ===== DATE FILTER =====
+    if (month && year && !isNaN(month) && !isNaN(year)) {
+      const start = new Date(year, month - 1, 1);
+      const end = new Date(year, month, 0, 23, 59, 59);
       filter.createdAt = { $gte: start, $lte: end };
     }
 
-    const fileName = `Danh-sach-vat-tu_${Date.now()}.xlsx`;
-    const filePath = path.join(__dirname, `../export/document/${fileName}`);
-
-    // ===== SET HEADER =====
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    );
-
-    res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+     const fileName = `Danh-sach-vat-tu_${Date.now()}.xlsx`;
+        const filePath = path.join(__dirname, `../export/document/${fileName}`);
+    
+        // ===== SET HEADER =====
+        res.setHeader(
+          "Content-Type",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        );
+    
+        res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
 
     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
-      // stream: res,
       filename: filePath,
       useStyles: true,
       useSharedStrings: true,
     });
 
-    const worksheet = workbook.addWorksheet("Document Export", {
+    const worksheet = workbook.addWorksheet("Export", {
       views: [{ state: "frozen", ySplit: 1 }],
     });
-
+    
+    //Thứ tự của file excel khi export
     worksheet.autoFilter = {
       from: "A1",
       to: "K1",
@@ -73,141 +420,164 @@ export const exportDocumentsExcelPRO = async (query: any, res?: any) => {
       { header: "Khoa", key: "department", width: 25 },
       { header: "Tiêu đề", key: "title", width: 35 },
       { header: "Ngày tạo", key: "createdAt", width: 15 },
-      { header: "Tên thiết bị", key: "deviceName", width: 30 },
-      { header: "Số lượng", key: "quantity", width: 10 },
-      { header: "Ghi chú", key: "note", width: 40 },
-      { header: "Kiểm tra", key: "inspectionResult", width: 35 },
-      // { header: "Ngày sửa chữa", key: "serviceDate", width: 18 },
-      // { header: "Trạng thái biên bản", key: "reportStatus", width: 20 }
-      // { header: "Actual Cost", key: "actualCost", width: 18 },
-      // { header: "Category", key: "category", width: 15 },
+      { header: "Thiết bị", key: "deviceName", width: 25 },
+      { header: "SL", key: "quantity", width: 8 },
+      { header: "Đơn giá", key: "unitPrice", width: 15 },
+      { header: "Thành tiền", key: "totalPrice", width: 18 },
+      { header: "Ghi chú", key: "note", width: 30 },
+      { header: "Kiểm tra", key: "inspectionResult", width: 40 },
+      { header: "Tiền kiểm tra", key: "reportTotal", width: 15 },
     ];
 
-    // ===== LOAD CONFIRM_STATUS MAP =====
-    const confirmStatusDocs = await Document.find({
-      subType: "CONFIRM_STATUS",
-      isActive: true,
-    })
-      .select("referenceTo meta.inspectionResult")
-      .lean();
-
-    const confirmMap = new Map<string, string>();
-
-    for (const report of confirmStatusDocs) {
-      if (report.referenceTo?.length) {
-        const proposalId = report.referenceTo[0].toString();
-        confirmMap.set(proposalId, report.meta?.inspectionResult || "");
-      }
-
-      //         if (report.referenceTo?.length) {
-      //             for (const refId of report.referenceTo) {
-      //             confirmMap.set(refId.toString(), {
-      //                 inspectionResult: report.meta?.inspectionResult || "",
-      //                 proposedSolution: report.meta?.proposedSolution || "",
-      //             });
-      //             }
-      //   }
-    }
-
-    // ===== LOAD CHECK_DAMAGE MAP =====
-    const checkDamageDocs = await Document.find({
-      subType: "CHECK_DAMAGE",
-      isActive: true,
-    })
-      .select("referenceTo meta.inspectionResult")
-      .lean();
-
-    const checkDamageMap = new Map<string, string>();
-
-    //Trường hợp 1 refernceTo
-    for (const report of checkDamageDocs) {
-      if (report.referenceTo?.length) {
-        const proposalId = report.referenceTo[0].toString();
-        checkDamageMap.set(proposalId, report.meta?.inspectionResult || "");
-      }
-    }
-
-    //Trường hợp nhiều refer
-    //     for (const report of checkDamageDocs) {
-    //         if (report.referenceTo?.length) {
-    //             for (const refId of report.referenceTo) {
-    //             inspectionMap.set(
-    //                 refId.toString(),
-    //                 report.meta?.inspectionResult || ""
-    //       );
-    //     }
-    //   }
-    // }
+    // ===== LOAD MAP SONG SONG =====
+    const [confirmMap, checkDamageMap] = await Promise.all([
+      buildMapFromReports("CONFIRM_STATUS"),
+      buildMapFromReports("CHECK_DAMAGE"),
+    ]);
 
     const cursor = Document.find(filter)
+      .sort({ createdAt: 1 })
       .populate("department", "name")
       .lean()
       .cursor();
 
+    let totals = {
+      ink: 0,
+      procurement: 0,
+      report: 0,
+    };
+
     for await (const doc of cursor as any) {
-      let inspectionResult = "";
+      const reportData =
+        doc.subType === "PROPOSE_INK"
+          ? confirmMap.get(doc._id.toString())
+          : checkDamageMap.get(doc._id.toString());
 
-      if (doc.subType === "PROPOSE_INK") {
-        inspectionResult = confirmMap.get(doc._id.toString()) || "";
-      }
+      const inspectionResult = reportData?.text || "";
+      const reportTotal = reportData?.total || 0;
 
-      if (doc.subType === "PROPOSE_REPAIR") {
-        inspectionResult = checkDamageMap.get(doc._id.toString()) || "";
-      }
-      const baseData = {
-        documentCode: doc.documentCode || "",
-        // category: doc.category || "",
-        subType: doc.subType || "",
+      const base = {
+        documentCode: doc.documentCode,
+        subType: doc.subType,
         department: doc.department?.name || "",
-        title: doc.title || "",
+        title: doc.title,
         createdAt: doc.createdAt
           ? new Date(doc.createdAt).toLocaleDateString("vi-VN")
           : "",
         inspectionResult,
-        // reportStatus: inspectionResult ? "Đã có report" : "Chưa có report"
+        reportTotal,
       };
 
-      if (
-        //trường hợp này là lấy duy nhất đề xuất nào đó
-        // doc.subType === "PROPOSE_REPAIR" &&
-        doc.meta?.items?.length
-      ) {
-        for (const item of doc.meta.items) {
-          const row = worksheet.addRow({
-            ...baseData,
-            deviceName: item.deviceName || "",
-            quantity: item.quantity || "",
-            note: item.note || "",
-            serviceDate: "",
-            actualCost: "",
-          });
+      if (!doc.meta?.items?.length) {
+        worksheet.addRow(base).commit();
+        continue;
+      }
 
-          row.eachCell((cell: any) => {
-            cell.alignment = { wrapText: true };
-          });
+      for (const item of doc.meta.items) {
+        const totalPrice =
+          item.totalPrice || item.quantity * item.unitPrice;
 
-          row.commit();
-        }
-      } else {
-        worksheet
-          .addRow({
-            ...baseData,
-          })
-          .commit();
+        if (doc.subType === "PROPOSE_INK") totals.ink += totalPrice;
+        if (doc.subType === "PROPOSE_PROCUREMENT") totals.procurement += totalPrice;
+        totals.report += reportTotal;
+        
+        const row = worksheet.addRow({
+          ...base,
+          deviceName: item.deviceName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice,
+          note: item.note,
+        });
+
+        ["unitPrice", "totalPrice", "reportTotal"].forEach((key) => {
+          row.getCell(key).numFmt = '#,##0 "VND"';
+        });
+
+        row.commit();
       }
     }
+      
+      //====Tổng sạc mực====
+      const inkRow = worksheet.addRow([
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "Tổng sạc mực",
+        totals.ink,
+      ]);
+      //Format vnd
+      inkRow.getCell(10).numFmt = '#,##0 "VND"';
+      inkRow.getCell(9).font = { bold: true };
+      inkRow.commit();
+      
+      //====Tổng dự trù====
+      const procurementRow = worksheet.addRow([
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "Tổng dự trù",
+        totals.procurement,
+      ]);
+       //Format vnd
+      procurementRow.getCell(10).numFmt = '#,##0 "VND"';
+      procurementRow.getCell(9).font = { bold: true };
+      procurementRow.commit();
+
+
+      //====Tổng sửa chữa====
+      const reportTotalRow = worksheet.addRow([
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "Tổng sửa chữa, thay thế",
+        totals.report,
+      ]);
+      //Format vnd
+      reportTotalRow.getCell(10).numFmt = '#,##0 "VND"';
+      reportTotalRow.getCell(9).font = { bold: true };
+      reportTotalRow.commit();
+
+    // ===== TOTAL ROW =====
+    const grand = totals.ink + totals.procurement + totals.report;
+
+    const totalRow = worksheet.addRow([
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "TỔNG",
+      grand,
+    ]);
+
+    totalRow.getCell(10).numFmt = '#,##0 "VND"';
+    totalRow.font = { bold: true };
+    totalRow.commit();
 
     await workbook.commit();
-    console.log("✅ EXPORT DONE");
-  } catch (error) {
-    console.error("❌ EXPORT SERVICE ERROR:", error);
-    throw error;
+  } catch (err) {
+    console.error(err);
+    throw err;
   }
-  //    return res.status(200).json({
-  //       success: true,
-  //       message: "Export thành công",
-  //     //   downloadUrl: `../Export/document/${fileName}`,
-  //     });
 };
 
 /**
@@ -688,8 +1058,10 @@ export const importDocumentsExcel = async (fileBuffer: Buffer, userId: any) => {
       }
 
       // ================= CREATE REPORT =================
+      const parsedInspection = parseInspectionJSONLike(inspectionResult);
 
-      if (inspectionResult) {
+      if(parsedInspection && parsedInspection.items.length){
+      // if (inspectionResult) {
         const reportSubType =
           subType === "PROPOSE_INK" ? "CONFIRM_STATUS" : "CHECK_DAMAGE";
 
@@ -719,8 +1091,10 @@ export const importDocumentsExcel = async (fileBuffer: Buffer, userId: any) => {
                 ? "Biên bản xác nhận tình trạng thiết bị"
                 : "Biên bản kiểm tra tình trạng hư hỏng",
             meta: {
-              inspectionResult,
-            },
+              inspectionResult: parsedInspection.inspectionResult,
+              items: parsedInspection.items,
+              totalAmount: parsedInspection.totalAmount,
+              },
           });
 
           result.reportsCreated++;

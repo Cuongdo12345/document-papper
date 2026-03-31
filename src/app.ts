@@ -13,7 +13,7 @@ import userRoutes from "./routes/user.routes";
 import userAuditRoutes from "./routes/userAudit.routes";
 import performanceRoutes from "./routes/performance.routes";
 import dashboardRoutes from "./routes/dashboard.route";
-import exportRoutes from "./routes/export-excel.route";
+import exportRoutes from "./routes/excel.route";
 
 import { performanceMiddleware } from "./middlewares/performance.middleware";
 import { errorHandler } from "./middlewares/error.middleware";

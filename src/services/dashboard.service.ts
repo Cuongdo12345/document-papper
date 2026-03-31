@@ -526,7 +526,88 @@ export const topDamagedDevicesService = async ({
 
     {
       $group: {
-        _id: "$meta.items.deviceName",
+        _id: "$meta.items.description",
+        totalBroken: { $sum: "$qty" },
+        totalReports: { $sum: 1 }
+      }
+    },
+
+    {
+      $project: {
+        _id: 0,
+        deviceName: "$_id",
+        totalBroken: 1,
+        totalReports: 1
+      }
+    },
+
+    { $sort: { totalBroken: -1 } },
+
+    { $limit: limit }
+  ]);
+
+  return result;
+};
+
+
+// 🏥 KPI TOP THIẾT BỊ MỰC IN HỎNG NHIỀU NHẤT
+/**
+ * Lấy top thiết bị hỏng nhiều nhất để giúp bệnh viện xác định những thiết bị nào đang gặp vấn đề thường xuyên nhất, từ đó có thể đưa ra quyết định về việc thay thế hoặc bảo trì định kỳ. Chúng ta sẽ thống kê số lượng thiết bị hỏng dựa trên các report có subType là CHECK_DAMAGE, sau đó nhóm theo tên thiết bị và tính tổng số lượng hỏng hóc của từng thiết bị. Kết quả sẽ được sắp xếp theo số lượng hỏng hóc giảm dần để dễ dàng nhận biết những thiết bị nào đang gặp vấn đề nhiều nhất.
+ * Lưu ý: Đảm bảo rằng trong hệ thống của bạn, các report về hỏng thiết bị được phân loại đúng với category là "REPORT" và subType là "CHECK_DAMAGE", và thông tin về thiết bị hỏng được lưu trữ chính xác trong meta.items để có thể lọc và thống kê chính xác.
+ * Trước khi thực hiện các truy vấn, chúng ta sẽ kiểm tra tính hợp lệ của departmentId để đảm bảo rằng nó là một ObjectId hợp lệ. Nếu không, chúng ta sẽ trả về lỗi Bad Request. Sau đó, chúng ta sẽ kiểm tra xem khoa có tồn tại hay không. Nếu không tìm thấy khoa, chúng ta sẽ trả về lỗi Not Found.
+ * Sau khi xác nhận khoa tồn tại, chúng ta sẽ thực hiện các truy vấn để lấy dữ liệu thống kê và thông tin cần thiết cho dashboard của khoa đó. Cuối cùng, chúng ta sẽ trả về một đối tượng chứa tất cả thông tin đã thu thập được để hiển thị trên dashboard.
+ * Lưu ý: Các truy vấn sử dụng aggregation để tính toán số lượng thiết bị hỏng dựa trên các report có subType là CHECK_DAMAGE, sau đó nhóm theo tên thiết bị và tính tổng số lượng hỏng hóc của từng thiết bị. Kết quả sẽ được sắp xếp theo số lượng hỏng hóc giảm dần để dễ dàng nhận biết những thiết bị nào đang gặp vấn đề nhiều nhất. Đảm bảo rằng trong hệ thống của bạn, các report về hỏng thiết bị được phân loại đúng với category là "REPORT" và subType là "CHECK_DAMAGE", và thông tin về thiết bị hỏng được lưu trữ chính xác trong meta.items để có thể lọc và thống kê chính xác.
+ * 
+ * @param param0 
+ * @returns 
+ */
+export const topDamagedInkService = async ({
+  department,
+  fromDate,
+  toDate,
+  limit = 10
+}: {
+  department?: any;
+  fromDate?: Date;
+  toDate?: Date;
+  limit?: number;
+}) => {
+
+  const match: any = {
+    category: "REPORT",
+    subType: "CONFIRM_STATUS",
+    isActive: true
+  };
+
+  if (department) match.department = department;
+
+  if (fromDate || toDate) {
+    match.createdAt = {};
+    if (fromDate) match.createdAt.$gte = new Date(fromDate);
+    if (toDate) match.createdAt.$lte = new Date(toDate);
+  }
+
+  const result = await Document.aggregate([
+
+    { $match: match },
+
+    { $unwind: "$meta.items" },
+
+    {
+      $addFields: {
+        qty: {
+          $cond: [
+            { $gt: ["$meta.items.quantity", 0] },
+            "$meta.items.quantity",
+            1
+          ]
+        }
+      }
+    },
+
+    {
+      $group: {
+        _id: "$meta.items.description",
         totalBroken: { $sum: "$qty" },
         totalReports: { $sum: 1 }
       }

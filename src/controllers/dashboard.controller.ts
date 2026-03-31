@@ -5,6 +5,7 @@ import {
   deviceDamageTrendByMonthService,
   topDamagedDevicesService,
   getDashboardDeviceStats,
+  topDamagedInkService
 } from "../services/dashboard.service";
 import { Request, Response, NextFunction } from "express";
 
@@ -93,6 +94,34 @@ export const getTopDamagedDevices = async (
     const { department, fromDate, toDate, limit } = req.query;
 
     const data = await topDamagedDevicesService({
+      department,
+      fromDate: fromDate ? new Date(String(fromDate)) : undefined,
+      toDate: toDate ? new Date(String(toDate)) : undefined,
+      limit: limit ? Number(limit) : 10,
+    });
+
+    res.json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+// 🔝 TOP DAMAGED INK
+// Endpoint này cho phép người dùng truy vấn danh sách các thiết bị bị hư hỏng nhiều nhất trong một khoảng thời gian cụ thể, có thể lọc theo phòng ban và giới hạn số lượng kết quả trả về.
+
+export const getTopDamagedInk = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { department, fromDate, toDate, limit } = req.query;
+
+    const data = await topDamagedInkService({
       department,
       fromDate: fromDate ? new Date(String(fromDate)) : undefined,
       toDate: toDate ? new Date(String(toDate)) : undefined,

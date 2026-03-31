@@ -15,7 +15,7 @@ export interface IUserAudit extends Document {
     | "AUDIT_DASHBOARD_VIEW"
     | "VIEW_DETAIL"
     | "DELETE";
-  performedBy: mongoose.Types.ObjectId;
+  performedBy?: mongoose.Types.ObjectId;
   note?: string;
   createdAt: Date;
 }
@@ -48,7 +48,7 @@ const UserAuditSchema = new Schema<IUserAudit>(
     performedBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      // required: true,
     },
     note: String,
     createdAt: { type: Date, default: Date.now },
@@ -86,6 +86,6 @@ UserAuditSchema.index({
 /**
  * DASHBOARD DATE RANGE
  */
-UserAuditSchema.index({ createdAt: -1 });
+UserAuditSchema.index({ createdAt: -1 })
 
 export default mongoose.model<IUserAudit>("UserAudit", UserAuditSchema);

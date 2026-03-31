@@ -21,7 +21,7 @@ export const exportDocumentsExcel = async (
     return res.status(200).json({
       success: true,
       message: "Export file thành công",
-      downloadUrl: `../Export/document/${fileName}`,
+      downloadUrl: `../export/document/${fileName}`,
     });
 
   } catch (error: any) {
@@ -90,13 +90,13 @@ export const syncDepartmentData = async (
 
     return res.status(200).json({
       success: true,
-      message: "Sync department thành công",
+      message: "Đồng bộ dữ liệu khoa thành công",
       data: result,
     });
   } catch (error: any) {
     return res.status(500).json({
       success: false,
-      message: error.message || "Sync thất bại",
+      message: error.message || "Đồng bộ thất bại",
     });
   }
 };

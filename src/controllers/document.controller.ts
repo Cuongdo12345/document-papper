@@ -1,255 +1,438 @@
-import {createDocumentService,
-        getDocumentDetailService,
-        getAllDocumentsService,
-        updateDocumentService,
-        deleteDocumentService,
-        getReportsByProposalService, 
-        restoreDocumentService,
-        deleteDocumentsByMonthService
-        } 
-        from "../services/documents.service";
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
+import {
+  createDocumentService,
+  getDocumentDetailService,
+  getAllDocumentsService,
+  updateDocumentService,
+  deleteDocumentService,
+  getReportsByProposalService,
+  restoreDocumentService,
+  deleteDocumentsByMonthService,
+  updateStatusService
+} from "../services/documents/document.service";
 
+import { catchAsync } from "../shared/utils/catchAsync";
 
+/* ===============================
+   CREATE
+=============================== */
+export const createDocuments = catchAsync(async (req: Request, res: Response) => {
 
-/**
- * API TẠO MỚI GIẤY ĐỀ XUẤT / BIÊN BẢN
- * Controller sẽ nhận request, gọi service để xử lý nghiệp vụ, và trả về response cho client
- * Logic chính sẽ nằm ở service, controller chỉ tập trung vào việc nhận request, gọi service, và trả về response
- * Ví dụ: nếu có logic phức tạp liên quan đến việc tạo document, ví dụ: kiểm tra điều kiện đặc biệt khi tạo document, hoặc có liên quan đến nhiều model khác nhau, thì nên chuyển vào service để dễ bảo trì và tái sử dụng
- * Ví dụ: nếu có logic liên quan đến audit khi tạo document, thì cũng nên đặt ở service để đảm bảo tính nhất quán và dễ quản lý
- * @param req 
- * @param res 
- * @returns 
- */
-export const createDocuments = async (req: Request, res: Response) => {
-  try {
+  const doc = await createDocumentService({
+    userId: req.user!.id,
+    ...req.body,
+  });
 
-    const doc = await createDocumentService({
-      userId: req.user!.id,
-      ...req.body
-    });
+  res.status(201).json({
+    success: true,
+    message: "Tạo document thành công",
+    data: doc,
+  });
+});
 
-    return res.status(201).json(doc);
+/* ===============================
+   GET DETAIL
+=============================== */
+export const getDocumentById = catchAsync(async (req: Request, res: Response) => {
 
-  } catch (error: any) {
+  const doc = await getDocumentDetailService(req.params.id);
 
-    // const map: any = {
-    //   INVALID_SUBTYPE: "Loại giấy không hợp lệ",
-    //   CATEGORY_MISMATCH: "Category không khớp subType",
-    //   REFERENCE_REQUIRED: "Loại giấy này bắt buộc phải có biên bản kèm theo",
-    //   REFERENCE_NOT_FOUND: "Biên bản tham chiếu không tồn tại",
-    //   INVALID_REFERENCE_TYPE: "Biên bản tham chiếu không đúng loại",
-    //   CROSS_DEPARTMENT_REFERENCE: "Biên bản khác khoa",
-    //   REFERENCE_NOT_ALLOWED: "Loại giấy này không cần biên bản tham chiếu",
-    // };
+  res.json({
+    success: true,
+    message: "Lấy chi tiết document thành công",
+    data: doc,
+  });
+});
+
+/* ===============================
+   GET ALL
+=============================== */
+export const getAllDocuments = catchAsync(async (req: Request, res: Response) => {
+
+  const result = await getAllDocumentsService(req.query);
+
+  res.json({
+    success: true,
+    ...result,
+  });
+});
+
+/* ===============================
+   UPDATE
+=============================== */
+export const updateDocuments = catchAsync(async (req: Request, res: Response) => {
+
+  const document = await updateDocumentService({
+    id: req.params.id,
+    userId: req.user!.id,
+    updateData: req.body,
+  });
+
+  res.json({
+    success: true,
+    message: "Cập nhật document thành công",
+    data: document,
+  });
+});
+
+/* ===============================
+   DELETE (SOFT)
+=============================== */
+export const deleteDocuments = catchAsync(async (req: Request, res: Response) => {
+
+  const user = req.user!;
+
+  const doc = await deleteDocumentService({
+    id: req.params.id,
+    userId: user.id,
+    role: user.role,
+  });
+
+  res.json({
+    success: true,
+    message: "Xóa document thành công",
+    data: doc._id,
+  });
+});
+
+/* ===============================
+   DELETE BY MONTH
+=============================== */
+export const deleteDocumentsByMonth = catchAsync(async (req: Request, res: Response) => {
+
+  const { month, year, category, subType, department } = req.body;
+
+  if (!month || !year) {
     return res.status(400).json({
-      message: error.message || "Lỗi tạo document"
+      success: false,
+      message: "month và year là bắt buộc",
     });
   }
-};
 
+  const result = await deleteDocumentsByMonthService(
+    month,
+    year,
+    { category, subType, department }
+  );
 
+  res.json({
+    success: true,
+    message: "Xóa dữ liệu thành công",
+    data: result,
+  });
+});
 
-/**
- *API LẤY CHI TIẾT GIẤY ĐỀ XUẤT / BIÊN BẢN
- * 
- * @param req 
- * @param res 
- * @returns 
- */
-export const getDocumentById = async (req: Request, res: Response) => {
-  try {
+/* ===============================
+   GET REPORTS BY PROPOSAL
+=============================== */
+export const getReportsByProposals = catchAsync(async (req: Request, res: Response) => {
 
-    const doc = await getDocumentDetailService(req.params.id);
+  const data = await getReportsByProposalService(req.params.proposalId);
 
-    return res.json({
-      message: "Get document detail successfully",
-      data: doc,
-    });
+  res.json({
+    success: true,
+    message: "Lấy reports thành công",
+    data,
+  });
+});
 
-  } catch (error: any) {
+/* ===============================
+   RESTORE
+=============================== */
+export const restoreDocuments = catchAsync(async (req: Request, res: Response) => {
 
-    if (error.message === "DOCUMENT_NOT_FOUND")
-      return res.status(404).json({ message: "Document not found" });
+  const result = await restoreDocumentService({
+    documentId: req.params.id,
+    userId: req.user!.id,
+    isAdmin: req.user!.role === "ADMIN",
+  });
 
-    return res.status(500).json({ message: "Internal server error" });
-  }
-};
+  res.json({
+    success: true,
+    ...result,
+  });
+});
 
+/* ===============================
+   Update status
+=============================== */
+export const updateStatusDocuments = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
 
-/**
- // API LẤY DANH SÁCH GIẤY ĐỀ XUẤT / BIÊN BẢN VỚI FILTER, PAGINATION VÀ SORTING
-  * Controller sẽ nhận request, gọi service để xử lý nghiệp vụ, và trả về response cho client
-  * Logic chính sẽ nằm ở service, controller chỉ tập trung vào việc nhận request, gọi service, và trả về response
-  * Ví dụ: nếu có logic phức tạp liên quan đến việc lấy danh sách document, ví dụ: kiểm tra điều kiện đặc biệt khi lọc document, hoặc có liên quan đến nhiều model khác nhau, thì nên chuyển vào service để dễ bảo trì và tái sử dụng
-  * Ví dụ: nếu có logic liên quan đến audit khi lấy danh sách document, thì cũng nên đặt ở service để đảm bảo tính nhất quán và dễ quản lý
- * @param req 
- * @param res 
- * @returns 
- */
-export const getAllDocuments = async (req: Request, res: Response) => {
-  try {
+    const { status } = req.body;
 
-    const result = await getAllDocumentsService(req.query);
-
-    return res.json(result);
-
-  } catch (error) {
-    return res.status(500).json({
-      message: "Lỗi lấy danh sách document"
-    });
-  }
-};
-
-/**
- * Update document
- * Controller sẽ nhận request, gọi service để xử lý nghiệp vụ, và trả về response cho client
- * Logic chính sẽ nằm ở service, controller chỉ tập trung vào việc nhận request, gọi service, và trả về response
- */
-
-export const updateDocuments = async (req: Request, res: Response) => {
-  try {
-
-    // if (!parsed.success) {
-    //   return res.status(422).json({
-    //     message: "Invalid update data",
-    //     errors: parsed.error.format(),
-    //   });
-    // }
-
-    const document = await updateDocumentService({
-      id: req.params.id,
-      userId: req.user!.id,
-      updateData: req.body
-    });
-
-    return res.status(200).json({
-      message: "Update document successfully",
-      data: document,
-    });
-
-  } catch (error: any) {
-
-    // const map: any = {
-    //   INVALID_ID: "ID giấy không hợp lệ",
-    //   DOCUMENT_NOT_FOUND: "Không tìm thấy giấy đề xuất / biên bản",
-    //   DOCUMENT_LOCKED: "Giấy đề xuất đã trình ký, không thể chỉnh sửa",
-    //   FORBIDDEN_FIELDS: "Bạn đang cố sửa field không được phép",
-    // };
-
-    return res.status(400).json({
-      message: error.message || "Internal server error",
-    });
-  }
-};
-
-/**
- * Delete document (soft delete)
- * Controller sẽ nhận request, gọi service để xử lý nghiệp vụ, và trả về response cho client
- * Logic chính sẽ nằm ở service, controller chỉ tập trung vào việc nhận request, gọi service, và trả về response
- * Ví dụ: nếu có logic phức tạp liên quan đến việc xoá document, ví dụ: kiểm tra điều kiện đặc biệt khi xoá document, hoặc có liên quan đến nhiều model khác nhau, thì nên chuyển vào service để dễ bảo trì và tái sử dụng
- */
-
-export const deleteDocuments = async (req: Request, res: Response) => {
-  try {
-    const user = req.user!;
-
-    const doc = await deleteDocumentService({
-      id: req.params.id,
-      userId: user.id,
-      role: user.role,
-    });
-
-    return res.status(200).json({
-      message: "Tài liệu đã được xóa (soft delete)",
-      data: doc._id,
-    });
-  } catch (error: any) {
-
-    // const map: any = {
-    //   INVALID_ID: "ID giấy không hợp lệ",
-    //   DOCUMENT_NOT_FOUND: "Không tìm thấy giấy đề xuất / biên bản",
-    //   NO_PERMISSION: "Bạn không có quyền xoá tài liệu này",
-    //   PROPOSAL_HAS_REPORT: "Không thể xóa đề xuất có biên bản liên quan",
-    //   DOCUMENT_LOCKED: "Tài liệu đã trình ký, không thể xoá",
-    // };
-
-    return res.status(400).json({
-      message: error.message || "Xóa tài liệu thất bại",
-    });
-  }
-};
-
-/**
- * 
- * @param req 
- * @param res 
- * @returns 
- */
-export const deleteDocumentsByMonth = async (
-  req: Request,
-  res: Response
-) => {
-  try {
-    const { month, year, category, subType, department } = req.body;
-
-    if (!month || !year) {
-      return res.status(400).json({
-        success: false,
-        message: "month và year là bắt buộc",
-      });
-    }
-
-    const result = await deleteDocumentsByMonthService(
-      month,
-      year,
-      { category, subType, department }
-    );
+    const result = await updateStatusService(
+      req.params.id,
+      status,
+      req.user,
+      req.user!.id
+);
 
     res.json({
       success: true,
-      message: "Xóa dữ liệu thành công",
+      message:"Update status thành công",
       data: result,
     });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
+});
 
-// API LẤY TOÀN BỘ BIÊN BẢN THUỘC 1 GIẤY ĐỀ XUẤT
-export const getReportsByProposals = async (req:Request, res:Response) => {
-  try {
-    const data = await getReportsByProposalService(req.params.proposalId);
 
-    return res.status(200).json({
-      message: "Lấy danh sách biên bản theo đề xuất thành công",
-      data,
-    });
-  } catch (error:any) {
-    return res.status(500).json({
-      message: error.message || "Internal server error",
-    });
-  }
-};
+//import {createDocumentService,
+//         getDocumentDetailService,
+//         getAllDocumentsService,
+//         updateDocumentService,
+//         deleteDocumentService,
+//         getReportsByProposalService, 
+//         restoreDocumentService,
+//         deleteDocumentsByMonthService
+//         } 
+//         from "../services/documents.service";
+// import { Request, Response } from "express";
 
-// PATCH /api/documents/:id/restore
-export const restoreDocuments = async (req: Request, res: Response, next: any) => {
-  try {
-    const result = await restoreDocumentService({
-      documentId: req.params.id,
-      userId: req.user!.id,
-      isAdmin: req.user!.role === "ADMIN",
-    });
 
-    res.json(result);
-  } catch (err) {
-    next(err);
-  }
-};
+
+// /**
+//  * API TẠO MỚI GIẤY ĐỀ XUẤT / BIÊN BẢN
+//  * Controller sẽ nhận request, gọi service để xử lý nghiệp vụ, và trả về response cho client
+//  * Logic chính sẽ nằm ở service, controller chỉ tập trung vào việc nhận request, gọi service, và trả về response
+//  * Ví dụ: nếu có logic phức tạp liên quan đến việc tạo document, ví dụ: kiểm tra điều kiện đặc biệt khi tạo document, hoặc có liên quan đến nhiều model khác nhau, thì nên chuyển vào service để dễ bảo trì và tái sử dụng
+//  * Ví dụ: nếu có logic liên quan đến audit khi tạo document, thì cũng nên đặt ở service để đảm bảo tính nhất quán và dễ quản lý
+//  * @param req 
+//  * @param res 
+//  * @returns 
+//  */
+// export const createDocuments = async (req: Request, res: Response) => {
+//   try {
+
+//     const doc = await createDocumentService({
+//       userId: req.user!.id,
+//       ...req.body
+//     });
+
+//     return res.status(201).json(doc);
+
+//   } catch (error: any) {
+
+//     // const map: any = {
+//     //   INVALID_SUBTYPE: "Loại giấy không hợp lệ",
+//     //   CATEGORY_MISMATCH: "Category không khớp subType",
+//     //   REFERENCE_REQUIRED: "Loại giấy này bắt buộc phải có biên bản kèm theo",
+//     //   REFERENCE_NOT_FOUND: "Biên bản tham chiếu không tồn tại",
+//     //   INVALID_REFERENCE_TYPE: "Biên bản tham chiếu không đúng loại",
+//     //   CROSS_DEPARTMENT_REFERENCE: "Biên bản khác khoa",
+//     //   REFERENCE_NOT_ALLOWED: "Loại giấy này không cần biên bản tham chiếu",
+//     // };
+//     return res.status(400).json({
+//       message: error.message || "Lỗi tạo document"
+//     });
+//   }
+// };
+
+
+
+// /**
+//  *API LẤY CHI TIẾT GIẤY ĐỀ XUẤT / BIÊN BẢN
+//  * 
+//  * @param req 
+//  * @param res 
+//  * @returns 
+//  */
+// export const getDocumentById = async (req: Request, res: Response) => {
+//   try {
+
+//     const doc = await getDocumentDetailService(req.params.id);
+
+//     return res.json({
+//       message: "Get document detail successfully",
+//       data: doc,
+//     });
+
+//   } catch (error: any) {
+
+//     if (error.message === "DOCUMENT_NOT_FOUND")
+//       return res.status(404).json({ message: "Document not found" });
+
+//     return res.status(500).json({ message: "Internal server error" });
+//   }
+// };
+
+
+// /**
+//  // API LẤY DANH SÁCH GIẤY ĐỀ XUẤT / BIÊN BẢN VỚI FILTER, PAGINATION VÀ SORTING
+//   * Controller sẽ nhận request, gọi service để xử lý nghiệp vụ, và trả về response cho client
+//   * Logic chính sẽ nằm ở service, controller chỉ tập trung vào việc nhận request, gọi service, và trả về response
+//   * Ví dụ: nếu có logic phức tạp liên quan đến việc lấy danh sách document, ví dụ: kiểm tra điều kiện đặc biệt khi lọc document, hoặc có liên quan đến nhiều model khác nhau, thì nên chuyển vào service để dễ bảo trì và tái sử dụng
+//   * Ví dụ: nếu có logic liên quan đến audit khi lấy danh sách document, thì cũng nên đặt ở service để đảm bảo tính nhất quán và dễ quản lý
+//  * @param req 
+//  * @param res 
+//  * @returns 
+//  */
+// export const getAllDocuments = async (req: Request, res: Response) => {
+//   try {
+
+//     const result = await getAllDocumentsService(req.query);
+
+//     return res.json(result);
+
+//   } catch (error) {
+//     return res.status(500).json({
+//       message: "Lỗi lấy danh sách document"
+//     });
+//   }
+// };
+
+// /**
+//  * Update document
+//  * Controller sẽ nhận request, gọi service để xử lý nghiệp vụ, và trả về response cho client
+//  * Logic chính sẽ nằm ở service, controller chỉ tập trung vào việc nhận request, gọi service, và trả về response
+//  */
+
+// export const updateDocuments = async (req: Request, res: Response) => {
+//   try {
+
+//     // if (!parsed.success) {
+//     //   return res.status(422).json({
+//     //     message: "Invalid update data",
+//     //     errors: parsed.error.format(),
+//     //   });
+//     // }
+
+//     const document = await updateDocumentService({
+//       id: req.params.id,
+//       userId: req.user!.id,
+//       updateData: req.body
+//     });
+
+//     return res.status(200).json({
+//       message: "Update document successfully",
+//       data: document,
+//     });
+
+//   } catch (error: any) {
+
+//     // const map: any = {
+//     //   INVALID_ID: "ID giấy không hợp lệ",
+//     //   DOCUMENT_NOT_FOUND: "Không tìm thấy giấy đề xuất / biên bản",
+//     //   DOCUMENT_LOCKED: "Giấy đề xuất đã trình ký, không thể chỉnh sửa",
+//     //   FORBIDDEN_FIELDS: "Bạn đang cố sửa field không được phép",
+//     // };
+
+//     return res.status(400).json({
+//       message: error.message || "Internal server error",
+//     });
+//   }
+// };
+
+// /**
+//  * Delete document (soft delete)
+//  * Controller sẽ nhận request, gọi service để xử lý nghiệp vụ, và trả về response cho client
+//  * Logic chính sẽ nằm ở service, controller chỉ tập trung vào việc nhận request, gọi service, và trả về response
+//  * Ví dụ: nếu có logic phức tạp liên quan đến việc xoá document, ví dụ: kiểm tra điều kiện đặc biệt khi xoá document, hoặc có liên quan đến nhiều model khác nhau, thì nên chuyển vào service để dễ bảo trì và tái sử dụng
+//  */
+
+// export const deleteDocuments = async (req: Request, res: Response) => {
+//   try {
+//     const user = req.user!;
+
+//     const doc = await deleteDocumentService({
+//       id: req.params.id,
+//       userId: user.id,
+//       role: user.role,
+//     });
+
+//     return res.status(200).json({
+//       message: "Tài liệu đã được xóa (soft delete)",
+//       data: doc._id,
+//     });
+//   } catch (error: any) {
+
+//     // const map: any = {
+//     //   INVALID_ID: "ID giấy không hợp lệ",
+//     //   DOCUMENT_NOT_FOUND: "Không tìm thấy giấy đề xuất / biên bản",
+//     //   NO_PERMISSION: "Bạn không có quyền xoá tài liệu này",
+//     //   PROPOSAL_HAS_REPORT: "Không thể xóa đề xuất có biên bản liên quan",
+//     //   DOCUMENT_LOCKED: "Tài liệu đã trình ký, không thể xoá",
+//     // };
+
+//     return res.status(400).json({
+//       message: error.message || "Xóa tài liệu thất bại",
+//     });
+//   }
+// };
+
+// /**
+//  * 
+//  * @param req 
+//  * @param res 
+//  * @returns 
+//  */
+// export const deleteDocumentsByMonth = async (
+//   req: Request,
+//   res: Response
+// ) => {
+//   try {
+//     const { month, year, category, subType, department } = req.body;
+
+//     if (!month || !year) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "month và year là bắt buộc",
+//       });
+//     }
+
+//     const result = await deleteDocumentsByMonthService(
+//       month,
+//       year,
+//       { category, subType, department }
+//     );
+
+//     res.json({
+//       success: true,
+//       message: "Xóa dữ liệu thành công",
+//       data: result,
+//     });
+//   } catch (error: any) {
+//     res.status(500).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// };
+
+// // API LẤY TOÀN BỘ BIÊN BẢN THUỘC 1 GIẤY ĐỀ XUẤT
+// export const getReportsByProposals = async (req:Request, res:Response) => {
+//   try {
+//     const data = await getReportsByProposalService(req.params.proposalId);
+
+//     return res.status(200).json({
+//       message: "Lấy danh sách biên bản theo đề xuất thành công",
+//       data,
+//     });
+//   } catch (error:any) {
+//     return res.status(500).json({
+//       message: error.message || "Internal server error",
+//     });
+//   }
+// };
+
+// // PATCH /api/documents/:id/restore
+// export const restoreDocuments = async (req: Request, res: Response, next: any) => {
+//   try {
+//     const result = await restoreDocumentService({
+//       documentId: req.params.id,
+//       userId: req.user!.id,
+//       isAdmin: req.user!.role === "ADMIN",
+//     });
+
+//     res.json(result);
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
+
+
+
+
+
 
 
 // /**

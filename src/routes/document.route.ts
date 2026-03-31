@@ -7,11 +7,10 @@ import {
   updateDocuments,
   deleteDocuments,
   restoreDocuments,
-  deleteDocumentsByMonth
+  deleteDocumentsByMonth,
+  updateStatusDocuments
 } from "../controllers/document.controller";
 import { authenticate } from "../middlewares/auth.middleware";
-import {uploadExcel} from "../middlewares/upload.middleware"
-import { authorizePermission } from "../middlewares/authorizePermission.middleware"; 
 // import {performanceMiddleware} from "../middlewares/performance.middleware";
 // import {exportDocumentsExcel,exportDocumentsPDF} from "../controllers/document.export.controller";
 
@@ -22,6 +21,7 @@ router.post("/proposal", authenticate, createDocuments);
 router.get("/",  getAllDocuments);
 router.get("/:id", authenticate,  getDocumentById);
 router.put("/:id", authenticate,  updateDocuments);
+router.put("/:id/status", authenticate, updateStatusDocuments);
 router.delete("/delete-by-month", authenticate,  deleteDocumentsByMonth);
 router.delete("/:id", authenticate,  deleteDocuments);
 router.patch("/restore/:id", authenticate,  restoreDocuments);

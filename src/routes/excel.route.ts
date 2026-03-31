@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authenticate } from "../middlewares/auth.middleware";
-import { exportDocumentsExcel, importDocumentsExcelData, syncDepartmentData  } from "../controllers/export-excel.controller"
+import { exportDocumentsExcel, importDocumentsExcelData, syncDepartmentData  } from "../controllers/excel.controller"
 import { uploadExcel } from "../middlewares/upload.middleware"
 
 const router = Router();

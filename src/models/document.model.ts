@@ -43,7 +43,7 @@ export interface IDocument {
 
   serviceDate?: Date;
   actualCost?: number;
-  repairStatus?: "PENDING" | "IN_PROGRESS" | "DONE";
+  repairStatus: "PENDING" | "IN_PROGRESS" | "DONE";
 
   signedBy?: {
     role: string;
@@ -122,12 +122,6 @@ const DocumentSchema = new Schema<IDocument>(
       default: "PENDING",
       index: true,
     },
-
-    // status: {
-    //   type: String,
-    //   enum: ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"],
-    //   default: "DRAFT",
-    // },
 
     /** ⛓ CHỈ DÙNG CHO REPORT */
     referenceTo: [
