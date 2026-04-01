@@ -1,0 +1,1012 @@
+openapi: 3.0.0
+info:
+  title: Document Papper API
+  description: Full API Document Papper
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3000
+
+tags:
+  - name: Auth
+  - name: Users
+  - name: Departments
+  - name: Documents
+  - name: Dashboard
+  - name: Excel Doc
+  - name: LogAudit
+
+paths:
+  # ================= AUTH =================
+  /api/auths/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  example: admin
+                password:
+                  type: string
+                  example: "123456"
+      responses:
+        "200":
+          description: Login success
+
+  /api/auths/refresh-token:
+    post:
+      tags: [Auth]
+      summary: Refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        "200":
+          description: Refresh success
+
+  /api/auths/logout:
+    post:
+      tags: [Auth]
+      summary: Logout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        "200":
+          description: Logout success
+
+  /api/auths/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Forgot password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  example: cuongit
+      responses:
+        "200":
+          description: Email sent
+
+  /api/auths/reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                newPassword:
+                  type: string
+      responses:
+        "200":
+          description: Password reset success
+
+  # ===================== USERS =====================
+
+  /api/users:
+    get:
+      tags: [Users]
+      summary: Get all users
+      security:
+        - bearerAuth: []
+
+      parameters:
+        - name: page
+          in: query
+          description: Trang hiện tại
+          schema:
+            type: integer
+            example: 1
+
+        - name: limit
+          in: query
+          description: Số lượng mỗi trang
+          schema:
+            type: integer
+            example: 20
+
+        - name: keyword
+          in: query
+          description: Tìm theo username hoặc fullName
+          schema:
+            type: string
+            example: admin
+
+        - name: role
+          in: query
+          description: Lọc theo role
+          schema:
+            type: string
+            enum: [ADMIN, USER, IT]
+            example: USER
+
+        - name: department
+          in: query
+          description: ID khoa/phòng
+          schema:
+            type: string
+            example: "6982b38294d9a655aeec8cce"
+
+        - name: isActive
+          in: query
+          description: Trạng thái hoạt động
+          schema:
+            type: boolean
+            example: true
+
+        - name: fromDate
+          in: query
+          description: Lọc từ ngày tạo (YYYY-MM-DD)
+          schema:
+            type: string
+            example: "2026-01-01"
+
+        - name: toDate
+          in: query
+          description: Lọc đến ngày tạo (YYYY-MM-DD)
+          schema:
+            type: string
+            example: "2026-01-31"
+
+        # - name: sortBy
+        #   in: query
+        #   description: Field để sort
+        #   schema:
+        #     type: string
+        #     example: createdAt
+
+        - name: order
+          in: query
+          description: Thứ tự sort
+          schema:
+            type: string
+            enum: [asc, desc]
+            example: desc
+
+      responses:
+        "200":
+          description: Succes
+
+    post:
+      tags: [Users]
+      summary: Create user
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              example:
+                username: dung
+                password: "12345"
+                fullName: Lương Tiến Dũng
+                role: USER
+                department: "department_id"
+      responses:
+        "200":
+          description: Success
+
+  /api/users/me:
+    get:
+      tags: [Users]
+      summary: Get profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Success
+
+    patch:
+      tags: [Users]
+      summary: Update profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              example:
+                fullName: Admin Updated
+                isActive: true
+      responses:
+        "200":
+          description: Success
+
+  /api/users/{id}:
+    get:
+      tags: [Users]
+      summary: Get user by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+
+    put:
+      tags: [Users]
+      summary: Update user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              example:
+                username: updatedUser
+                role: ADMIN
+      responses:
+        "200":
+          description: Success
+
+    delete:
+      tags: [Users]
+      summary: Delete user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+      responses:
+        "200":
+          description: Success
+
+  /api/users/restore/{id}:
+    patch:
+      tags: [Users]
+      summary: Restore user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+      responses:
+        "200":
+          description: Success
+
+  /api/users/change-password:
+    patch:
+      tags: [Users]
+      summary: Change password
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              example:
+                oldPassword: "123456"
+                newPassword: "12345"
+      responses:
+        "200":
+          description: Success
+
+  /api/users/reset-password/{id}:
+    patch:
+      tags: [Users]
+      summary: Reset password (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              example:
+                newPassword: "12345"
+      responses:
+        "200":
+          description: Success
+
+  # ================= DOCUMENT =================
+  /api/documents/proposal:
+    post:
+      tags: [Documents]
+      summary: Create document
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                category:
+                  type: string
+                  example: PROPOSAL
+                subType:
+                  type: string
+                  example: PROPOSE_PROCUREMENT
+                title:
+                  type: string
+                department:
+                  type: string
+                meta:
+                  type: object
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          deviceName:
+                            type: string
+                          quantity:
+                            type: number
+                          note:
+                            type: string
+      responses:
+        "200":
+          description: Created
+
+  /api/documents:
+    get:
+      tags: [Documents]
+      summary: Get all documents
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Trang hiện tại
+          schema:
+            type: integer
+            example: 1
+
+        - name: limit
+          in: query
+          description: Số lượng mỗi trang
+          schema:
+            type: integer
+            example: 20
+
+        - name: keyword
+          in: query
+          description: Tìm theo title hoặc documentCode
+          schema:
+            type: string
+            example: Giấy đề xuất sạc mực
+
+        - name: fromDate
+          in: query
+          description: Ngày bắt đầu (YYYY-MM-DD)
+          schema:
+            type: string
+            example: "2026-01-01"
+
+        - name: toDate
+          in: query
+          description: Ngày kết thúc (YYYY-MM-DD)
+          schema:
+            type: string
+            example: "2026-01-31"
+
+        - name: isActive
+          in: query
+          description: Trạng thái hoạt động
+          schema:
+            type: boolean
+            example: true
+
+        - name: category
+          in: query
+          description: Loại document (PROPOSAL, REPAIR,...)
+          schema:
+            type: string
+            example: PROPOSAL
+
+        - name: subType
+          in: query
+          description: Loại con (PROPOSE_PROCUREMENT,...)
+          schema:
+            type: string
+            example: PROPOSE_PROCUREMENT
+
+        - name: department
+          in: query
+          description: ID khoa/phòng
+          schema:
+            type: string
+            example: "6982b38294d9a655aeec8cce"
+
+      responses:
+        "200":
+          description: Success
+
+  /api/documents/{id}:
+    get:
+      tags: [Documents]
+      summary: Get document by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 698d9240f0b67d3f1ff2a85f
+      responses:
+        "200":
+          description: Success
+
+    put:
+      tags: [Documents]
+      summary: Update document
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              example:
+                title: Đề xuất sửa chữa máy in HP
+                meta:
+                  device:
+                    name: Hộp mực HP
+                    quantity: 1
+      responses:
+        "200":
+          description: Updated
+
+    delete:
+      tags: [Documents]
+      summary: Delete document
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+
+  /api/documents/{id}/status:
+    put:
+      tags: [Documents]
+      summary: Update status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: IN_PROGRESS
+      responses:
+        "200":
+          description: Updated
+
+  /api/documents/{id}/reports:
+    get:
+      tags: [Documents]
+      summary: Get reports
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+
+  /api/documents/restore/{id}:
+    patch:
+      tags: [Documents]
+      summary: Restore document
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Restored
+
+  /api/documents/delete-by-month:
+    delete:
+      tags: [Documents]
+      summary: Delete by month
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                month:
+                  type: string
+                  example: "03"
+                year:
+                  type: string
+                  example: "2026"
+      responses:
+        "200":
+          description: Deleted
+
+    # ================= DEPARTMENT =================
+  /api/departments:
+    get:
+      tags: [Departments]
+      summary: Get all departments
+      description: |
+        SEARCH: ?keyword=IT  
+        FILTER: ?code=HC / ?name=...  
+        SORT: ?sortBy=name&order=desc
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: keyword
+          in: query
+          schema:
+            type: string
+        - name: code
+          in: query
+          schema:
+            type: string
+        - name: name
+          in: query
+          schema:
+            type: string
+        # - name: sortBy
+        #   in: query
+        #   schema:
+        #     type: string
+        - name: order
+          in: query
+          description: Thứ tự sort
+          schema:
+            type: string
+            enum: [asc, desc]
+            example: desc
+      responses:
+        "200":
+          description: Success
+
+    post:
+      tags: [Departments]
+      summary: Create department
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  example: BGĐ
+                name:
+                  type: string
+                  example: Ban Giám Đốc
+      responses:
+        "200":
+          description: Created
+
+  /api/departments/{id}:
+    get:
+      tags: [Departments]
+      summary: Get department by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+
+    put:
+      tags: [Departments]
+      summary: Update department
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                name:
+                  type: string
+      responses:
+        "200":
+          description: Updated
+
+    delete:
+      tags: [Departments]
+      summary: Delete department
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+      responses:
+        "200":
+          description: Deleted
+
+  ########################
+  # DASHBOARD
+  ########################
+
+  /api/dashboard/admin-summary:
+    get:
+      tags: [Dashboard]
+      summary: Admin summary
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Summary
+
+  /api/dashboard/department/{departmentId}:
+    get:
+      tags: [Dashboard]
+      summary: Department stats
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: departmentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Stats
+
+  /api/dashboard/kpi/proposal-conversion:
+    get:
+      tags: [Dashboard]
+      summary: Proposal conversion KPI
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: integer
+        - name: year
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: KPI
+
+  /api/dashboard/kpi/device-damage-trend:
+    get:
+      tags: [Dashboard]
+      summary: Device damage trend
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Trend
+
+  /api/dashboard/kpi/top-damaged-devices:
+    get:
+      tags: [Dashboard]
+      summary: Top damaged devices
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: integer
+        - name: year
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Top devices
+
+  /api/dashboard/kpi/top-damaged-inks:
+    get:
+      tags: [Dashboard]
+      summary: Top damaged inks
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Ink stats
+
+  /api/dashboard/device-stats:
+    get:
+      tags: [Dashboard]
+      summary: Device stats
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: integer
+        - name: year
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Stats
+
+    # ===================== EXPORT =====================
+    /api/export/import-proposal:
+    post:
+      tags: [Excel Doc]
+      summary: Import proposal from Excel
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Import success
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  message: Import successful
+
+  /api/export/export-documents-excel:
+    get:
+      tags: [Excel Doc]
+      summary: Export documents to Excel
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: integer
+          example: 2
+        - name: year
+          in: query
+          schema:
+            type: integer
+          example: 2026
+      responses:
+        "200":
+          description: Excel file
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+
+  /api/export/departments/sync-from-excel:
+    post:
+      tags: [Excel Doc]
+      summary: Sync departments from Excel
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Sync success
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  message: Sync completed
+
+      # ===================== GET ALL AUDIT LOG =====================
+  /api/user-audits:
+    get:
+      tags: [LogAudit]
+      summary: Get all user audit logs
+      description: Lấy danh sách lịch sử thao tác người dùng (có phân trang + filter)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+          example: 1
+
+        - name: limit
+          in: query
+          schema:
+            type: integer
+          example: 20
+
+        - name: userId
+          in: query
+          schema:
+            type: string
+          example: 698313689ce9dc3ab3821d1b
+
+        - name: action
+          in: query
+          schema:
+            type: string
+          example: CREATE_DOCUMENT
+
+        - name: fromDate
+          in: query
+          schema:
+            type: string
+            format: date
+          example: 2026-01-01
+
+        - name: toDate
+          in: query
+          schema:
+            type: string
+            format: date
+          example: 2026-01-31
+
+      responses:
+        "200":
+          description: Get audit logs success
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  data:
+                    - _id: 1
+                      userId: 698313689ce9dc3ab3821d1b
+                      action: CREATE_DOCUMENT
+                      description: Tạo document
+                      createdAt: 2026-01-01T10:00:00Z
+                  pagination:
+                    page: 1
+                    limit: 20
+                    total: 100
+
+  # ===================== AUDIT DASHBOARD =====================
+  /api/user-audits/dashboard:
+    get:
+      tags: [LogAudit]
+      summary: Audit dashboard statistics
+      description: Thống kê hoạt động người dùng (dashboard logs)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: fromDate
+          in: query
+          schema:
+            type: string
+            format: date
+          example: 2026-01-01
+
+        - name: toDate
+          in: query
+          schema:
+            type: string
+            format: date
+          example: 2026-01-31
+
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  totalActions: 1200
+                  topUsers:
+                    - userId: 123
+                      total: 300
+                  actionsBreakdown:
+                    CREATE_DOCUMENT: 500
+                    UPDATE_DOCUMENT: 300
+                    DELETE_DOCUMENT: 100
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

@@ -17,6 +17,8 @@ import exportRoutes from "./routes/excel.route";
 
 import { performanceMiddleware } from "./middlewares/performance.middleware";
 import { errorHandler } from "./middlewares/error.middleware";
+import { setupSwagger } from "./config/swagger/swagger";
+
 
 const app = express();
 
@@ -66,6 +68,9 @@ app.use("/api/auths", authLimiter);
 
 // Middleware này sẽ tính thời gian xử lý của mỗi request và log ra console
 app.use(performanceMiddleware);
+
+// Cấu hình swagger load API
+setupSwagger(app);
 
 /* ===============================
    🚀 ROUTES

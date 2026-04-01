@@ -18,7 +18,7 @@ import { authenticate } from "../middlewares/auth.middleware";
 const router = Router();
 
 router.post("/proposal", authenticate, createDocuments);
-router.get("/",  getAllDocuments);
+router.get("/", authenticate ,getAllDocuments);
 router.get("/:id", authenticate,  getDocumentById);
 router.put("/:id", authenticate,  updateDocuments);
 router.put("/:id/status", authenticate, updateStatusDocuments);

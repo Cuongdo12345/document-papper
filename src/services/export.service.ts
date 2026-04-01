@@ -8,7 +8,7 @@ import { generateDepartmentCode } from "../shared/helpers/generate-code";
 import { parseExcelDate } from "../shared/utils/formatDate";
 import { DocumentCategory } from "../models/document.model";
 import { generateDocumentCode } from "../shared/utils/generateDocumentCode";
-import { parseInspectionJSONLike, buildInspectionText } from "../shared/helpers/parse-doc";
+import { parseInspectionJSONLike } from "../shared/helpers/parse-doc";
 import { buildMapFromReports } from "../shared/helpers/buildMapReports"
 /**
  *  Xuất Excel danh sách document
