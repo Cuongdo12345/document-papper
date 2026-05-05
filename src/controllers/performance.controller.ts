@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { ApiPerformanceModel } from "../models/apiPerformance.model";
+import { ApiPerformanceModel } from "../models/apiPerformance/apiPerformance.model";
 
 
 /**

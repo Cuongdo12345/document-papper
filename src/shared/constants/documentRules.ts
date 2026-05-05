@@ -1,5 +1,5 @@
 // constants/document.rules.ts
-import { DocumentCategory, DocumentSubType } from "../../models/document.model";
+import { DocumentCategory, DocumentSubType } from "../../models/documents/document.model";
 
 export const DOCUMENT_RULES: Record<
   DocumentSubType,

@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { getAuditLogsService, getAuditDashboardService } from "../services/userAudits.service";
+import { getAuditLogsService, getAuditDashboardService } from "../services/users/userAudits.service";
 
 // GET USER AUDIT LOGS (ADMIN)
 // I️⃣ AUDIT LÀ GÌ TRONG BÀI TOÁN NÀY?

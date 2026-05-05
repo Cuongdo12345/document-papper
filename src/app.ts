@@ -14,6 +14,9 @@ import userAuditRoutes from "./routes/userAudit.routes";
 import performanceRoutes from "./routes/performance.routes";
 import dashboardRoutes from "./routes/dashboard.route";
 import exportRoutes from "./routes/excel.route";
+import uploadRoutes from "./routes/upload.routes";
+import workflowRoutes from "./routes/workflow.routes";
+import rbacRoutes from "./routes/rbac.routes";
 
 import { performanceMiddleware } from "./middlewares/performance.middleware";
 import { errorHandler } from "./middlewares/error.middleware";
@@ -83,6 +86,9 @@ app.use("/api/user-audits", userAuditRoutes);
 app.use("/api/performances", performanceRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/export", exportRoutes);
+app.use("/api/upload", uploadRoutes);
+app.use("/api/workflows", workflowRoutes);
+app.use("/api/rbac", rbacRoutes)
 
 /* ===============================
    ❌ GLOBAL ERROR HANDLER

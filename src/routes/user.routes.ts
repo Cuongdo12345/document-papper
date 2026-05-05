@@ -24,5 +24,7 @@ router.delete("/:id", authenticate, authorizePermission("USER_DELETE"), deleteUs
 router.patch("/restore/:id", authenticate, authorizePermission("USER_RESTORE"), restoreUser);
 router.patch("/change-password", authenticate, authorizePermission("USER_CHANGE_PASSWORD"), changePasswordUser);
 router.patch("/reset-password/:id", authenticate, authorizePermission("SYSTEM_ADMIN"), resetPasswordByAdmin);
+
+
 export default router;
 // authorizePermission("AUDIT_VIEW")

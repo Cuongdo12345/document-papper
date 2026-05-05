@@ -7,8 +7,7 @@ import {
   updateDocuments,
   deleteDocuments,
   restoreDocuments,
-  deleteDocumentsByMonth,
-  updateStatusDocuments
+  deleteDocumentsByMonth
 } from "../controllers/document.controller";
 import { authenticate } from "../middlewares/auth.middleware";
 // import {performanceMiddleware} from "../middlewares/performance.middleware";
@@ -21,7 +20,7 @@ router.post("/proposal", authenticate, createDocuments);
 router.get("/", authenticate ,getAllDocuments);
 router.get("/:id", authenticate,  getDocumentById);
 router.put("/:id", authenticate,  updateDocuments);
-router.put("/:id/status", authenticate, updateStatusDocuments);
+// router.put("/:id/status", authenticate, updateStatusDocuments);
 router.delete("/delete-by-month", authenticate,  deleteDocumentsByMonth);
 router.delete("/:id", authenticate,  deleteDocuments);
 router.patch("/restore/:id", authenticate,  restoreDocuments);

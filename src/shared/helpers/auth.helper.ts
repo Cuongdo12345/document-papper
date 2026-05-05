@@ -12,8 +12,6 @@ import crypto from "crypto";
  */
 export const generateAccessToken = (payload: {
   id: any;
-  role: string;
-  department: any;
 }) => {
   return jwt.sign(
     payload,

@@ -1,4 +1,4 @@
-import { Document } from "../../models/document.model";
+import { Document } from "../../models/documents/document.model";
 import { buildInspectionText } from "../helpers/parse-doc"
 /**
  * Build load map song song CONFIRM_STATUS, CHECK_DAMAGE

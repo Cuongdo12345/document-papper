@@ -1,7 +1,7 @@
 /**
  * Function tự động tạo...
  */
-import { Counter } from "../../models/counter.model";
+import { Counter } from "../../models/documents/counter.model";
 
 export const getNextSequence = async (key: string): Promise<number> => {
   const counter = await Counter.findOneAndUpdate(

@@ -1,4 +1,4 @@
-import { ApiPerformanceModel } from "../models/apiPerformance.model";
+import { ApiPerformanceModel } from "../models/apiPerformance/apiPerformance.model";
 import { Request, Response, NextFunction } from "express";
 
 // Mở rộng kiểu Request để thêm thông tin hiệu năng

@@ -23,26 +23,3 @@ export const uploadExcel = multer({
   fileFilter,
 });
 
-
-// const storage = multer.diskStorage({
-//   destination: (req:Request, file, cb) => {
-//     cb(null, "uploads/");
-//   },
-//   filename: (req, file, cb) => {
-//     cb(null, `import-${Date.now()}.xlsx`);
-//   },
-// });
-
-// export const uploadExcel = multer({
-//   storage,
-//   fileFilter: (req, file, cb) => {
-//     if (
-//       file.mimetype.includes("spreadsheet") ||
-//       file.originalname.endsWith(".xlsx")
-//     ) {
-//       cb(null, true);
-//     } else {
-//       cb(new Error("Chỉ chấp nhận file Excel"));
-//     }
-//   },
-// });

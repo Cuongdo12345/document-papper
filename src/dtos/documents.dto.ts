@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DocumentCategory, DocumentSubType } from "../models/document.model";
+import { DocumentCategory, DocumentSubType } from "../models/documents/document.model";
 
 export const CreateDocumentDTO = z.object({
   category: z.enum(Object.values(DocumentCategory) as [string, ...string[]]),

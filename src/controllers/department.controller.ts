@@ -5,7 +5,7 @@ import {
   getDepartmentByIdService,
   updateDepartmentService,
   deleteDepartmentService,
-} from "../services/departments.service";
+} from "../services/departments/departments.service";
 
 // ================================ CONTROLLER MỚI CHUYỂN LOGIC XỬ LÝ LIÊN QUAN ĐẾN DEPARTMENT VỀ ĐÂY ================================
 // Controller sẽ nhận request, gọi service để xử lý nghiệp vụ, và trả về response cho client

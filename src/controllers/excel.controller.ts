@@ -1,5 +1,5 @@
-import { exportDocumentsExcelPRO, importDocumentsExcel, syncDepartmentFromExcel } from "../services/export.service";
-import { Request, Response, NextFunction } from "express";
+import { exportDocumentsExcelPRO, importDocumentsExcel, syncDepartmentFromExcel } from "../services/excel/export.service";
+import { Request, Response } from "express";
 
 /**
  *
@@ -100,3 +100,4 @@ export const syncDepartmentData = async (
     });
   }
 };
+

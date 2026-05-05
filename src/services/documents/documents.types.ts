@@ -1,4 +1,4 @@
-import { DocumentCategory, DocumentSubType } from "../../models/document.model";
+import { DocumentCategory, DocumentSubType } from "../../models/documents/document.model";
 
 export interface CreateDocumentPayload {
   userId: any;

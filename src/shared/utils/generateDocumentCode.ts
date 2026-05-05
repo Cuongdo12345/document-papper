@@ -74,9 +74,9 @@ Production ready	✅
 //   return `${prefix}-${deptCode}-${year}-${order}`;
 // };
 import { Types } from "mongoose";
-import Department from "../../models/department.model";
+import Department from "../../models/departments/department.model";
 import { getNextSequence } from "../utils/getNext";
-import { Document, DocumentCategory } from "../../models/document.model";
+import { Document, DocumentCategory } from "../../models/documents/document.model";
 
 export const generateDocumentCode = async (
   category: DocumentCategory,

@@ -8,7 +8,7 @@ import { create,
   disable, 
   restore, 
   resetPassword,
-  changePassword  } from "../services/users.service";
+  changePassword  } from "../services/users/users.service";
 
 // CONTROLLER LÀ NƠI XỬ LÝ LOGIC LIÊN QUAN ĐẾN REQUEST/RESPONSE
 // Ví dụ: validate dữ liệu đầu vào, gọi service để xử lý nghiệp vụ, trả response về client
@@ -17,7 +17,7 @@ import { create,
 // ==============================================================================================================
 export const createUser = async (req: Request, res: Response) => {
   try {
-    const user = await create(req.body, req.user!.id);
+    const user = await create(req.body, req.user!._id);
 
     res.json({
       message: "Tạo user thành công",
@@ -59,7 +59,7 @@ export const updateUser = async (req: Request, res: Response) => {
     const updated = await update(
       req.params.id,
       req.body,
-      req.user!.id
+      req.user!._id
     );
 
     res.json({ message: "Cập nhật user thành công", data: updated });
@@ -71,7 +71,7 @@ export const updateUser = async (req: Request, res: Response) => {
 // DELETE USER
 export const deleteUser = async (req: Request, res: Response) => {
   try {
-    await disable(req.params.id, req.user!.id);
+    await disable(req.params.id, req.user!._id);
     res.json({ message: "User đã bị vô hiệu hóa" });
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -80,7 +80,7 @@ export const deleteUser = async (req: Request, res: Response) => {
 
 export const restoreUser = async (req: Request, res: Response) => {
   try {
-    await restore(req.params.id, req.user!.id);
+    await restore(req.params.id, req.user!._id);
     res.json({ message: "Khôi phục user thành công" });
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -91,7 +91,7 @@ export const restoreUser = async (req: Request, res: Response) => {
 export const changePasswordUser = async (req: Request, res: Response) => {
   try {
     await changePassword(
-      req.user!.id,
+      req.user!._id,
       req.body.oldPassword,
       req.body.newPassword
     );
@@ -108,7 +108,7 @@ export const resetPasswordByAdmin = async (req: Request, res: Response) => {
     await resetPassword(
       req.params.id,
       req.body.newPassword,
-      req.user!.id
+      req.user!._id
     );
 
     res.json({ message: "Reset mật khẩu thành công" });
@@ -121,7 +121,7 @@ export const resetPasswordByAdmin = async (req: Request, res: Response) => {
 export const getMe = async (req: Request, res: Response, next: any) => {
   try {
 
-    const userId = req.user!.id;
+    const userId = req.user!._id;
 
     const user = await getMeService(userId);
 
@@ -139,7 +139,7 @@ export const getMe = async (req: Request, res: Response, next: any) => {
 export const updateMe = async (req: Request, res: Response, next: any) => {
   try {
 
-    const userId = req.user!.id;
+    const userId = req.user!._id;
 
     const updatedUser = await updateMeService(
       userId,

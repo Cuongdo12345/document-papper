@@ -1,0 +1,29 @@
+/**
+ * format size
+ * @param bytes 
+ * @returns 
+ */
+export const formatBytes = (bytes: number) => {
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+
+  if (bytes === 0) return "0 Byte";
+
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+
+  return (
+    (bytes / Math.pow(1024, i)).toFixed(2) + " " + sizes[i]
+  );
+};
+
+export const normalizeFiles = (
+  files:
+    | Express.Multer.File[]
+    | { [fieldname: string]: Express.Multer.File[] }
+    | undefined
+): Express.Multer.File[] => {
+  if (!files) return [];
+
+  if (Array.isArray(files)) return files;
+
+  return Object.values(files).flat();
+};

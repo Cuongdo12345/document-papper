@@ -1,1181 +1,418 @@
-Link convert Postman - swagger
----
-
-# 1️⃣ Tổng quan kiến trúc project
-
-Root backend của bạn:
-
-```
-document-manager
-│
-├── server.ts
-├── src
-│   ├── app.ts
-│   ├── config
-│   ├── controllers
-│   ├── dtos
-│   ├── export
-│   ├── middlewares
-│   ├── models
-│   ├── routes
-│   ├── services
-│   ├── shared
-│   └── views
-```
-
-Kiến trúc này thuộc dạng:
-
-**Layered Architecture + Service Pattern**
-
-```
-Route
- ↓
-Middleware
- ↓
-Controller
- ↓
-Service
- ↓
-Model (Mongoose)
- ↓
-MongoDB
-```
+Tôi đã đọc toàn bộ structure backend của bạn. Đây là một project khá đầy đủ (Node.js + TypeScript + MongoDB + RBAC + Workflow + Upload + Export). Dưới đây là cách mình **phân rã toàn bộ hệ thống** để bạn nắm rõ từng phần 👇
 
 ---
 
-# 2️⃣ Backend Request Flow (thực tế)
+# 🧠 1. Tổng quan kiến trúc
 
-Flow request của hệ thống:
+Project đang theo kiến trúc chuẩn:
 
-```
-Client
-  │
-  ▼
-Routes
-  │
-  ▼
-Middlewares
-  │
-  ▼
-Controller
-  │
-  ▼
-Service
-  │
-  ▼
-Model (Mongoose)
-  │
-  ▼
-MongoDB
-```
+* **Controller → Service → Model**
+* Có thêm:
 
-Ví dụ API:
-
-```
-POST /documents
-```
-
-Flow:
-
-```
-document.route.ts
-     ↓
-auth.middleware
-     ↓
-authorizePermission.middleware
-     ↓
-validate.middleware
-     ↓
-document.controller
-     ↓
-documents.service
-     ↓
-document.model
-     ↓
-MongoDB
-```
+  * Middleware
+  * DTO (validate)
+  * RBAC (Role-based access control)
+  * Workflow engine (duyệt tài liệu)
+  * Upload + Export
+  * Audit + Performance tracking
 
 ---
 
-# 3️⃣ Folder Architecture phân tích chi tiết
+# 📁 2. Entry & Core Config
 
-## 1. server.ts
+### 🔹 `server.ts`
 
-Entry point server
+* Entry chính
+* Start server
+* Load app từ `app.ts`
 
-```
-create Express server
-connect database
-start listening port
-```
+### 🔹 `src/app.ts`
 
----
-
-## 2. app.ts
-
-Nơi config:
-
-```
-express
-middlewares
-routes
-error handling
-swagger
-```
-
-Flow:
-
-```
-Express App
-  │
-  ├── cors
-  ├── json parser
-  ├── routes
-  └── error middleware
-```
+* Setup Express
+* Mount routes
+* Middleware global
+* Error handler
 
 ---
 
-# 4️⃣ Config Layer
+# ⚙️ 3. Config hệ thống
 
-```
-src/config
-```
+## 📂 `config/database`
 
-bao gồm:
+* `database.ts`: kết nối MongoDB
+* `database.events.ts`: log event DB
+* `database.shutdown.ts`: graceful shutdown
+* `mongo.logger.ts`: log query Mongo
 
-```
-database/
-   database.ts
-   database.events.ts
-   database.shutdown.ts
-   mongo.logger.ts
-```
+## 📂 `config/swagger`
 
-Đây là:
-
-```
-MongoDB connection manager
-```
-
-Có:
-
-```
-connect
-reconnect
-shutdown
-logging
-```
-
-Đây là **thiết kế tốt cho production**.
+* `swagger.ts`: cấu hình Swagger UI
 
 ---
 
-# 5️⃣ Models (Database Layer)
+# 🧩 4. Layer Controller (API entry)
 
-```
-src/models
-```
+## 📂 `controllers/`
 
-gồm:
+Các module chính:
 
-```
-apiPerformance.model.ts
-counter.model.ts
-department.model.ts
-document.model.ts
-passwordResetToken.model.ts
-refreshToken.model.ts
-user.model.ts
-userAudit.model.ts
-```
+* `auth.controller.ts` → login / register / refresh token
+* `user.controller.ts` → quản lý user
+* `department.controller.ts` → phòng ban
+* `document.controller.ts` → tài liệu (core)
+* `workflow.controller.ts` → luồng duyệt
+* `upload.controller.ts` → upload file
+* `excel.controller.ts` → import/export Excel
+* `dashboard.controller.ts` → thống kê
+* `performance.controller.ts` → tracking performance
+* `userAudit.controller.ts` → audit log user
 
-### Core Collections
-
-```
-Users
-Departments
-Documents
-UserAudits
-```
-
-### Supporting Collections
-
-```
-RefreshTokens
-PasswordResetTokens
-Counters
-ApiPerformance
-```
+👉 Đây là toàn bộ API layer
 
 ---
 
-# 6️⃣ Services Layer
+# 🧠 5. Service Layer (Business logic)
 
-```
-src/services
-```
+## 📂 `services/`
 
-services của bạn:
+### 🔹 Core services:
 
-```
-auths.service.ts
-dashboard.service.ts
-departments.service.ts
-documents.service.ts
-export.service.ts
-userAudits.service.ts
-users.service.ts
-```
-
-Service layer chịu trách nhiệm:
-
-```
-business logic
-database interaction
-data transformation
-workflow
-```
-
-Ví dụ:
-
-```
-documents.service
-```
-
-xử lý:
-
-```
-create proposal
-create report
-repair workflow
-import excel
-document statistics
-```
+* `auths.service.ts`
+* `users.service.ts`
+* `departments.service.ts`
+* `workflow.service.ts`
+* `dashboard.service.ts`
+* `export.service.ts`
 
 ---
 
-# 7️⃣ Controllers Layer
+## 📂 `services/documents/` (RẤT QUAN TRỌNG)
 
-```
-src/controllers
-```
+Đây là core nghiệp vụ tài liệu:
 
-controllers:
+* `document.service.ts` → xử lý chính
+* `documents.query.ts` → filter/search
+* `documents.mapper.ts` → mapping data
+* `documents.validator.ts` → validate business
+* `documents.constants.ts` → constant
+* `documents.types.ts` → typing
+* `documents.service-old-version.ts` → version cũ
 
-```
-auth.controller.ts
-dashboard.controller.ts
-department.controller.ts
-document.controller.ts
-export-excel.controller.ts
-performance.controller.ts
-user.controller.ts
-userAudit.controller.ts
-```
-
-Controllers:
-
-```
-handle request
-call services
-return response
-```
+👉 Đây là nơi bạn nên tập trung nếu muốn nâng cấp logic
 
 ---
 
-# 8️⃣ Routes Layer
+## 📂 `services/upload/`
 
-```
-src/routes
-```
+* `upload.service.ts`
+* `upload.middleware.ts`
+* `upload.validator.ts`
 
-routes:
-
-```
-auth.routes.ts
-dashboard.route.ts
-department.routes.ts
-document.route.ts
-export-excel.route.ts
-performance.routes.ts
-user.routes.ts
-userAudit.routes.ts
-```
-
-Pattern:
-
-```
-Router → Controller
-```
-
-Ví dụ:
-
-```
-/api/documents
-/api/users
-/api/departments
-```
+👉 Xử lý upload 1 file / nhiều file + validate
 
 ---
 
-# 9️⃣ Middleware Layer
+# 🗄️ 6. Database Models (MongoDB)
 
-```
-src/middlewares
-```
+## 📂 `models/`
 
-middlewares:
+### 🔹 Core:
 
-```
-auth.middleware.ts
-authorizePermission.middleware.ts
-error.middleware.ts
-performance.middleware.ts
-upload.middleware.ts
-validate.middleware.ts
-```
-
-### Auth Middleware
-
-```
-JWT verification
-```
-
-### Permission Middleware
-
-```
-RBAC permission check
-```
-
-### Upload Middleware
-
-```
-Multer
-```
-
-### Performance Middleware
-
-```
-API latency tracking
-```
-
-### Validate Middleware
-
-```
-request validation
-```
+* `user.model.ts`
+* `department.model.ts`
+* `document.model.ts`
+* `workflowInstance.model.ts`
+* `workflowTemplate.model.ts`
 
 ---
 
-# 🔟 Shared Layer (rất tốt)
+### 🔹 Auth:
 
-```
-src/shared
-```
-
-structure:
-
-```
-constants
-errors
-helpers
-types
-utils
-```
-
-### constants
-
-```
-permission.constant.ts
-rolePermission.map.ts
-documentRules.ts
-```
-
-### helpers
-
-```
-auth.helper.ts
-document-excel.mapper.ts
-document.filter.helper.ts
-generate-code.ts
-```
-
-### utils
-
-```
-formatDate
-generateDocumentCode
-getNext
-```
+* `refreshToken.model.ts`
+* `passwordResetToken.model.ts`
 
 ---
 
-# 11️⃣ DTO Layer
+### 🔹 Upload:
 
-```
-src/dtos
-```
-
-DTO dùng cho:
-
-```
-request validation
-data mapping
-```
-
-ví dụ:
-
-```
-update-document.dto.ts
-user.dto.ts
-userAudit.dto.ts
-```
+* `upload.model.ts`
 
 ---
 
-# 12️⃣ Export Layer
+### 🔹 Audit & Tracking:
 
-```
-src/export
-```
-
-chứa:
-
-```
-excel export files
-```
-
-Excel được generate bởi:
-
-```
-export.service
-```
+* `userAudit.model.ts`
+* `apiPerformance.model.ts`
 
 ---
 
-# 13️⃣ Email Templates
+### 🔹 Counter:
 
-```
-src/views/email
-```
-
-```
-forgotPassword.ejs
-```
-
-được dùng cho:
-
-```
-reset password
-```
+* `counter.model.ts` → generate mã auto (document code)
 
 ---
 
-# 14️⃣ Authentication Architecture
+## 🔐 RBAC (QUAN TRỌNG)
 
-Auth system:
+📂 `models/rbac/`
 
-```
-JWT
-+
-Refresh Token
-+
-Password Reset Token
-```
+* `role.model.ts`
+* `permission.model.ts`
 
-Collections:
-
-```
-Users
-RefreshTokens
-PasswordResetTokens
-```
-
-Flow:
-
-```
-Login
- ↓
-JWT access token
- ↓
-Refresh token
- ↓
-API requests
-```
+👉 Đây là nền tảng phân quyền
 
 ---
 
-# 15️⃣ Permission System
+# 🔐 7. Middleware
 
-Permission được định nghĩa trong:
+## 📂 `middlewares/`
 
-```
-permission.constant.ts
-rolePermission.map.ts
-```
-
-Flow:
-
-```
-User role
-   ↓
-rolePermission.map
-   ↓
-permissions
-   ↓
-authorizePermission.middleware
-```
-
-RBAC system.
+* `auth.middleware.ts` → verify JWT
+* `authorizePermission.middleware.ts` → check permission (RBAC)
+* `validate.middleware.ts` → validate DTO
+* `upload.middleware.ts` → xử lý file upload
+* `performance.middleware.ts` → tracking API time
+* `error.middleware.ts` → handle error
 
 ---
 
-# 16️⃣ Document Workflow Engine
+# 📦 8. DTO (Validation)
 
-Core system của project.
+## 📂 `dtos/`
 
-Document types:
+* `auths.dto.ts`
+* `users.dto.ts`
+* `documents.dto.ts`
+* `departments.dto.ts`
+* `update-status.dto.ts`
 
-```
-PROPOSE_REPAIR
-PROPOSE_INK
-PROPOSE_PROCUREMENT
-```
-
-Reports:
-
-```
-CHECK_DAMAGE
-CONFIRM_STATUS
-```
-
-Workflow:
-
-```
-Proposal
-  ↓
-Report
-  ↓
-Repair workflow
-  ↓
-Signed confirmation
-```
-
-Document fields quan trọng:
-
-```
-repairStatus
-signedBy[]
-referenceTo
-```
+👉 Dùng để validate request input
 
 ---
 
-# 17️⃣ Dashboard Analytics
+# 🌐 9. Routes
 
-Dashboard được build trong:
+## 📂 `routes/`
 
-```
-dashboard.service.ts
-```
+Mapping controller:
 
-Thống kê:
-
-```
-repair quantity
-ink quantity
-procurement quantity
-monthly statistics
-```
-
----
-
-# 18️⃣ Performance Monitoring
-
-Bạn có middleware:
-
-```
-performance.middleware
-```
-
-và model:
-
-```
-apiPerformance.model
-```
-
-để track:
-
-```
-API latency
-execution time
-endpoint performance
-```
+* `auth.routes.ts`
+* `user.routes.ts`
+* `document.route.ts`
+* `workflow.routes.ts`
+* `upload.routes.ts`
+* `excel.route.ts`
+* `dashboard.route.ts`
+* `performance.routes.ts`
+* `userAudit.routes.ts`
 
 ---
 
-# 19️⃣ Kiến trúc thực tế của hệ thống
+# 🔄 10. Workflow Engine (điểm mạnh của project)
 
-System architecture:
+## Gồm:
 
-```
-Frontend (React Admin)
-        │
-        ▼
-Express API
-        │
-        ▼
-Middleware Layer
-        │
-        ▼
-Controller Layer
-        │
-        ▼
-Service Layer
-        │
-        ▼
-Mongoose Models
-        │
-        ▼
-MongoDB
-```
+* `workflowTemplate` → template luồng duyệt
+* `workflowInstance` → instance khi document chạy
+
+## Logic:
+
+* Document → attach workflow
+* Submit → tạo instance
+* Approve/Reject → update step
+
+👉 Bạn đã build gần giống hệ thống DMS/ERP
 
 ---
 
-# 20️⃣ Đánh giá kiến trúc hiện tại
+# 📂 11. Shared (Reusable)
 
-### Điểm mạnh
+## 📂 `shared/`
 
-✔ Layered architecture rõ ràng
-✔ Service pattern chuẩn
-✔ Middleware tách riêng
-✔ RBAC permission system
-✔ Excel import/export
-✔ Dashboard analytics
-✔ Performance monitoring
+### 🔹 constants:
 
-Đây là **backend khá chuẩn cho enterprise admin system**.
+* `permission.constant.ts`
+* `rolePermission.map.ts`
+* `documentRules.ts`
+* `workflow-docs.ts`
 
 ---
 
-### Điểm có thể cải thiện
+### 🔹 helpers:
 
-1️⃣ Service khá lớn
-
-```
-documents.service
-```
-
-có thể tách thành:
-
-```
-documentProposal.service
-documentReport.service
-documentRepair.service
-```
+* `generate-code.ts`
+* `parse-doc.ts`
+* `auth.helper.ts`
+* `buildMapReports.ts`
 
 ---
 
-2️⃣ Repository layer
+### 🔹 utils:
 
-Hiện tại:
-
-```
-Service → Model
-```
-
-có thể tách thêm:
-
-```
-Service
- ↓
-Repository
- ↓
-Model
-```
+* `catchAsync.ts`
+* `formatDate.ts`
+* `generateDocumentCode.ts`
 
 ---
 
-3️⃣ Domain layer
+### 🔹 errors:
 
-Có thể refactor thành:
-
-```
-Domain Driven Design
-```
+* `ApiError.ts`
+* `errorHandler.ts`
 
 ---
 
-# ⭐ Đánh giá tổng thể
+# 📤 12. Upload & File Storage
 
-Kiến trúc project của bạn:
+## 📂 `uploads/`
 
-```
-Layered Architecture
-+
-Service Pattern
-+
-RBAC Permission
-+
-Workflow Engine
-```
+* Lưu file thực tế (PDF, DOCX, XLSX)
 
-Mức độ:
+## 📂 `export/document/`
 
-```
-Intermediate → Senior backend architecture
-```
-
-Khá tốt cho hệ thống:
-
-```
-Document Management System
-Repair Workflow System
-```
+* File export Excel
 
 ---
 
+# 📊 13. Export / Import
 
-1️⃣ **ERD Database chuẩn từ code thật**
-2️⃣ **Document Workflow Engine Diagram chuẩn hệ thống của bạn**
-3️⃣ **Admin UI Architecture (match 100% backend)**
+* `excel.controller.ts`
+* `export.service.ts`
 
----
-
-# 1️⃣ ERD Database (chuẩn theo code project)
-
-Dựa trên các model bạn có:
-
-* user.model
-* department.model
-* document.model
-* userAudit.model
-* refreshToken.model
-* passwordResetToken.model
-* counter.model
-* apiPerformance.model
-
-Sơ đồ ERD:
-
-```
-                           ┌────────────────────┐
-                           │     Departments    │
-                           │────────────────────│
-                           │ _id                │
-                           │ name               │
-                           │ code               │
-                           │ createdAt          │
-                           └─────────┬──────────┘
-                                     │
-                                     │
-                                     ▼
-                           ┌────────────────────┐
-                           │       Users        │
-                           │────────────────────│
-                           │ _id                │
-                           │ name               │
-                           │ email              │
-                           │ password           │
-                           │ role               │
-                           │ permissions[]      │
-                           │ departmentId       │
-                           │ createdAt          │
-                           └─────────┬──────────┘
-                                     │
-                                     │ createdBy
-                                     ▼
-                           ┌───────────────────────────┐
-                           │        Documents          │
-                           │───────────────────────────│
-                           │ _id                       │
-                           │ documentCode              │
-                           │ category                  │
-                           │ subType                   │
-                           │ departmentId              │
-                           │ createdBy                 │
-                           │ repairStatus              │
-                           │ signedBy[]                │
-                           │ referenceTo               │
-                           │ meta                      │
-                           │ createdAt                 │
-                           └───────────┬───────────────┘
-                                       │
-                                       │ referenceTo
-                                       ▼
-                           ┌───────────────────────────┐
-                           │        Documents          │
-                           │        (Report)           │
-                           └───────────────────────────┘
-
-
-                 ┌──────────────────────────┐
-                 │       UserAudits         │
-                 │──────────────────────────│
-                 │ userId                   │
-                 │ action                   │
-                 │ endpoint                 │
-                 │ method                   │
-                 │ ipAddress                │
-                 │ timestamp                │
-                 └──────────────┬───────────┘
-                                │
-                                ▼
-                           ┌──────────────┐
-                           │     Users    │
-                           └──────────────┘
-
-
-        ┌───────────────────────┐
-        │     RefreshTokens     │
-        │───────────────────────│
-        │ userId                │
-        │ token                 │
-        │ expiresAt             │
-        └──────────────┬────────┘
-                       │
-                       ▼
-                     Users
-
-
-        ┌──────────────────────────┐
-        │   PasswordResetTokens    │
-        │──────────────────────────│
-        │ userId                   │
-        │ token                    │
-        │ expiresAt                │
-        └──────────────┬───────────┘
-                       │
-                       ▼
-                     Users
-
-
-        ┌──────────────────────────┐
-        │        Counters          │
-        │──────────────────────────│
-        │ key                      │
-        │ seq                      │
-        └──────────────────────────┘
-
-
-        ┌──────────────────────────┐
-        │     ApiPerformance       │
-        │──────────────────────────│
-        │ endpoint                 │
-        │ method                   │
-        │ duration                 │
-        │ timestamp                │
-        └──────────────────────────┘
-```
+👉 Export Excel từ DB
+👉 Import file Excel
 
 ---
 
-# 2️⃣ Document Workflow Engine (core system)
+# 📧 14. Email
 
-Workflow thật của hệ thống bạn:
+## 📂 `views/email/`
 
-```
-                    ┌────────────────────────────┐
-                    │      CREATE PROPOSAL       │
-                    │────────────────────────────│
-                    │ PROPOSE_REPAIR             │
-                    │ PROPOSE_INK                │
-                    │ PROPOSE_PROCUREMENT        │
-                    └───────────────┬────────────┘
-                                    │
-                                    │ stored in
-                                    ▼
-                           ┌──────────────────┐
-                           │     DOCUMENT     │
-                           │    (Proposal)    │
-                           └────────┬─────────┘
-                                    │
-                                    │ generate report
-                                    ▼
-                    ┌────────────────────────────┐
-                    │          REPORT            │
-                    │────────────────────────────│
-                    │ CHECK_DAMAGE               │
-                    │ CONFIRM_STATUS             │
-                    │ referenceTo = proposalId   │
-                    └───────────────┬────────────┘
-                                    │
-                                    ▼
-                    ┌────────────────────────────┐
-                    │       REPAIR WORKFLOW      │
-                    │────────────────────────────│
-                    │ repairStatus               │
-                    │                            │
-                    │  PENDING                   │
-                    │  IN_PROGRESS               │
-                    │  DONE                      │
-                    └───────────────┬────────────┘
-                                    │
-                                    ▼
-                    ┌────────────────────────────┐
-                    │        CONFIRMATION        │
-                    │────────────────────────────│
-                    │ signedBy[]                 │
-                    │ inspectionResult           │
-                    │ repair completed           │
-                    └────────────────────────────┘
-```
+* `forgotPassword.ejs`
 
-Key logic bạn đã build:
-
-```
-Proposal
-   ↓
-Report
-   ↓
-Repair workflow
-   ↓
-Confirmation
-```
+👉 dùng cho reset password
 
 ---
 
-# 3️⃣ Admin UI Architecture (match backend)
+# 📄 15. API Docs
 
-Dựa trên **routes + services bạn có**, UI admin nên như sau.
+## 📂 `docs/openAPI.yaml`
 
-## Admin Layout
-
-```
-Admin Dashboard
-│
-├ Dashboard
-│
-├ Document Management
-│   ├ Proposals
-│   │   ├ Repair Proposals
-│   │   ├ Ink Proposals
-│   │   └ Procurement Proposals
-│   │
-│   ├ Reports
-│   │   ├ Check Damage
-│   │   └ Confirm Status
-│   │
-│   └ Repair Tracking
-│
-├ Departments
-│
-├ Users
-│
-├ Audit Logs
-│
-├ Performance Monitoring
-│
-└ Excel Export
-```
+* Swagger full API
 
 ---
 
-## Dashboard UI
+# 🚀 16. Các module chính của hệ thống
 
-```
-Dashboard
-│
-├ Total Repair Requests
-├ Total Ink Requests
-├ Total Procurement Requests
-│
-├ Monthly Statistics
-│
-├ Repair Status Chart
-│
-└ Department Statistics
-```
+Tóm lại project bạn gồm:
 
----
+### 🔹 1. Authentication
 
-## Document Workflow UI
+* Login / JWT / Refresh token
 
-```
-Documents
-│
-├ Create Proposal
-│
-├ Proposal List
-│
-├ Proposal Detail
-│
-│    Proposal Info
-│    Related Report
-│
-├ Create Report
-│
-├ Repair Status
-│
-└ Sign Confirmation
-```
+### 🔹 2. User & Department
 
----
+* Quản lý user + phòng ban
 
-## User Management UI
+### 🔹 3. Document Management (CORE)
 
-```
-Users
-│
-├ User List
-├ Create User
-├ Update User
-├ Assign Role
-├ Assign Permissions
-```
+* CRUD document
+* Upload file
+* Version / metadata
+
+### 🔹 4. Workflow Engine
+
+* Submit / approve / reject
+
+### 🔹 5. RBAC
+
+* Role
+* Permission
+* Middleware check quyền
+
+### 🔹 6. Upload System
+
+* Single / multiple file
+* Validate file
+
+### 🔹 7. Import / Export
+
+* Excel import/export
+
+### 🔹 8. Audit & Logging
+
+* User audit
+* API performance
+
+### 🔹 9. Dashboard
+
+* Thống kê
 
 ---
 
-## Department Management
+# 🔥 17. Đánh giá nhanh (rất quan trọng)
 
-```
-Departments
-│
-├ Department List
-├ Create Department
-├ Update Department
-└ Sync From Excel
-```
+## 👍 Điểm mạnh
 
----
-
-## Audit Log UI
-
-```
-Audit Logs
-│
-├ User
-├ Endpoint
-├ Action
-├ IP
-└ Timestamp
-```
+* Kiến trúc rõ ràng
+* Có RBAC chuẩn
+* Có workflow (rất giá trị)
+* Tách service tốt
+* Có audit + performance
 
 ---
 
-# 4️⃣ Full System Flow (toàn bộ hệ thống)
+## ⚠️ Điểm có thể nâng cấp
 
-```
-User
-  │
-  ▼
-Login
-  │
-  ▼
-JWT Auth
-  │
-  ▼
-API Request
-  │
-  ▼
-Middleware Layer
-  │
-  ▼
-Controller
-  │
-  ▼
-Service
-  │
-  ▼
-MongoDB
-  │
-  ▼
-Document Workflow Engine
-  │
-  ▼
-Repair Lifecycle
-  │
-  ▼
-Dashboard Analytics
-  │
-  ▼
-Excel Export
-```
+1. **Workflow chưa gắn chặt document**
 
+   * nên lưu `workflowInstanceId` trong document (như bạn đã nói 👍)
 
+2. **RBAC nâng cao**
 
-///////////////////////////////////////////////////////////////////////////////////////////////
-Mẫu tạo biên bản và đề xuất
+   * chưa thấy:
 
-biên bản kiểm tra sửa chữa
-{
-  "category": "REPORT",
-  "subType": "CHECK_DAMAGE",
-  "title": "Biên bản kiểm tra tình trạng hư hỏng thiết bị",
-  "department": "64ff...",
-  "meta": {
-    "checkDate": "2026-01-07",
-    "location": "Khoa Nội tổng hợp",
-    "representatives": {
-      "departmentRep": "Phạm Thị Kim Lý",
-      "inspector": "Đỗ Mạnh Cường"
-    },
-    "device": {
-      "name": "Máy vi tính"
-    },
-    "inspectionResult": "Hỏng nguồn, CPU",
-    "proposedSolution": "Đề xuất sửa chữa"
-  }
-}
+     * permission theo resource (document owner)
+     * dynamic condition
 
-Giấy đề xuất sửa chửa
-POST /api/documents
-Authorization: Bearer <token>
+3. **Upload**
 
-Mẫu đề xuất sửa chữa thiết bị
-{
-  "category": "PROPOSAL",
-  "subType": "PROPOSE_REPAIR",
-  "title": "Giấy đề xuất sửa chữa thiết bị",
-  "department": "64ff...",
-  "referenceTo": "",
-  "meta": {
-    "items": [
-      {
-        "deviceName": "Máy vi tính",
-        "quantity": 1,
-        "note": "Hỏng nguồn, CPU"
-      }
-    ]
-  }
-}
+   * chưa thấy:
 
-Mẫu đề xuất thay mực
-{
-  "category": "PROPOSAL",
-  "subType": "PROPOSE_INK",
-  "title": "Đề xuất thay mực máy in",
-  "meta": {
-    "items": [
-      {
-        "deviceName": "Máy vi tính",
-        "quantity": 1,
-        "note": "Hỏng nguồn, CPU"
-      }
-    ]
-  }
-}
+     * cloud (S3)
+     * phân quyền file
 
-Biên bản xác nhận tình trang thay mực
-{
-  "category": "REPORT",
-  "subType": "CONFIRM_STATUS",
-  "title": "Biên bản xác nhận tình trạng thiết bị",
-  "department": "depId",
-  "createdBy": "userId",
-  "meta": {
-    "checkDate": "2026-02-03",
-    "location": "Khoa Nội Cơ Xương Khớp",
-    "representatives": {
-      "departmentRep": "Trần Thị Ngọc Hạnh",
-      "inspector": "Đỗ Mạnh Cường"
-    },
-    "device": {
-      "name": "Hộp mực máy in",
-      "relatedDevice": "Máy in HP",
-      "quantity": 1
-    },
-    "inspectionResult": "Khi in giấy bị đen đường dọc",
-    "proposedSolution": "Thay drum và gạt lớn hộp mực"
-  }
-}
+4. **Document**
+
+   * chưa có:
+
+     * versioning chuẩn
+     * soft delete
+     * tagging
+
+5. **Search**
+
+   * nên thêm:
+
+     * full-text search (Mongo Atlas)
+
+6. **Audit**
+
+   * nên log:
+
+     * before/after data
+
+---
+
+# 👉 Nếu bạn muốn tiếp
+
+Mình có thể giúp bạn:
+
+* Build **RBAC nâng cao (enterprise-level)**
+* Gắn **workflowInstanceId vào document chuẩn**
+* Thiết kế lại **document versioning**
+* Build **permission theo từng document**
+* Hoặc **review sâu từng file code (line-by-line)**
+
+Chỉ cần nói:
+👉 *"phân tích sâu phần X"* hoặc *"build lại module Y"*

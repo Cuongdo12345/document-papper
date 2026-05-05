@@ -1,8 +1,7 @@
 import { Types } from "mongoose";
 import { generateDocumentCode } from "../../shared/utils/generateDocumentCode";
 import ApiError from "../../shared/errors/ApiError";
-import UserAudit from "../../models/userAudit.model";
-import { Document } from "../../models/document.model"
+import UserAudit from "../../models/users/userAudit.model";
 import {
   validateDocumentRule,
   validateReference,
@@ -22,10 +21,9 @@ import {
   findReportsByProposal,
   findDocumentIncludeDeleted
 } from "./documents.query";
-
-import { validateStatusTransition, validateStatusPermission,} from "../documents/documents.validator";
+// import { validateStatusTransition, validateStatusPermission,} from "../documents/documents.validator";
 import { DOCUMENT_UPDATE_WHITELIST } from "./documents.constants";
-import { DocumentStatus } from "../../shared/constants/workflow-docs";
+// import { DocumentStatus } from "../../shared/constants/workflow-docs";
 
 /* ===============================
    CREATE
@@ -375,45 +373,45 @@ export const restoreDocumentService = async ({
    * Update workflow doc
    * =============================== */
 
-export const updateStatusService = async (
-  documentId: any,
-  nextStatus: DocumentStatus,
-  user: any,
-  userId: any
-) => {
-  const doc = await Document.findById(documentId);
+// export const updateStatusService = async (
+//   documentId: any,
+//   nextStatus: DocumentStatus,
+//   user: any,
+//   userId: any
+// ) => {
+//   const doc = await Document.findById(documentId);
 
-  if (!doc) {
-    throw ApiError.notFound("Document không tồn tại");
-  }
+//   if (!doc) {
+//     throw ApiError.notFound("Document không tồn tại");
+//   }
 
-  // ❌ Lock nếu đã DONE
-  if (doc.repairStatus === "DONE") {
-    throw ApiError.badRequest("Document đã hoàn thành, không thể cập nhật");
-  }
+//   // ❌ Lock nếu đã DONE
+//   if (doc.repairStatus === "DONE") {
+//     throw ApiError.badRequest("Document đã hoàn thành, không thể cập nhật");
+//   }
 
-  // ✅ Validate flow
-  validateStatusTransition(doc.repairStatus, nextStatus as any);
+//   // ✅ Validate flow
+//   validateStatusTransition(doc.repairStatus, nextStatus as any);
 
-  // ✅ Validate permission
-  validateStatusPermission(nextStatus as any, user.role);
+//   // ✅ Validate permission
+//   validateStatusPermission(nextStatus as any, user.role);
 
-  const oldStatus = doc.repairStatus;
+//   const oldStatus = doc.repairStatus;
 
-  // ✅ Update trực tiếp
-    doc.repairStatus = nextStatus;
-    doc.updatedBy = user._id;
+//   // ✅ Update trực tiếp
+//     doc.repairStatus = nextStatus;
+//     doc.updatedBy = user._id;
 
-   await doc.save();
+//    await doc.save();
 
-  // ⚠️ Audit log (không có transaction)
-  await UserAudit.create({
-    user: doc._id,
-    action: "UPDATE",
-    note: oldStatus,
-    // to: nextStatus,
-    performedBy: userId,
-  });
+//   // ⚠️ Audit log (không có transaction)
+//   await UserAudit.create({
+//     user: doc._id,
+//     action: "UPDATE",
+//     note: oldStatus,
+//     // to: nextStatus,
+//     performedBy: userId,
+//   });
 
-  return doc;
-};
+//   return doc;
+// };

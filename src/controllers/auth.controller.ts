@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { AuthService } from "../services/auths.service";
+import { AuthService } from "../services/auth/auths.service";
 
 // ================================ CONTROLLER MỚI SỬ DỤNG SERVICE ================================
 // Controller chỉ còn nhiệm vụ nhận request, gọi service và trả response
@@ -31,7 +31,7 @@ export const refreshAccessToken = async (req: Request, res: Response) => {
 
 export const logout = async (req: Request, res: Response) => {
   try {
-    await AuthService.logout(req.body.refreshToken, req.user!.id);
+    await AuthService.logout(req.body.refreshToken, req.user!._id);
     res.json({ message: "Đăng xuất thành công" });
   } catch (error: any) {
     res.status(400).json({ message: error.message });

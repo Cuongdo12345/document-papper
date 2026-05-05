@@ -8,7 +8,7 @@ import {
   getReportsByProposalService,
   restoreDocumentService,
   deleteDocumentsByMonthService,
-  updateStatusService
+  // updateStatusService
 } from "../services/documents/document.service";
 
 import { catchAsync } from "../shared/utils/catchAsync";
@@ -156,23 +156,23 @@ export const restoreDocuments = catchAsync(async (req: Request, res: Response) =
 /* ===============================
    Update status
 =============================== */
-export const updateStatusDocuments = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+// export const updateStatusDocuments = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
 
-    const { status } = req.body;
+//     const { status } = req.body;
 
-    const result = await updateStatusService(
-      req.params.id,
-      status,
-      req.user,
-      req.user!.id
-);
+//     const result = await updateStatusService(
+//       req.params.id,
+//       status,
+//       req.user,
+//       req.user!.id
+// );
 
-    res.json({
-      success: true,
-      message:"Update status thành công",
-      data: result,
-    });
-});
+//     res.json({
+//       success: true,
+//       message:"Update status thành công",
+//       data: result,
+//     });
+// });
 
 
 //import {createDocumentService,

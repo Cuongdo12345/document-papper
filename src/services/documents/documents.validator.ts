@@ -1,6 +1,6 @@
 import { DOCUMENT_RULES } from "../../shared/constants/documentRules";
 import ApiError from "../../shared/errors/ApiError";
-import { Document, DocumentCategory, DocumentSubType } from "../../models/document.model";
+import { Document, DocumentCategory, DocumentSubType } from "../../models/documents/document.model";
 import { Types } from "mongoose";
 import { DOCUMENT_WORKFLOW, STATUS_PERMISSION, DocumentStatus } from "../../shared/constants/workflow-docs";
 

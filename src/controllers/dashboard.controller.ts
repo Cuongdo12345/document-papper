@@ -6,7 +6,7 @@ import {
   topDamagedDevicesService,
   getDashboardDeviceStats,
   topDamagedInkService
-} from "../services/dashboard.service";
+} from "../services/dashboard/dashboard.service";
 import { Request, Response, NextFunction } from "express";
 
 // 🏥 ADMIN DASHBOARD SUMMARY'

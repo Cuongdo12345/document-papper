@@ -1,4 +1,4 @@
-import { Document } from "../../models/document.model";
+import { Document } from "../../models/documents/document.model";
 
 export const createDocument = (data: any) => {
   return Document.create(data);
