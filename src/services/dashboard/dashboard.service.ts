@@ -1,6 +1,6 @@
 import { Document, DocumentCategory, DocumentSubType } from "../../models/documents/document.model";
 import Department from "../../models/departments/department.model";
-import User from "../../models/users/user.model";
+import {User} from "../../models/users/user.model";
 import { Types } from "mongoose";
 import ApiError from "../../shared/errors/ApiError";
 

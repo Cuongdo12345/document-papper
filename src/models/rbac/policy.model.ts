@@ -1,10 +1,10 @@
 import { Schema, model } from "mongoose";
 
 export interface IPolicy {
-  name: string;
-  resource: string;
-  action: string;
-  condition:string
+  name?: string;
+  resource?: string;
+  action?: string;
+  condition?:string
 }
 
 const PolicySchema =  new Schema<IPolicy>(

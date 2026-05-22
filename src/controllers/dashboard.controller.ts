@@ -16,7 +16,7 @@ export const adminDashboardSummary = async (
   next: NextFunction,
 ) => {
   try {
-    if (req.user!.role !== "ADMIN") {
+    if (req.user!.role.name !== "ADMIN") {
       return res.status(403).json({
         message: "Chỉ ADMIN được truy cập dashboard",
       });

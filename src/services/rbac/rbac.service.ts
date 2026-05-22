@@ -87,6 +87,18 @@ export const assignPermissionsToRoleService = async (
   return role.save();
 };
 
+
+/**
+ * | RBAC thường           | Policy RBAC                |
+| --------------------- | -------------------------- |
+| chỉ role → permission | role → policy → permission |
+| khó mở rộng           | scale lớn                  |
+| hard-code             | dynamic                    |
+| khó audit             | audit cực mạnh             |
+
+ * @param payload 
+ * @returns 
+ */
 // ================= POLICY =================
 
 export const createPolicyService = async (payload: any) => {

@@ -14,10 +14,10 @@ import { authorizePermission } from "../middlewares/authorizePermission.middlewa
 
 const router = Router();
 
-router.post("/",authenticate, createUser);
-router.get("/", authenticate, getUsers);
+router.post("/",authenticate, authorizePermission("USER_CREATE"), createUser);
+router.get("/", authenticate, authorizePermission("USER_READ"), getUsers); 
 router.get("/me", authenticate, getMe);
-router.get("/:id", authenticate, getUserById);
+router.get("/:id", authenticate, authorizePermission("USER_DETAIL"), getUserById);
 router.patch("/me", authenticate, updateMe);
 router.put("/:id", authenticate, authorizePermission("USER_UPDATE"), updateUser);
 router.delete("/:id", authenticate, authorizePermission("USER_DELETE"), deleteUser);
