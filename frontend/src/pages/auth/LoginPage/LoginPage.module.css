@@ -1,0 +1,16 @@
+/* src/pages/auth/LoginPage/LoginPage.module.css */
+
+/* Theo AUTH_UI_SPEC.md §8.1 — Spacing multiples of 8px, không hardcode màu */
+
+.container {
+  width: 100%;
+}
+
+.title {
+  margin-bottom: 24px;
+}
+
+.forgotLink {
+  margin-bottom: 0;
+  text-align: right;
+}

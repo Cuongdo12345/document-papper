@@ -1,0 +1,26 @@
+/* src/components/data-display/DataTable/DataTable.module.css */
+
+/* Striped rows — bật khi prop `striped=true` */
+.striped :global(.ant-table-tbody) > tr:nth-child(even) > td {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Sticky header — đảm bảo header luôn nổi trên scroll body, không bị che bởi nội dung */
+.stickyHeader :global(.ant-table-thead) > tr > th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+/* Action column luôn sticky right — khoảng đệm tránh dính sát viền phải khi scroll ngang */
+.actionColumn {
+  padding-right: 8px;
+}
+
+/* Row có onRow handler (click row) — đổi cursor báo hiệu có thể tương tác.
+   Lưu ý: DataTable hiện tại KHÔNG có prop onRow trong Props Interface đã xác nhận
+   (SHARED_COMPONENTS_LIBRARY.md §4) — class này dự phòng cho tương lai nếu được
+   bổ sung, KHÔNG sử dụng ở phiên bản hiện tại. */
+.clickableRow {
+  cursor: pointer;
+}

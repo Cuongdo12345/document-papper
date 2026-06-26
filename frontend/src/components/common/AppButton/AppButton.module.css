@@ -1,0 +1,122 @@
+/*
+ * AppButton.module.css
+ *
+ * Chỉ chứa styles KHÔNG có sẵn trong AntD 5:
+ *   - success variant (AntD không có Button type="success")
+ *   - warning variant
+ *   - iconAfter layout
+ *   - base reset đồng nhất
+ *
+ * Màu lấy từ AntD CSS variables — không hardcode hex.
+ * PROJECT_UNDERSTANDING §11.1:
+ *   colorSuccess: #52c41a  → var(--ant-color-success)
+ *   colorWarning: #faad14  → var(--ant-color-warning)
+ */
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+.base {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Size overrides (bổ sung vào AntD defaults) ───────────────────────────── */
+.size-large {
+  /* AntD large đã là 40px — chỉ thêm min-width để tránh quá nhỏ */
+  min-width: 88px;
+}
+
+.size-small {
+  /* Table row actions — không cần min-width */
+  min-width: unset;
+  padding-inline: 8px;
+}
+
+/* ── Success variant ────────────────────────────────────────────────────────
+ * AntD 5 Button không có type="success" — override màu thủ công
+ * Dùng CSS custom properties từ AntD ConfigProvider
+ */
+:global(.app-btn--success) {
+  background-color: var(--ant-color-success, #52c41a) !important;
+  border-color: var(--ant-color-success, #52c41a) !important;
+  color: #fff !important;
+}
+
+:global(.app-btn--success:not(:disabled):hover) {
+  background-color: var(--ant-color-success-hover, #73d13d) !important;
+  border-color: var(--ant-color-success-hover, #73d13d) !important;
+}
+
+:global(.app-btn--success:not(:disabled):active) {
+  background-color: var(--ant-color-success-active, #389e0d) !important;
+  border-color: var(--ant-color-success-active, #389e0d) !important;
+}
+
+/* ── Warning variant ────────────────────────────────────────────────────────
+ * Dùng cho Reject workflow button
+ */
+:global(.app-btn--warning) {
+  border-color: var(--ant-color-warning, #faad14) !important;
+  color: var(--ant-color-warning, #faad14) !important;
+}
+
+:global(.app-btn--warning:not(:disabled):hover) {
+  background-color: var(--ant-color-warning-bg, #fffbe6) !important;
+  border-color: var(--ant-color-warning-hover, #ffc53d) !important;
+  color: var(--ant-color-warning-hover, #ffc53d) !important;
+}
+
+:global(.app-btn--warning:not(:disabled):active) {
+  border-color: var(--ant-color-warning-active, #d48806) !important;
+  color: var(--ant-color-warning-active, #d48806) !important;
+}
+
+/* ── Critical variant ───────────────────────────────────────────────────────
+ * danger=true + type=primary → đã đỏ trong AntD
+ * Thêm subtle pulsing border khi focus để nhấn mạnh nguy hiểm
+ */
+:global(.app-btn--critical:focus-visible) {
+  outline: 2px solid var(--ant-color-error, #ff4d4f);
+  outline-offset: 2px;
+}
+
+/* ── Ghost variant ─────────────────────────────────────────────────────────
+ * Inline table actions — nhẹ, không chiếm visual space
+ */
+:global(.app-btn--ghost) {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+:global(.app-btn--ghost:hover) {
+  background-color: var(--ant-color-bg-text-hover, rgba(0, 0, 0, 0.06)) !important;
+  border-color: transparent !important;
+}
+
+/* ── Loading state ──────────────────────────────────────────────────────────
+ * Cursor và opacity đã handled bởi AntD — chỉ thêm không-shrink để
+ * prevent layout shift khi text thay đổi (vd: "Lưu" → "Đang xử lý...")
+ */
+.loading {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* ── Icon-only button ───────────────────────────────────────────────────────
+ * Khi không có children — đảm bảo padding đều
+ */
+.iconOnly {
+  padding-inline: 8px;
+}
+
+/* ── Icon after children ────────────────────────────────────────────────────
+ * Trailing icon (ví dụ DownOutlined trong dropdown trigger)
+ */
+.iconAfter {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  opacity: 0.8;
+}

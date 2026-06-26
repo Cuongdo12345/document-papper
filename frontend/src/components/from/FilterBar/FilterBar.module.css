@@ -1,0 +1,135 @@
+/*
+ * FilterBar.module.css
+ *
+ * Layout và visual cho filter panel.
+ * Không override AntD component internals — chỉ wrapper và structural styles.
+ */
+
+/* ── Outer wrapper ───────────────────────────────────────────────────────── */
+.wrapper {
+  background-color: var(--ant-color-bg-container, #fff);
+  border: 1px solid var(--ant-color-border, #d9d9d9);
+  border-radius: var(--ant-border-radius-lg, 8px);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+/* ── Form layout ─────────────────────────────────────────────────────────── */
+.form {
+  width: 100%;
+}
+
+.fieldsWrapper {
+  /* Khi không có collapse header */
+}
+
+.formItem {
+  margin-bottom: 0 !important;
+}
+
+.formItem :global(.ant-form-item-label > label) {
+  font-size: 13px;
+  color: var(--ant-color-text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ── Action buttons column ───────────────────────────────────────────────── */
+.actionsCol {
+  display: flex;
+  align-items: flex-end;
+}
+
+.actionButtons {
+  width: 100%;
+  justify-content: flex-end;
+}
+
+/* ── Collapse header ─────────────────────────────────────────────────────── */
+.collapseHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  padding: 4px 0 12px;
+  border-bottom: 1px solid var(--ant-color-border, #d9d9d9);
+  margin-bottom: 12px;
+  user-select: none;
+  transition: color 0.2s;
+}
+
+.collapseHeader:hover {
+  color: var(--ant-color-primary, #1677ff);
+}
+
+.collapseTitle {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+/* Active filter count badge trên collapse button */
+.activeBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 11px;
+  font-weight: 600;
+  background-color: var(--ant-color-primary, #1677ff);
+  color: #fff;
+  border-radius: 9px;
+  line-height: 1;
+}
+
+/* ── Active filter summary bar ───────────────────────────────────────────── */
+.activeSummary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-top: 10px;
+  margin-top: 10px;
+  border-top: 1px dashed var(--ant-color-border, #d9d9d9);
+}
+
+.activeSummaryText {
+  font-size: 12px;
+  color: var(--ant-color-text-secondary);
+}
+
+.clearAllLink {
+  font-size: 12px;
+  padding: 0 !important;
+  height: auto !important;
+  line-height: inherit !important;
+}
+
+/* ── Search icon ─────────────────────────────────────────────────────────── */
+.searchIcon {
+  color: var(--ant-color-text-quaternary);
+}
+
+/* ── Responsive: tablet (max-width: 768px) ───────────────────────────────── */
+@media (max-width: 768px) {
+  .wrapper {
+    padding: 12px;
+  }
+
+  .actionButtons {
+    justify-content: stretch;
+    flex-direction: column;
+  }
+
+  .actionButtons :global(.ant-btn) {
+    width: 100%;
+  }
+}
+
+/* ── Responsive: mobile (max-width: 480px) ───────────────────────────────── */
+@media (max-width: 480px) {
+  .wrapper {
+    padding: 10px;
+    margin-bottom: 12px;
+  }
+}

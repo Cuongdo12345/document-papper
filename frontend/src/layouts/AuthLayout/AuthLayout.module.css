@@ -1,0 +1,72 @@
+/**
+ * AuthLayout.module.css
+ *
+ * Styles cho AuthLayout.
+ * Chỉ chứa layout structure — màu và radius lấy từ AntD theme tokens.
+ *
+ * Nguồn: LAYOUT_ARCHITECTURE.md §1.3 và §8.2
+ */
+
+/* ── Outer wrapper ───────────────────────────────────────────────────────── */
+.wrapper {
+  min-height: 100vh;
+  width: 100%;
+  /* background được set qua style prop (token.colorBgLayout) */
+}
+
+/* ── Flex center container ───────────────────────────────────────────────── */
+.centerFlex {
+  min-height: 100vh;
+  padding: 24px 16px;
+}
+
+/* ── Card ────────────────────────────────────────────────────────────────── */
+.card {
+  width: 100%;
+  max-width: 420px;   /* AUTH_LAYOUT_CONSTANTS.CARD_MAX_WIDTH */
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+
+  /* Transition khi resize */
+  transition: max-width 0.2s ease;
+}
+
+/* ── Logo image ─────────────────────────────────────────────────────────── */
+.logoImage {
+  object-fit: contain;
+  display: block;
+}
+
+/* ── Footer text ─────────────────────────────────────────────────────────── */
+.footerText {
+  margin-top: 16px;
+  font-size: 12px;
+  text-align: center;
+}
+
+/* ── Responsive: mobile (< 480px) ───────────────────────────────────────── */
+/*
+ * LAYOUT_ARCHITECTURE §8.2 AuthLayout mobile rules:
+ *   - Card chiếm toàn chiều rộng
+ *   - Giảm padding (qua Card styles.body)
+ *   - Ẩn box-shadow cho full-bleed look
+ */
+@media (max-width: 480px) {
+  .centerFlex {
+    padding: 0;
+    justify-content: flex-start;
+  }
+
+  .card {
+    max-width: 100%;
+    min-height: 100vh;
+    box-shadow: none;
+    border-radius: 0 !important;
+  }
+
+  /* Override Card body padding về mobile value */
+  /* AUTH_LAYOUT_CONSTANTS.CARD_PADDING_MOBILE = 20px */
+  /* AntD Card.styles.body được override trực tiếp trong component via responsive check */
+}
+
+/* ── Responsive: tablet+ (≥ 480px) — baseline đã đủ ────────────────────── */
+/* Card max-width và padding đã set trong component + CSS trên */

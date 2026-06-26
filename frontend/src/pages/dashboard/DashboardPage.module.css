@@ -1,0 +1,27 @@
+/* src/pages/dashboard/DashboardPage.module.css */
+
+/*
+  DASHBOARD_UI_SPEC.md §1.4 — Tabs container spacing:
+    AppPageHeader → Tabs: 24px (margin-bottom mặc định AppPageHeader)
+    Tabs → Tab Content: 16px
+
+  Phần lớn spacing đã set inline trong DashboardPage.tsx (style={{ marginTop: 24 }}).
+  File này dự phòng cho fine-tune responsive sau này.
+*/
+
+.dashboardPage {
+  width: 100%;
+}
+
+.tabContentCard {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #f0f0f0;
+}
+
+@media (max-width: 767px) {
+  .tabContentCard {
+    padding: 12px;
+  }
+}
