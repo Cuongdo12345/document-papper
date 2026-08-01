@@ -10,7 +10,12 @@ const workflowInstanceSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["pending", "approved", "rejected"],
+      // "cancelled" bổ sung thêm (additive) — dùng cho `cancelWorkflow` mới,
+      // phân biệt rõ với "rejected" (bị 1 approver chủ động từ chối): huỷ là
+      // do CHÍNH người tạo document rút lại trước khi ai duyệt bước nào.
+      // Không đổi/xoá 3 giá trị cũ — mọi check `status !== "pending"` hiện
+      // có vẫn hoạt động đúng y nguyên.
+      enum: ["pending", "approved", "rejected", "cancelled", "completed"],
       default: "pending",
     },
 
@@ -23,7 +28,7 @@ const workflowInstanceSchema = new mongoose.Schema(
         approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         status: {
           type: String,
-          enum: ["pending", "approved", "rejected"],
+          enum: ["pending", "approved", "rejected", "cancelled"],
           default: "pending",
         },
         comment: String,

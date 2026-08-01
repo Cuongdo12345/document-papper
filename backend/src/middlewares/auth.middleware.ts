@@ -1,76 +1,46 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { User } from "../models/users/user.model"
-import { ROLE_PERMISSIONS } from "../shared/constants/rolePermission.map";
+import { Types } from "mongoose";
+import { User } from "../models/users/user.model";
 import ApiError from "../shared/errors/ApiError";
 
 /**
- * 
- * COde phân quyền mới
-✔ Gộp role permission + user permission
-✔ Không query DB mỗi request
-✔ Performance tốt
- */
-// export const authenticate = (
-//   req: Request,
-//   res: Response,
-//   next: NextFunction,
-// ) => {
-//   try {
-//     //kiểm tra token
-//     const token = req.headers.authorization?.split(" ")[1];
-//     if (!token) {
-//       return res.status(401).json({ message: "Chưa đăng nhập" });
-//     }
-
-//     // Giải mã tokenvà lấy thông tin user
-//     const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
-
-//     // Lấy permissions từ role + permissions riêng của user
-//     const rolePermissions = ROLE_PERMISSIONS[decoded.role] || [];
-
-//     // Gắn thông tin user + permissions vào req
-//     req.user = {
-//       id: decoded.id,
-//       role: decoded.role,
-//       permissions: [
-//         ...new Set([...rolePermissions, ...(decoded.permissions || [])]),
-//       ],
-//     };
-
-//     next();
-//   } catch {
-//     res.status(401).json({ message: "Token không hợp lệ" });
-//   }
-// };
-
-/**
- * 
- * @param req 
- * @param res 
- * @param next 
  * AUTHENTICATE (RBAC READY)
+ *
+ * Permission KHÔNG được load ở đây — `authorizePermission.middleware.ts`
+ * (chạy sau) tự load permission qua cache, giúp middleware này không phải
+ * query permission mỗi request.
+ *
+ * (Không đổi logic so với bản trước — chỉ dọn hẳn 3 phiên bản `authenticate`
+ * cũ từng để dạng comment ~150 dòng bên dưới file này. Lịch sử/lý do các
+ * phiên bản cũ đã được ghi trong git log; giữ code chết dạng comment dễ gây
+ * hiểu nhầm khi audit lại sau này hơn là hữu ích.)
  */
-export const authenticate = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // 🔥 1. Lấy token
+    // 1. Lấy token
     const token = req.headers.authorization?.split(" ")[1];
 
     if (!token) {
       throw ApiError.unauthorized("Chưa đăng nhập");
     }
 
-    // 🔥 2. Verify token
-    const decoded: any = jwt.verify(
-      token,
-      process.env.JWT_SECRET!
-    );
+    // 2. Verify token.
+    // Sửa A1 (DOCUMENT_SECURITY_ANALYSIS.md — "Trung bình-Cao"): whitelist
+    // tường minh thuật toán ký, chỉ chấp nhận HS256 — tránh "algorithm
+    // confusion" (đổi giá trị này nếu hệ thống thực tế dùng thuật toán khác).
+    const decoded: any = jwt.verify(token, process.env.JWT_SECRET!, {
+      algorithms: ["HS256"],
+    });
 
-    // 🔥 3. Load user từ DB (KHÔNG load permission ở đây)
+    // Sửa A2: validate cấu trúc payload sau khi giải mã trước khi dùng để
+    // truy vấn DB — id sai định dạng có thể gây lỗi cast không chuẩn hoá ở
+    // tầng dưới.
+    if (!decoded?.id || !Types.ObjectId.isValid(decoded.id)) {
+      throw ApiError.unauthorized("Token không hợp lệ");
+    }
+
+    // 3. Load user từ DB (KHÔNG load permission ở đây)
     const user = await User.findById(decoded.id)
       .select("_id role department isActive")
       .populate("role", "name");
@@ -79,7 +49,7 @@ export const authenticate = async (
       throw ApiError.unauthorized("User không hợp lệ");
     }
 
-    // 🔥 4. Attach vào req (KHÔNG attach permissions)
+    // 4. Attach vào req (KHÔNG attach permissions)
     req.user = {
       _id: user._id,
       role: user.role as any, // populated
@@ -90,88 +60,11 @@ export const authenticate = async (
 
     next();
   } catch (error) {
+    // Sửa A4: log lỗi GỐC ở server (giúp phân biệt lỗi hạ tầng như DB down/
+    // JWT_SECRET bị undefined với lỗi token thật sự sai/hết hạn), nhưng vẫn
+    // trả về đúng 1 message chung cho client — không lộ chi tiết lỗi ra ngoài.
+    console.error("[authenticate] Lỗi xác thực:", error);
     next(ApiError.unauthorized("Token không hợp lệ"));
   }
 };
 
-
-/**
- * 🚀 Mục tiêu refactor
-   Chúng ta sẽ chuyển sang:
-    ✅ JWT chỉ chứa:
-    userId
-    roleId
-    ✅ Permission sẽ được:
-    load từ DB (hoặc cache)
-    merge:
-    role.permissions
-    extraPermissions
-    denyPermissions
- */
-/**
- * AUTHENTICATE (RBAC READY)
- */
-// export const authenticate = async (
-//   req: Request,
-//   res: Response,
-//   next: NextFunction
-// ) => {
-//   try {
-//     const token = req.headers.authorization?.split(" ")[1];
-
-//     if (!token) {
-//       throw ApiError.unauthorized("Chưa đăng nhập");
-//     }
-
-//     const decoded: any = jwt.verify(
-//       token,
-//       process.env.JWT_SECRET!
-//     );
-
-//     // 🔥 Load user + RBAC
-//     const user = await User.findById(decoded.id)
-//       .populate({
-//         path: "role",
-//         populate: {
-//           path: "permissions",
-//         },
-//       })
-//       .populate("extraPermissions")
-//       .populate("denyPermissions");
-
-//     if (!user || !user.isActive) {
-//       throw ApiError.unauthorized("User không hợp lệ");
-//     }
-
-//     // 🔥 Merge permission
-//     const role = user.role as any;
-//     const rolePermissions =
-//       user.role?.permissions?.map((p: any) => p.name) || [];
-
-//     const extraPermissions =
-//       user.extraPermissions?.map((p: any) => p.name) || [];
-
-//     const denyPermissions =
-//       user.denyPermissions?.map((p: any) => p.name) || [];
-
-//     // 👉 final permissions
-//     const finalPermissions = [
-//       ...new Set([
-//         ...rolePermissions,
-//         ...extraPermissions,
-//       ]),
-//     ].filter(p => !denyPermissions.includes(p));
-
-//     // 🔥 attach vào req
-//     req.user = {
-//       _id: user._id,
-//       role: user.role,
-//       permissions: finalPermissions,
-//       department: user.department,
-//     };
-
-//     next();
-//   } catch (error) {
-//     next(ApiError.unauthorized("Token không hợp lệ"));
-//   }
-// };

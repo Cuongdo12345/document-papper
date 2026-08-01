@@ -1,11 +1,5 @@
 import { Schema, model } from "mongoose";
-
-export interface IPermission {
-  name: string;
-  resource: string;
-  action: string;
-  description:string
-}
+import type { IPermission } from "../../interfaces/rbac/permission.interface";
 
 const PermissionSchema = new Schema<IPermission>(
   {

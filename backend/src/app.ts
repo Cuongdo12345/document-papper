@@ -5,18 +5,22 @@ import compression from "compression";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
+import { randomUUID } from "crypto";
 
-import documentRoutes from "./routes/document.route";
-import departmentRoutes from "./routes/department.routes";
-import authRoutes from "./routes/auth.routes";
-import userRoutes from "./routes/user.routes";
-import userAuditRoutes from "./routes/userAudit.routes";
-import performanceRoutes from "./routes/performance.routes";
-import dashboardRoutes from "./routes/dashboard.route";
-import exportRoutes from "./routes/excel.route";
-import uploadRoutes from "./routes/upload.routes";
-import workflowRoutes from "./routes/workflow.routes";
-import rbacRoutes from "./routes/rbac.routes";
+import documentRoutes from "./routes/documents/document.route";
+import departmentRoutes from "./routes/departments/department.routes";
+import authRoutes from "./routes/auth/auth.routes";
+import userRoutes from "./routes/users/user.routes";
+import userAuditRoutes from "./routes/users/userAudit.routes";
+import performanceRoutes from "./routes/performances/performance.routes";
+import dashboardRoutes from "./routes/dashboard/dashboard.route";
+import exportRoutes from "./routes/excel/excel.route";
+import uploadRoutes from "./routes/upload/upload.routes";
+import workflowRoutes from "./routes/documents/workflow.routes";
+import rbacRoutes from "./routes/rbac/rbac.routes";
+import notificationRoutes from "./routes/notifications/notification.routes";
+import assetRoutes from "./routes/assets/asset.routes";
+import assetCategoryRoutes from "./routes/assets/assetCategory.routes";
 
 import { performanceMiddleware } from "./middlewares/performance.middleware";
 import { errorHandler } from "./middlewares/error.middleware";
@@ -24,6 +28,21 @@ import { setupSwagger } from "./config/swagger/swagger";
 
 
 const app = express();
+
+/* ===============================
+   🆔 REQUEST ID
+================================= */
+// Sửa #5 (DOCUMENT_ERROR_ANALYSIS.md — structured logging): gắn 1 ID duy
+// nhất cho mỗi request NGAY TỪ ĐẦU (trước mọi middleware/route khác), để
+// `error.middleware.ts` log kèm được `requestId`, giúp đối chiếu 1 lỗi cụ
+// thể giữa log server và báo lỗi của client (client nhận lại qua header
+// `X-Request-Id` để tiện báo lỗi). Dùng `crypto.randomUUID()` built-in của
+// Node — không cần thêm dependency.
+app.use((req, res, next) => {
+  (req as any).id = randomUUID();
+  res.setHeader("X-Request-Id", (req as any).id);
+  next();
+});
 
 /* ===============================
    🔐 SECURITY MIDDLEWARE
@@ -89,6 +108,9 @@ app.use("/api/export", exportRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/workflows", workflowRoutes);
 app.use("/api/rbac", rbacRoutes)
+app.use("/api/notifications", notificationRoutes)
+app.use("/api/assets", assetRoutes)
+app.use("/api/asset-categories", assetCategoryRoutes)
 
 /* ===============================
    ❌ GLOBAL ERROR HANDLER
@@ -98,24 +120,3 @@ app.use("/api/rbac", rbacRoutes)
 app.use(errorHandler);
 
 export default app;
-
-// import express from "express";
-// import documentRoutes from "./routes/document.route";
-// import departmentRoutes from "./routes/department.routes";
-// import authRoutes from "./routes/auth.routes";
-// import userRoutes from "./routes/user.routes";
-// import userAuditRoutes from "./routes/userAudit.routes";
-// import performanceRoutes from "./routes/performance.routes";
-
-// // 🔹 app chính, gắn route và middleware
-// const app = express();
-
-// app.use(express.json());
-// app.use("/api/documents", documentRoutes);
-// app.use("/api/departments", departmentRoutes);
-// app.use("/api/auths", authRoutes);
-// app.use("/api/users", userRoutes);
-// app.use("/api/user-audits", userAuditRoutes);
-// app.use("/api/performances", performanceRoutes);
-
-// export default app;

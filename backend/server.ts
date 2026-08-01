@@ -6,8 +6,9 @@ import app from "./src/app";
 import { connectDB } from "./src/config/database/database";
 import { registerMongoEvents } from "./src/config/database/database.events";
 import { registerMongoShutdown } from "./src/config/database/database.shutdown";
+import { registerCronJobs } from "./src/shared/cron/assetAlerts.cron";
 // import { setupSwagger } from "./src/config/swagger";
-import { errorHandler } from "./src/shared/errors/errorHandler";
+// import { errorHandler } from "./src/shared/errors/errorHandler";
 
 // ==============================
 // Validate ENV
@@ -34,11 +35,12 @@ const startServer = async () => {
     registerMongoEvents();
     registerMongoShutdown();
 
+     // 1.5️⃣ Đăng ký cron jobs (Giai đoạn 4 — cảnh báo Asset). Đặt SAU khi
+    // DB kết nối xong vì cron job cần query được DB ngay khi tới lịch chạy.
+    registerCronJobs();
+
     // 2️⃣ Swagger
     // setupSwagger(app);
-
-    // 3️⃣ Global error handler (must be after routes)
-    app.use(errorHandler);
 
     // 4️⃣ Create HTTP server
     const server = http.createServer(app);

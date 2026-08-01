@@ -1,10 +1,5 @@
 import mongoose, { Document as MongoDoc, Schema } from "mongoose";
-
-export interface IDepartment extends MongoDoc {
-  code: string; // CNTT, HCQT, KHTH
-  name: string; // Công nghệ thông tin
-  createdAt: Date;
-}
+import type { IDepartment } from "../../interfaces/departments/department.interface";
 
 const DepartmentSchema = new Schema<IDepartment>(
   {

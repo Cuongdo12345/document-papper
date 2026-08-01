@@ -1,3 +1,50 @@
+import { Types } from "mongoose";
+import Department from "../../models/departments/department.model";
+import { getNextSequence } from "../utils/getNext";
+import { Document, DocumentCategory } from "../../models/documents/document.model";
+import ApiError from "../errors/ApiError";
+
+/**
+ * Sinh `documentCode` an toàn cho nhiều request song song, dùng Counter
+ * Collection + atomic `$inc` (`getNextSequence`) — không dùng transaction,
+ * không dùng `countDocuments` (tránh race condition khi nhiều request tạo
+ * document cùng lúc).
+ *
+ * Sửa #3 (DOCUMENT_ERROR_ANALYSIS.md, "High"): trước đây `throw new
+ * Error("Không tìm thấy khoa/phòng")` — lỗi thuần, bỏ qua `ApiError`. Kể cả
+ * khi caller (`document.service.ts`) đã bọc đúng `catchAsync`/error flow,
+ * lỗi này vẫn rơi vào nhánh 500 mặc định của `error.middleware.ts` thay vì
+ * đúng 404, gây hiểu nhầm cho client/monitoring (lỗi "department không tồn
+ * tại" là input sai của client, không phải lỗi hạ tầng server).
+ */
+export const generateDocumentCode = async (
+  category: DocumentCategory,
+  departmentId: Types.ObjectId,
+  createdAt?: Date
+): Promise<string> => {
+  const department = await Department.findById(departmentId);
+
+  if (!department) {
+    throw ApiError.notFound("Không tìm thấy khoa/phòng");
+  }
+
+  const deptCode = department.code.toUpperCase();
+
+  const prefix = category === DocumentCategory.PROPOSAL ? "PR" : "RP";
+
+  const baseDate = createdAt || new Date();
+  const year = baseDate.getFullYear();
+
+  // KEY COUNTER
+  const counterKey = `${category}-${departmentId}-${year}`;
+
+  const seq = await getNextSequence(counterKey);
+
+  const order = String(seq).padStart(4, "0");
+
+  return `${prefix}-${deptCode}-${year}-${order}`;
+};
+
 /**III. HÀM SINH documentCode (TỰ ĐỘNG – AN TOÀN)
 🔧 Logic
 Đếm số document cùng loại + khoa + năm
@@ -28,81 +75,3 @@ Scale cho nhiều server	✅
 Production ready	✅
  */
 
-// import { Document, DocumentCategory } from "../../models/document.model";
-// import Department from "../../models/department.model";
-// import { Types } from "mongoose";
-
-// export const generateDocumentCode = async (
-//   category: DocumentCategory,
-//   departmentId: Types.ObjectId,
-//   createdAt?: Date
-// ): Promise<string> => {
-//   /* ===== 1. LẤY MÃ KHOA ===== */
-//   const department = await Department.findById(departmentId);
-
-//   if (!department) {
-//     throw new Error("Không tìm thấy khoa/phòng");
-//   }
-
-//   const deptCode = department.code.toUpperCase();
-
-//   /* ===== 2. XÁC ĐỊNH PREFIX ===== */
-//   const prefix =
-//     category === DocumentCategory.PROPOSAL ? "PR" : "RP";
-
-//   /* ===== 3. NĂM HIỆN TẠI ===== */
-//   const baseDate = createdAt || new Date();
-//   const year = new Date().getFullYear();
-
-//   /* ===== 4. ĐẾM SỐ DOCUMENT TRONG NĂM ===== */
-//   const startOfYear = new Date(`${year}-01-01T00:00:00.000Z`);
-//   const endOfYear = new Date(`${year}-12-31T23:59:59.999Z`);
-
-//   const count = await Document.countDocuments({
-//     category,
-//     department: departmentId,
-//     createdAt: {
-//       $gte: startOfYear,
-//       $lte: endOfYear,
-//     },
-//   });
-
-//   /* ===== 5. TẠO STT ===== */
-//   const order = String(count + 1).padStart(4, "0");
-
-//   /* ===== 6. GHÉP MÃ ===== */
-//   return `${prefix}-${deptCode}-${year}-${order}`;
-// };
-import { Types } from "mongoose";
-import Department from "../../models/departments/department.model";
-import { getNextSequence } from "../utils/getNext";
-import { Document, DocumentCategory } from "../../models/documents/document.model";
-
-export const generateDocumentCode = async (
-  category: DocumentCategory,
-  departmentId: Types.ObjectId,
-  createdAt?: Date
-): Promise<string> => {
-  const department = await Department.findById(departmentId);
-
-  if (!department) {
-    throw new Error("Không tìm thấy khoa/phòng");
-  }
-
-  const deptCode = department.code.toUpperCase();
-
-  const prefix =
-    category === DocumentCategory.PROPOSAL ? "PR" : "RP";
-
-  const baseDate = createdAt || new Date();
-  const year = baseDate.getFullYear();
-
-  // 🔥 KEY COUNTER
-  const counterKey = `${category}-${departmentId}-${year}`;
-
-  const seq = await getNextSequence(counterKey);
-
-  const order = String(seq).padStart(4, "0");
-
-  return `${prefix}-${deptCode}-${year}-${order}`;
-};

@@ -1,5 +1,6 @@
 // models/document.model.ts
 import { Schema, model, Types } from "mongoose";
+import type { IDocument } from "../../interfaces/documents/document.interface";
 
 /* ===== ENUM ===== */
 // Loại giấy tờ chính (Đề xuất, Biên bản)
@@ -19,43 +20,6 @@ export enum DocumentSubType {
   CONFIRM_STATUS = "CONFIRM_STATUS",
 }
 
-/* ===== INTERFACE ===== */
-
-export interface IDocument {
-  category: DocumentCategory;
-  subType: DocumentSubType;
-  title: string;
-  documentCode?: string;
-  isActive?: boolean;
-  department: Types.ObjectId;
-  createdBy: Types.ObjectId;
-  updatedBy: Types.ObjectId;
-  deletedBy?: Types.ObjectId;
-  workflowInstanceId?: Types.ObjectId;
-
-  // status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
-
-  /** 🔗 Biên bản trỏ về giấy đề xuất */
-  referenceTo?: Types.ObjectId[];
-
-  /** Dữ liệu động theo từng loại giấy */
-  meta: Record<string, any>;
-
-  serviceDate?: Date;
-  actualCost?: number;
-  workflowStatus: "pending" | "approved" | "rejected";
-
-
-  signedBy?: {
-    role: string;
-    user?: Types.ObjectId;
-    signedAt?: Date;
-  }[];
-
-  createdAt?: Date;
-  deletedAt?: Date;
-  updatedAt?: Date;
-}
 
 /* ===== SCHEMA ===== */
 
@@ -64,7 +28,7 @@ const DocumentSchema = new Schema<IDocument>(
     documentCode: {
       type: String,
       unique: true,
-      index: true,
+      // index: true,
     },
 
     category: {
@@ -117,22 +81,22 @@ const DocumentSchema = new Schema<IDocument>(
       type: Number,
     },
 
-    // repairStatus: {
-    //   type: String,
-    //   enum: ["PENDING", "IN_PROGRESS", "DONE"],
-    //   default: "PENDING",
-    //   index: true,
-    // },
-
     workflowInstanceId: {
       type: Schema.Types.ObjectId,
       ref: "WorkflowInstance",
     },
 
-    workflowStatus: {
+     workflowStatus: {
       type: String,
-      enum: ["pending", "approved", "rejected"],
+      enum: ["pending", "approved", "rejected", "cancelled", "completed"],
       default: "pending",
+    },
+
+     // 🔗 GIAI ĐOẠN 3 (module Asset) — xem giải thích đầy đủ ở interface
+    // `IDocument.relatedAsset` phía trên.
+    relatedAsset: {
+      type: Schema.Types.ObjectId,
+      ref: "Asset",
     },
 
     /** ⛓ CHỈ DÙNG CHO REPORT */
@@ -140,7 +104,7 @@ const DocumentSchema = new Schema<IDocument>(
       {
         type: Schema.Types.ObjectId,
         ref: "Document",
-        index: true,
+        // index: true,
         default: [],
       },
     ],
@@ -206,12 +170,20 @@ DocumentSchema.index({ createdAt: -1 });
  * 2. Tìm kiếm theo category + subType + isActive (lọc danh sách theo loại và trạng thái)
  * 3. Tìm kiếm theo department + subType (lọc danh sách theo khoa và loại)
  * 4. Tìm kiếm theo referenceTo + category + isActive (tìm report theo proposal và trạng thái)
+ *
+ * Bật lại (P3.1, MODULE_P3_PERFORMANCE_PLAN.md): index này trước đây bị
+ * comment, khiến `getReportsByProposalService`/`findReportsByProposal`
+ * (documents.query.ts) phải collection-scan thay vì dùng index đúng shape
+ * đã thiết kế sẵn. Không breaking — chỉ đổi tốc độ truy vấn, không đổi kết
+ * quả trả về. Nên chạy `explain("executionStats")` sau khi deploy để xác
+ * nhận `IXSCAN` thay vì `COLLSCAN`.
  */
-// DocumentSchema.index({
-//   referenceTo: 1,
-//   category: 1,
-//   isActive: 1,
-//   createdAt: 1,
-// });
+DocumentSchema.index({
+  referenceTo: 1,
+  category: 1,
+  isActive: 1,
+  createdAt: 1,
+});
 
 export const Document = model<IDocument>("Document", DocumentSchema);
+

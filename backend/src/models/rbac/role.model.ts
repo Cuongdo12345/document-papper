@@ -1,9 +1,5 @@
 import { Schema, model, Types } from "mongoose";
-
-export interface IRole {
-  name: string;
-  permissions: Types.ObjectId;
-}
+import type { IRole } from "../../interfaces/rbac/role.interface";
 
 const RoleSchema = new Schema<IRole>(
   {

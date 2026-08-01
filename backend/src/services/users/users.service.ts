@@ -5,6 +5,7 @@ import Department from "../../models/departments/department.model";
 import UserAudit from "../../models/users/userAudit.model";
 import RefreshToken from "../../models/auth/refreshToken.model";
 import ApiError from "../../shared/errors/ApiError";
+import { clearPermissionCache } from "../rbac/permission.cache";
 
 // import { createUserSchema } from "../dtos/users/user.dto";
 
@@ -22,15 +23,22 @@ import ApiError from "../../shared/errors/ApiError";
    * 
    */
   export const create = async (data: any, performedBy: any) => {
-    const { username, password, fullName, role, department } = data;
-      // createUserSchema.parse(data);
+    const { username, password, fullName, role: roleId, department } = data;
+    // Lưu ý: format input (username regex/length, password length, fullName,
+    // role/department ObjectId format) đã được validate ở CreateUserDTO middleware.
+    // `roleId` ở đây là string ObjectId do client gửi lên — cần resolve thành
+    // Role document thật từ DB trước khi đọc `.name`, KHÔNG được coi roleId
+    // như một object đã populate sẵn.
 
     const exists = await User.findOne({ username });
     if (exists) {
       throw ApiError.conflict("Username đã tồn tại");
     }
 
-    if (role === "USER") {
+    const role = await Role.findById(roleId);
+    if (!role) throw ApiError.notFound("Role không tồn tại");
+
+    if (role.name === "USER") {
       if (!department) throw ApiError.badRequest("User khoa phải gắn khoa");
 
       const dept = await Department.findById(department);
@@ -43,7 +51,7 @@ import ApiError from "../../shared/errors/ApiError";
       username,
       password: hashedPassword,
       fullName,
-      role,
+      role: role._id,
       department
     });
 
@@ -61,21 +69,24 @@ import ApiError from "../../shared/errors/ApiError";
    * GET USERS (filter + pagination)
    * Hỗ trợ filter theo role, department, isActive, keyword (tìm kiếm username), createdAt (fromDate, toDate)
    * Hỗ trợ pagination và sorting
-   * Trả về list user + thông tin pagination (không bao gồm password)
-   * Nếu có filter không hợp lệ => 400
-   * Nếu department filter không tồn tại => 404
-   *  
+   *
+   * LƯU Ý: toàn bộ validate format (page/limit number, max limit 100, sortBy/order
+   * enum, isActive enum, fromDate/toDate hợp lệ, keyword độ dài) đã được xử lý ở
+   * `validateQuery(GetUsersQueryDTO)` middleware trước khi vào đây. Service không
+   * cần parseInt, không cần default value, không cần check format nữa — `query`
+   * nhận vào đã đúng type (page/limit là number, isActive là "true"/"false" string
+   * literal đã enum-checked, fromDate/toDate đã chắc chắn parse được thành Date hợp lệ).
    */
   export const getList = async(query: any) => {
     const {
-      page = "1",
-      limit = "10",
+      page,
+      limit,
       role,
       department,
       isActive,
       keyword,
-      sortBy = "createdAt",
-      order = "desc",
+      sortBy,
+      order,
       fromDate,
       toDate,
     } = query;
@@ -83,8 +94,7 @@ import ApiError from "../../shared/errors/ApiError";
     const filter: any = {};
 
     // active filter
-    if (isActive === "false") filter.isActive = false;
-    else filter.isActive = true;
+    filter.isActive = isActive === "false" ? false : true;
 
     if (role) filter.role = role;
     if (department) filter.department = department;
@@ -99,9 +109,7 @@ import ApiError from "../../shared/errors/ApiError";
       filter.username = { $regex: keyword, $options: "i" };
     }
 
-    const pageNumber = Math.max(parseInt(page, 10), 1);
-    const pageSize = Math.max(parseInt(limit, 10), 1);
-    const skip = (pageNumber - 1) * pageSize;
+    const skip = (page - 1) * limit;
 
     const sortOption: any = {
       [sortBy]: order === "asc" ? 1 : -1
@@ -109,11 +117,10 @@ import ApiError from "../../shared/errors/ApiError";
 
     const [users, total] = await Promise.all([
       User.find(filter)
-        .select("-password")
         .populate("department", "code name")
         .sort(sortOption)
         .skip(skip)
-        .limit(pageSize),
+        .limit(limit),
 
       User.countDocuments(filter)
     ]);
@@ -121,10 +128,10 @@ import ApiError from "../../shared/errors/ApiError";
     return {
       users,
       pagination: {
-        page: pageNumber,
-        limit: pageSize,
+        page,
+        limit,
         total,
-        totalPage: Math.ceil(total / pageSize)
+        totalPage: Math.ceil(total / limit)
       }
     };
   }
@@ -135,7 +142,6 @@ import ApiError from "../../shared/errors/ApiError";
    */
   export const getById = async (id: any) => {
     const user = await User.findById(id)
-      .select("-password")
       .populate("department", "code name");
 
     if (!user) throw ApiError.notFound("User không tồn tại");
@@ -144,36 +150,70 @@ import ApiError from "../../shared/errors/ApiError";
 
   /**
    * UPDATE USER
-   * Kiểm tra user tồn tại và isActive
-   * Nếu role là DEPARTMENT thì phải có departmentId và kiểm tra department đó tồn tại
-   * Cập nhật thông tin user (không cập nhật password ở đây)
-   * Ghi log audit
-   * Trả về user đã cập nhật (không bao gồm password)
-   * Nếu user không tồn tại => 404
+   *
+   * Thứ tự xử lý (đã sửa bug: trước đây gọi findByIdAndUpdate TRƯỚC khi kiểm tra
+   * isActive, khiến user bị disable vẫn bị ghi đè dữ liệu trước khi báo lỗi).
+   *
+   * 1. Tìm user theo id
+   * 2. Không tồn tại => 404 notFound
+   * 3. isActive === false => 400 badRequest (KHÔNG update gì cả)
+   * 4. Validate department nếu role là USER
+   * 5. Validate username trùng (nếu username thay đổi)
+   * 6. Gán dữ liệu mới vào document đã tìm được
+   * 7. save()
+   * 8. Ghi audit log
    */
   export const update = async (id: any, data: any, performedBy: any) => {
-    const { fullName, role, department, username } = data;
+    const { fullName, role: roleId, department, username } = data;
 
-    if (role === "USER" && department) {
+    // 1 & 2. Tìm user trước tiên
+    const user = await User.findById(id);
+    if (!user) throw ApiError.notFound("User không tồn tại");
+
+    // 3. Chặn ngay nếu user đã bị disable — KHÔNG được update bất cứ gì
+    if (!user.isActive) {
+      throw ApiError.badRequest("User đã bị vô hiệu hóa");
+    }
+
+    // 4. Resolve role (string ObjectId từ client) thành Role document thật,
+    // rồi mới được đọc role.name — roleId KHÔNG phải object đã populate.
+    let role: any;
+    if (roleId !== undefined) {
+      role = await Role.findById(roleId);
+      if (!role) throw ApiError.notFound("Role không tồn tại");
+    }
+
+    // 5. Validate department nếu role (mới hoặc giữ nguyên) là USER
+    if (role?.name === "USER" && department) {
       const dept = await Department.findById(department);
       if (!dept) throw ApiError.notFound("Khoa không tồn tại");
     }
 
-    const updated = await User.findByIdAndUpdate(
-      id,
-      { fullName, role, department, username },
-      { new: true }
-    ).select("-password");
+    // 6. Validate username trùng nếu có thay đổi username
+    if (username && username !== user.username) {
+      const existed = await User.findOne({ username, _id: { $ne: id } });
+      if (existed) throw ApiError.conflict("Username đã tồn tại");
+    }
 
-    if (!updated) throw ApiError.notFound("User không tồn tại");
-    if (!updated.isActive) throw ApiError.badRequest("User đã bị vô hiệu hóa");
+    // 7. Gán dữ liệu mới
+    if (fullName !== undefined) user.fullName = fullName;
+    if (role !== undefined) user.role = role._id;
+    if (department !== undefined) user.department = department;
+    if (username !== undefined) user.username = username;
 
+    // 8. Save
+    await user.save();
+
+    // 9. Audit log
     await UserAudit.create({
-      user: updated._id,
+      user: user._id,
       action: "UPDATE",
       performedBy,
       note: "Cập nhật thông tin user"
     });
+
+    const updated = await User.findById(user._id)
+      .populate("department", "code name");
 
     return updated;
   }
@@ -182,7 +222,9 @@ import ApiError from "../../shared/errors/ApiError";
    * DISABLE USER
    *  Kiểm tra user tồn tại và isActive
    * Nếu role là ADMIN => không cho vô hiệu hóa
-   * Đặt isActive = false để vô hiệu hóa (không xóa)  
+   * Nếu user đã bị vô hiệu hóa từ trước => 400 (chặn disable nhiều lần)
+   * Đặt isActive = false để vô hiệu hóa (không xóa)
+   * Thu hồi toàn bộ refresh token hiện có của user => buộc logout toàn bộ thiết bị
    * Ghi log audit
    * Trả về thành công
    * Nếu user không tồn tại => 404
@@ -192,7 +234,12 @@ import ApiError from "../../shared/errors/ApiError";
   export const disable = async (id: any, performedBy: any) => {
     const user = await User.findById(id);
     if (!user) throw ApiError.notFound("User không tồn tại");
-    
+
+    // ❌ Chặn disable user đã bị disable từ trước
+    if (!user.isActive) {
+      throw ApiError.badRequest("User đã bị vô hiệu hóa từ trước");
+    }
+
     // const role = user.role as any;
     const role = await Role.findById(user.role).select("name");
     if (role?.name === "ADMIN") {
@@ -201,6 +248,13 @@ import ApiError from "../../shared/errors/ApiError";
 
     user.isActive = false;
     await user.save();
+
+    // 🔒 Thu hồi toàn bộ refresh token hiện có — user bị disable phải
+    // bị logout ngay trên mọi thiết bị, không chỉ chặn API mới.
+    await RefreshToken.updateMany(
+      { user: user._id },
+      { revoked: true }
+    );
 
     await UserAudit.create({
       user: user._id,
@@ -300,6 +354,9 @@ import ApiError from "../../shared/errors/ApiError";
     newPassword: string,
     performedBy: any
   ) => {
+    // Không cần .select("+password") ở đây vì chỉ GHI ĐÈ password mới,
+    // không đọc giá trị password cũ. Set tường minh một field luôn hoạt động
+    // bình thường dù field đó có select: false trong schema.
     const user = await User.findById(targetUserId);
 
     if (!user) throw ApiError.notFound("User không tồn tại");
@@ -334,7 +391,7 @@ import ApiError from "../../shared/errors/ApiError";
   export const getMeService = async(userId: any) => {
 
     const user = await User.findById(userId)
-      .select("-password -__v").populate("role", "name")
+      .select("-__v").populate("role", "name")
     .populate("department", "code name");
 
     if (!user || !user.isActive) {
@@ -374,7 +431,7 @@ import ApiError from "../../shared/errors/ApiError";
       { _id: userId, isActive: true },
       { $set: updates },
       { new: true, runValidators: true }
-    ).select("-password -__v");
+    ).select("-__v");
 
     if (!updatedUser) {
       throw ApiError.notFound("User không tồn tại hoặc đã bị vô hiệu hóa");
@@ -404,33 +461,37 @@ export const assignRole = async (
   if (userId.toString() === performedBy.toString()) {
     throw ApiError.badRequest("Không thể tự thay đổi role của chính mình");
   }
-
+ 
   // ✅ Check user
   const user = await User.findById(userId);
   if (!user) throw ApiError.notFound("User không tồn tại");
   if (!user.isActive) throw ApiError.badRequest("User đã bị vô hiệu hóa");
-
+ 
   // ✅ Check role
   const role = await Role.findById(roleId);
   if (!role) throw ApiError.notFound("Role không tồn tại");
-
+ 
   // 🔥 Optional: không cho assign ADMIN lung tung
   if (role.name === "ADMIN") {
     throw ApiError.badRequest("Không thể gán role ADMIN");
   }
-
+ 
   const oldRole = user.role;
-
+ 
   // 🔥 Update
   user.role = roleId;
-
+ 
   if (resetPermissions) {
     user.extraPermissions = [];
     user.denyPermissions = [];
   }
-
+ 
   await user.save();
-
+ 
+  // 🔒 Invalidate permission cache — role vừa đổi, permission cũ trong cache
+  // (tối đa 5 phút TTL) không còn phản ánh đúng quyền hiện tại của user.
+  clearPermissionCache(user._id.toString());
+ 
   // 🔥 Audit log
   await UserAudit.create({
     user: user._id,
@@ -438,13 +499,12 @@ export const assignRole = async (
     performedBy,
     note: `Gán role từ ${oldRole} -> ${roleId}`
   });
-
+ 
   // ✅ return sạch
   const updatedUser = await User.findById(user._id)
-    .select("-password")
     .populate("department", "code name")
     .populate("role");
-
+ 
   return updatedUser;
-};
+}
 // };

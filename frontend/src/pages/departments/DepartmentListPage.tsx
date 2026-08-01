@@ -13,7 +13,7 @@ import dayjs from "dayjs";
 
 import AppPageHeader from "../../components/layout/AppPageHeader/AppPageHeader";
 // ⚠️ Đã sửa: 'from' → 'form' (kiểm tra lại đúng tên thư mục thật trong project)
-import { FilterBar } from "../../components/from/FilterBar/FilterBar";
+import { FilterBar } from "../../components/data-display/FilterBar/FilterBar";
 import { DataTable } from "../../components/data-display/DataTable/DataTable";
 import type {
   DataTableColumn,

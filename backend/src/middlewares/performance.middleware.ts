@@ -52,7 +52,7 @@ export const performanceMiddleware = (
       serviceTime: req.perf.serviceTime,
       controllerTime: req.perf.controllerTime,
 
-      user: req.user?.id,
+      user: req.user?._id,
       isSlow,
     };
 

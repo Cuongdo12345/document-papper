@@ -1,18 +1,6 @@
+/**Refactor */
 import { Schema, model, Types } from "mongoose";
-// import mongoose, { Document as MongoDoc, Schema, Types } from "mongoose";
-
-export interface IUser {
-  username: string;
-  password: string;
-  fullName: string;
-  department?: Types.ObjectId;
-  role: Types.ObjectId;
-  extraPermissions: Types.ObjectId[];
-  denyPermissions: Types.ObjectId[];
-  isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
+import type { IUser } from "../../interfaces/users/user.interface";
 
 const UserSchema = new Schema<IUser>(
   {
@@ -24,14 +12,48 @@ const UserSchema = new Schema<IUser>(
       trim: true,
     },
 
+    // 🔒 password mặc định KHÔNG được trả về trong bất kỳ query nào.
+    // Muốn lấy password (vd: changePassword cần so sánh hash cũ) phải
+    // gọi tường minh .select("+password").
     password: {
       type: String,
       required: true,
+      select: false,
     },
 
     fullName: {
       type: String,
       required: true,
+    },
+
+    /**
+     * ⚠️ MỚI: field `email` — TRƯỚC ĐÂY MODEL NÀY KHÔNG CÓ FIELD NÀY.
+     * Bắt buộc phải thêm vì 2 tính năng vừa được build cho module Auth cần
+     * `user.email` để hoạt động:
+     *   - `AuthService.register()` — thu thập email lúc đăng ký.
+     *   - `AuthService.forgotPassword()` — gửi link reset mật khẩu qua email
+     *     thật (trước đây trả thẳng token qua response vì chưa tích hợp mail).
+     *
+     * `required: false` + `sparse: true` (thay vì `required: true`) vì đây là
+     * MIGRATION cho collection đã có dữ liệu — user cũ (tạo trước khi có field
+     * này) sẽ không có email. `unique: true` KHÔNG dùng kèm `sparse: true` sẽ
+     * chặn nhiều document cùng thiếu email (nhiều `null`/`undefined` bị coi là
+     * trùng) — dùng `sparse` để cho phép nhiều user không có email tồn tại
+     * song song, chỉ chặn trùng khi 2 user CÙNG có giá trị email giống nhau.
+     *
+     * ⚠️ CẦN LÀM THÊM (ngoài phạm vi code): với user cũ đã tồn tại trước khi
+     * thêm field này, cân nhắc chạy 1 script backfill email (nếu có nguồn dữ
+     * liệu khác để đối chiếu) hoặc yêu cầu họ tự cập nhật email qua màn hình
+     * Profile — nếu không, user cũ sẽ KHÔNG dùng được tính năng quên mật khẩu
+     * cho tới khi có email.
+     */
+    email: {
+      type: String,
+      required: false,
+      unique: true,
+      sparse: true,
+      lowercase: true,
+      trim: true,
     },
 
     // // 🔐 RBAC

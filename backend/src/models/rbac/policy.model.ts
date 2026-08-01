@@ -1,11 +1,5 @@
 import { Schema, model } from "mongoose";
-
-export interface IPolicy {
-  name?: string;
-  resource?: string;
-  action?: string;
-  condition?:string
-}
+import type { IPolicy } from "../../interfaces/rbac/policy.interface";
 
 const PolicySchema =  new Schema<IPolicy>(
   {

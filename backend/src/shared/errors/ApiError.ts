@@ -51,8 +51,8 @@ export default class ApiError extends Error {
   }
 
   // ✅ Thêm phương thức 429 Too Many Requests
-  static tooManyRequests(message = "Too many requests") {
-    return new ApiError(429, message);
+   static tooManyRequests(message = "Too many requests") {
+    return new ApiError(429, message, "TOO_MANY_REQUESTS");
   }
 
 }

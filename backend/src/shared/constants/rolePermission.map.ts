@@ -21,15 +21,49 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     //Quyền về user
     PERMISSIONS.USER_CHANGE_PASSWORD,
     // PERMISSIONS.USER_VIEW_DETAIL,
+
+    //Quyền về tài sản/thiết bị IT — IT là bộ phận trực tiếp quản lý tài sản
+    PERMISSIONS.ASSET_VIEW,
+    PERMISSIONS.ASSET_VIEW_DETAIL,
+    PERMISSIONS.ASSET_CREATE,
+    PERMISSIONS.ASSET_UPDATE,
+    PERMISSIONS.ASSET_DELETE,
+    PERMISSIONS.ASSET_ASSIGN,
+    PERMISSIONS.ASSET_ALERTS_TRIGGER,
+    PERMISSIONS.ASSET_EXCEL_EXPORT,
+    PERMISSIONS.ASSET_EXCEL_IMPORT,
+    PERMISSIONS.ASSET_INVENTORY_CHECK,
+    // ASSET_DELETE_PERMANENT CỐ TÌNH KHÔNG gán ở đây — xoá vĩnh viễn tài
+    // sản là thao tác rủi ro cao, chỉ role ADMIN (bypass toàn bộ permission
+    // check ở authorizePermission.middleware.ts) mới thực hiện được. Nếu
+    // sau này cần cho IT tự xoá vĩnh viễn, thêm dòng
+    // `PERMISSIONS.ASSET_DELETE_PERMANENT,` tại đây một cách CÓ CHỦ ĐÍCH.
+    PERMISSIONS.ASSET_CATEGORY_VIEW,
+    PERMISSIONS.ASSET_CATEGORY_CREATE,
+    PERMISSIONS.ASSET_CATEGORY_UPDATE,
+    PERMISSIONS.ASSET_CATEGORY_DELETE,
+    // ASSET_CATEGORY_DELETE_PERMANENT cũng CỐ TÌNH KHÔNG gán ở đây, cùng lý
+    // do với ASSET_DELETE_PERMANENT ở trên.
   ],
   
   //Nơi cấp quyền nếu token trả về role check đk trong này
   USER:[
+    PERMISSIONS.ROLE_CREATE,
     PERMISSIONS.DOCUMENT_CREATE,
     PERMISSIONS.DOCUMENT_VIEW_DETAIL,
     PERMISSIONS.DOCUMENT_DELETE,
     PERMISSIONS.DOCUMENT_UPDATE,
     PERMISSIONS.DOCUMENT_VIEW,
     PERMISSIONS.USER_CHANGE_PASSWORD,
+
+    // User thường chỉ được xem tài sản (vd: xem thiết bị mình đang dùng)
+    PERMISSIONS.ASSET_VIEW,
+    PERMISSIONS.ASSET_VIEW_DETAIL,
+    PERMISSIONS.ASSET_CATEGORY_VIEW,
+    // Kiểm kê (quét QR xác nhận còn thấy thiết bị) là hành động vật lý,
+    // KHÔNG đổi status/dữ liệu quan trọng — cho phép cả user thường thực
+    // hiện (không chỉ IT), vì nhân viên khoa/phòng mới là người trực tiếp
+    // cầm máy quét kiểm kê thiết bị của khoa mình.
+    PERMISSIONS.ASSET_INVENTORY_CHECK,
   ]
 };

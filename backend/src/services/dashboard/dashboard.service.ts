@@ -1,14 +1,100 @@
 import { Document, DocumentCategory, DocumentSubType } from "../../models/documents/document.model";
 import Department from "../../models/departments/department.model";
-import {User} from "../../models/users/user.model";
-import { Types } from "mongoose";
+import { User } from "../../models/users/user.model";
+import { Types, PipelineStage } from "mongoose";
 import ApiError from "../../shared/errors/ApiError";
+import { toOptionalObjectId } from "../../shared/utils/Mongoid.util";
+import { SortOrder } from "../../shared/utils/Queryparsing.util";
 
+/* =====================================================================
+   GHI CHÚ REFACTOR (đọc trước khi sửa tiếp file này)
+   =====================================================================
+   So với bản trước, các thay đổi chính:
 
-// 🏢 ADMIN DASHBOARD SUMMARY
+   1. 🐛 BUG: `topDamagedDevicesService` / `topDamagedInkService` gán thẳng
+      `match.department = department` (string) vào aggregation `$match` —
+      Mongoose không tự cast string → ObjectId trong aggregate (chỉ tự cast
+      ở Query API). Filter theo khoa ở 2 KPI này trước đây KHÔNG hoạt động.
+      → Sửa bằng `toOptionalObjectId()`.
+
+   2. ⚡ PERFORMANCE: mọi hàm phân trang trước đây chạy pipeline 2 LẦN
+      (1 lần `$count`, 1 lần `$sort/$skip/$limit`) — collection bị quét/
+      group 2 lần cho mỗi request. Gộp lại bằng `$facet` — chỉ 1 lần
+      aggregate cho cả data + tổng số record.
+
+   3. 🧹 DUPLICATE: `topDamagedDevicesService` và `topDamagedInkService`
+      giống hệt nhau, chỉ khác `subType` (CHECK_DAMAGE vs CONFIRM_STATUS).
+      Gộp chung vào `getDamageReportKpiService()`, 2 hàm cũ giữ nguyên chữ
+      ký/tên export để không phải sửa controller.
+
+   4. 🔒 SOFT-DELETE: thêm `deletedAt: null` nhất quán ở mọi $match (trước
+      đây chỉ `getDashboardDeviceStats` có, các hàm khác chỉ lọc
+      `isActive: true`) — phòng trường hợp `deletedAt` được set độc lập
+      với `isActive` ở tầng ghi dữ liệu.
+
+   5. Dùng enum `DocumentCategory` / `DocumentSubType` từ model thay vì
+      magic string "PROPOSAL"/"REPORT"/"CHECK_DAMAGE"/... — sai chính tả
+      enum sẽ báo lỗi biên dịch thay vì âm thầm trả rỗng lúc runtime.
+
+   6. Validate `month`/`year` (range hợp lý) trong `getDashboardDeviceStats`
+      thay vì chỉ check "truthy".
+
+   7. Xoá toàn bộ code chết (~250 dòng comment-out của các bản cũ) — lịch sử
+      đã có trong git log, giữ lại trong file chỉ gây nhiễu khi đọc/audit.
+
+   KHÔNG đổi: field `meta.items.description` (dùng cho REPORT — CHECK_DAMAGE/
+   CONFIRM_STATUS) và `meta.items.deviceName` (dùng cho PROPOSAL) — đã xác
+   nhận đây là 2 field hợp lệ khác nhau theo loại document, không phải bug.
+===================================================================== */
+
+interface PaginationResult<T> {
+  items: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+/**
+ * Chạy 1 pipeline aggregation "chưa sort/skip/limit" qua `$facet` để lấy
+ * đồng thời (a) trang dữ liệu đã sort/phân trang và (b) tổng số record —
+ * thay cho pattern cũ chạy pipeline riêng cho `$count` và riêng cho data
+ * (2 lần quét/group toàn bộ dữ liệu match được cho mỗi request).
+ */
+const runPaginatedAggregate = async <T = any>(
+  basePipeline: PipelineStage[],
+  params: { page: number; limit: number; sortBy: string; sortOrder: SortOrder },
+): Promise<PaginationResult<T>> => {
+  const { page, limit, sortBy, sortOrder } = params;
+  const skip = (page - 1) * limit;
+  const sortStage: Record<string, 1 | -1> = { [sortBy]: sortOrder === "asc" ? 1 : -1 };
+
+  const [result] = await Document.aggregate([
+    ...basePipeline,
+    {
+      $facet: {
+        items: [{ $sort: sortStage }, { $skip: skip }, { $limit: limit }],
+        totalCount: [{ $count: "count" }],
+      },
+    },
+  ]);
+
+  const items: T[] = result?.items ?? [];
+  const total: number = result?.totalCount?.[0]?.count ?? 0;
+
+  return {
+    items,
+    pagination: { page, limit, total, totalPages: limit > 0 ? Math.ceil(total / limit) : 0 },
+  };
+};
+
+/* =====================================================================
+   🏥 ADMIN DASHBOARD SUMMARY
+===================================================================== */
 export const adminDashboardSummaryService = async () => {
   const now = new Date();
-  // We want to analyze data from the start of the current year to get a clear picture of annual trends
   const startOfYear = new Date(now.getFullYear(), 0, 1);
 
   const [
@@ -18,100 +104,78 @@ export const adminDashboardSummaryService = async () => {
     documentsByDepartment,
     recentDocuments,
     totalDepartments,
-    totalUsers
+    totalUsers,
   ] = await Promise.all([
-
     // 📊 TOTAL DOCUMENT STATS
     Document.aggregate([
-      { $match: { isActive: true } },
+      { $match: { isActive: true, deletedAt: null } },
       {
         $group: {
           _id: null,
           totalDocuments: { $sum: 1 },
           totalProposals: {
-            $sum: {
-              $cond: [{ $eq: ["$category", "PROPOSAL"] }, 1, 0]
-            }
+            $sum: { $cond: [{ $eq: ["$category", DocumentCategory.PROPOSAL] }, 1, 0] },
           },
           totalReports: {
-            $sum: {
-              $cond: [{ $eq: ["$category", "REPORT"] }, 1, 0]
-            }
-          }
-        }
-      }
+            $sum: { $cond: [{ $eq: ["$category", DocumentCategory.REPORT] }, 1, 0] },
+          },
+        },
+      },
     ]),
 
-    // 📈 PROPOSALS BY MONTH
-    //Lấy số lượng proposal theo tháng trong năm hiện tại để xem xu hướng nộp proposal qua các tháng. Điều này giúp xác định thời điểm cao điểm và thấp điểm trong năm.
+    // 📈 PROPOSALS BY MONTH (năm hiện tại)
     Document.aggregate([
       {
         $match: {
-          category: "PROPOSAL",
+          category: DocumentCategory.PROPOSAL,
           isActive: true,
-          createdAt: { $gte: startOfYear }
-        }
+          deletedAt: null,
+          createdAt: { $gte: startOfYear },
+        },
       },
-      {
-        $group: {
-          _id: { $month: "$createdAt" },
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { "_id": 1 } }
+      { $group: { _id: { $month: "$createdAt" }, count: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
     ]),
 
-    // 📈 REPORTS BY MONTH
-    // Lấy số lượng report theo tháng trong năm hiện tại để phân tích xu hướng báo cáo. Điều này giúp hiểu rõ hơn về các giai đoạn mà người dùng thường xuyên tạo báo cáo, từ đó có thể tối ưu hóa hệ thống để hỗ trợ tốt hơn trong những thời điểm đó.
+    // 📈 REPORTS BY MONTH (năm hiện tại)
     Document.aggregate([
       {
         $match: {
-          category: "REPORT",
+          category: DocumentCategory.REPORT,
           isActive: true,
-          createdAt: { $gte: startOfYear }
-        }
+          deletedAt: null,
+          createdAt: { $gte: startOfYear },
+        },
       },
-      {
-        $group: {
-          _id: { $month: "$createdAt" },
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { "_id": 1 } }
+      { $group: { _id: { $month: "$createdAt" }, count: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
     ]),
 
     // 🏥 DOCUMENTS BY DEPARTMENT
-    //Lấy số lượng document theo phòng ban để xác định những phòng ban nào đang hoạt động tích cực nhất. Điều này giúp ban quản lý có thể tập trung hỗ trợ và phát triển những phòng ban có tiềm năng cao, đồng thời cũng có thể đưa ra các biện pháp khuyến khích cho những phòng ban ít hoạt động hơn.
     Document.aggregate([
-      { $match: { isActive: true } },
-      {
-        $group: {
-          _id: "$department",
-          count: { $sum: 1 }
-        }
-      },
+      { $match: { isActive: true, deletedAt: null } },
+      { $group: { _id: "$department", count: { $sum: 1 } } },
       {
         $lookup: {
           from: "departments",
           localField: "_id",
           foreignField: "_id",
-          as: "department"
-        }
+          as: "department",
+        },
       },
       { $unwind: "$department" },
       {
         $project: {
           departmentId: "$_id",
           departmentName: "$department.name",
-          count: 1
-        }
+          count: 1,
+        },
       },
-      { $sort: { count: -1 } }
+      { $sort: { count: -1 } },
     ]),
 
-    // 📄 RECENT DOCS
-    //Lấy 5 document mới nhất để hiển thị trên dashboard. Điều này giúp người quản trị nhanh chóng nắm bắt được những hoạt động gần đây nhất trong hệ thống, từ đó có thể phản ứng kịp thời nếu có vấn đề phát sinh hoặc đơn giản là để theo dõi sự phát triển của hệ thống.
-    Document.find({ isActive: true })
+    // 📄 5 DOCUMENT MỚI NHẤT
+    Document.find({ isActive: true, deletedAt: null })
       .sort({ createdAt: -1 })
       .limit(5)
       .populate("department", "name code")
@@ -120,8 +184,8 @@ export const adminDashboardSummaryService = async () => {
 
     Department.countDocuments(),
 
-    // 🧑‍⚕️ TOTAL USERS
-    User.countDocuments({ isActive: true })
+    // 🧑‍⚕️ TỔNG SỐ USER
+    User.countDocuments({ isActive: true }),
   ]);
 
   return {
@@ -134,17 +198,14 @@ export const adminDashboardSummaryService = async () => {
     proposalsByMonth,
     reportsByMonth,
     documentsByDepartment,
-    recentDocuments
+    recentDocuments,
   };
 };
 
-// 🏥 DEPARTMENT DASHBOARD SUMMARY
-// Lấy thông tin dashboard cho một khoa cụ thể, bao gồm tổng số document, proposal, report, số lượng proposal và report theo tháng, 5 document mới nhất và tổng số người dùng trong khoa đó. Điều này giúp trưởng khoa hoặc quản lý khoa có cái nhìn tổng quan về hoạt động của khoa mình, từ đó có thể đưa ra các quyết định quản lý hiệu quả hơn.
-// Trước khi thực hiện các truy vấn, chúng ta sẽ kiểm tra tính hợp lệ của departmentId để đảm bảo rằng nó là một ObjectId hợp lệ. Nếu không, chúng ta sẽ trả về lỗi Bad Request. Sau đó, chúng ta sẽ kiểm tra xem khoa có tồn tại hay không. Nếu không tìm thấy khoa, chúng ta sẽ trả về lỗi Not Found.
-// Sau khi xác nhận khoa tồn tại, chúng ta sẽ thực hiện các truy vấn để lấy dữ liệu thống kê và thông tin cần thiết cho dashboard của khoa đó. Cuối cùng, chúng ta sẽ trả về một đối tượng chứa tất cả thông tin đã thu thập được để hiển thị trên dashboard.
-// Lưu ý: Các truy vấn sử dụng aggregation để tính toán tổng số document, proposal, report và phân tích theo tháng. Chúng ta cũng sử dụng populate để lấy thông tin chi tiết về người tạo document và khoa liên quan.
+/* =====================================================================
+   🏢 DEPARTMENT DASHBOARD SUMMARY
+===================================================================== */
 export const departmentDashboardService = async (departmentId: any) => {
-
   if (!Types.ObjectId.isValid(departmentId)) {
     throw ApiError.badRequest("Department ID không hợp lệ");
   }
@@ -154,96 +215,67 @@ export const departmentDashboardService = async (departmentId: any) => {
     throw ApiError.notFound("Không tìm thấy khoa");
   }
 
+  const departmentObjectId = new Types.ObjectId(departmentId);
   const now = new Date();
   const startOfYear = new Date(now.getFullYear(), 0, 1);
 
-  const [
-    stats,
-    proposalsByMonth,
-    reportsByMonth,
-    recentDocuments,
-    totalUsers
-  ] = await Promise.all([
-
-    // 📊 TOTAL STATS
+  const [stats, proposalsByMonth, reportsByMonth, recentDocuments, totalUsers] = await Promise.all([
+    // 📊 TỔNG QUAN
     Document.aggregate([
-      {
-        $match: {
-          department: new Types.ObjectId(departmentId),
-          isActive: true
-        }
-      },
+      { $match: { department: departmentObjectId, isActive: true, deletedAt: null } },
       {
         $group: {
           _id: null,
           totalDocuments: { $sum: 1 },
           totalProposals: {
-            $sum: {
-              $cond: [{ $eq: ["$category", "PROPOSAL"] }, 1, 0]
-            }
+            $sum: { $cond: [{ $eq: ["$category", DocumentCategory.PROPOSAL] }, 1, 0] },
           },
           totalReports: {
-            $sum: {
-              $cond: [{ $eq: ["$category", "REPORT"] }, 1, 0]
-            }
-          }
-        }
-      }
+            $sum: { $cond: [{ $eq: ["$category", DocumentCategory.REPORT] }, 1, 0] },
+          },
+        },
+      },
     ]),
 
     // 📈 PROPOSAL BY MONTH
     Document.aggregate([
       {
         $match: {
-          department: new Types.ObjectId(departmentId),
-          category: "PROPOSAL",
+          department: departmentObjectId,
+          category: DocumentCategory.PROPOSAL,
           isActive: true,
-          createdAt: { $gte: startOfYear }
-        }
+          deletedAt: null,
+          createdAt: { $gte: startOfYear },
+        },
       },
-      {
-        $group: {
-          _id: { $month: "$createdAt" },
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { "_id": 1 } }
+      { $group: { _id: { $month: "$createdAt" }, count: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
     ]),
 
     // 📈 REPORT BY MONTH
     Document.aggregate([
       {
         $match: {
-          department: new Types.ObjectId(departmentId),
-          category: "REPORT",
+          department: departmentObjectId,
+          category: DocumentCategory.REPORT,
           isActive: true,
-          createdAt: { $gte: startOfYear }
-        }
+          deletedAt: null,
+          createdAt: { $gte: startOfYear },
+        },
       },
-      {
-        $group: {
-          _id: { $month: "$createdAt" },
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { "_id": 1 } }
+      { $group: { _id: { $month: "$createdAt" }, count: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
     ]),
 
-    // 📄 RECENT DOCS
-    Document.find({
-      department: departmentId,
-      isActive: true
-    })
+    // 📄 5 DOCUMENT MỚI NHẤT CỦA KHOA
+    Document.find({ department: departmentObjectId, isActive: true, deletedAt: null })
       .sort({ createdAt: -1 })
       .limit(5)
       .populate("createdBy", "fullName")
       .lean(),
 
-    // 🧑 USERS IN DEPARTMENT
-    User.countDocuments({
-      department: departmentId,
-      isActive: true
-    })
+    // 🧑 SỐ USER TRONG KHOA
+    User.countDocuments({ department: departmentObjectId, isActive: true }),
   ]);
 
   return {
@@ -255,41 +287,14 @@ export const departmentDashboardService = async (departmentId: any) => {
 
     proposalsByMonth,
     reportsByMonth,
-    recentDocuments
+    recentDocuments,
   };
 };
 
-
-/**
- * 1️⃣ 📊 KPI Proposal → Report Conversion Rate theo khoa
-🎯 Ý nghĩa nghiệp vụ
-Đo hiệu quả xử lý đề xuất:
-Conversion Rate = số proposal có report / tổng proposal
-
-👉 giúp admin biết:
-khoa nào xử lý nhanh
-khoa nào đề xuất xong bỏ đó
-khoa nào phát sinh nhiều hỏng hóc
-
-⚠️ Lưu ý DB bạn đang dùng
-Bạn đã đổi:
-PROPOSAL.referenceTo = [reportId]
-
-👉 nên:
-proposal có referenceTo.length > 0 = đã phát sinh report
-proposal có referenceTo.length = 0 = chưa xử lý
- */
-
-/**
- *  // 🏥 KPI PROPOSAL → REPORT CONVERSION RATE THEO KHOA
- * Lấy tỷ lệ chuyển đổi từ proposal sang report theo từng khoa để đánh giá hiệu quả xử lý đề xuất của các khoa. Tỷ lệ này được tính bằng cách đếm số lượng proposal đã phát sinh report (có referenceTo) chia cho tổng số proposal của khoa đó, sau đó nhân với 100 để ra phần trăm. Kết quả sẽ giúp admin xác định được khoa nào đang xử lý đề xuất hiệu quả nhất và khoa nào cần cải thiện.
- * // Lưu ý: Đảm bảo rằng bạn đã cập nhật schema của Document để có trường referenceTo là một mảng chứa reportId, và các proposal có referenceTo.length > 0 được coi là đã phát sinh report.
- * // Trước khi thực hiện các truy vấn, chúng ta sẽ kiểm tra tính hợp lệ của departmentId để đảm bảo rằng nó là một ObjectId hợp lệ. Nếu không, chúng ta sẽ trả về lỗi Bad Request. Sau đó, chúng ta sẽ kiểm tra xem khoa có tồn tại hay không. Nếu không tìm thấy khoa, chúng ta sẽ trả về lỗi Not Found.
- * // Sau khi xác nhận khoa tồn tại, chúng ta sẽ thực hiện các truy vấn để lấy dữ liệu thống kê và thông tin cần thiết cho dashboard của khoa đó. Cuối cùng, chúng ta sẽ trả về một đối tượng chứa tất cả thông tin đã thu thập được để hiển thị trên dashboard.
- * // Lưu ý: Các truy vấn sử dụng aggregation để tính toán tổng số proposal và số proposal đã chuyển đổi thành report, sau đó tính toán tỷ lệ chuyển đổi và sắp xếp kết quả theo tỷ lệ này.
- * // Đảm bảo rằng bạn đã cập nhật schema của Document để có trường referenceTo là một mảng chứa reportId, và các proposal có referenceTo.length > 0 được coi là đã phát sinh report.
- * @returns 
- */
+/* =====================================================================
+   📊 KPI: PROPOSAL → REPORT CONVERSION RATE THEO KHOA
+   conversionRate = (số proposal có referenceTo.length > 0) / tổng proposal
+===================================================================== */
 export const proposalConversionByDepartmentService = async ({
   page = 1,
   limit = 10,
@@ -299,33 +304,17 @@ export const proposalConversionByDepartmentService = async ({
   page?: number;
   limit?: number;
   sortBy?: string;
-  sortOrder?: "asc" | "desc";
-}) => {
-  const skip = (page - 1) * limit;
-
-  const sortStage: any = {};
-  sortStage[sortBy] = sortOrder === "asc" ? 1 : -1;
-
-  const pipeline = [
-    {
-      $match: {
-        category: "PROPOSAL",
-        isActive: true,
-      },
-    },
-
+  sortOrder?: SortOrder;
+}): Promise<PaginationResult<any>> => {
+  const basePipeline: PipelineStage[] = [
+    { $match: { category: DocumentCategory.PROPOSAL, isActive: true, deletedAt: null } },
     {
       $addFields: {
         hasReport: {
-          $cond: [
-            { $gt: [{ $size: { $ifNull: ["$referenceTo", []] } }, 0] },
-            1,
-            0,
-          ],
+          $cond: [{ $gt: [{ $size: { $ifNull: ["$referenceTo", []] } }, 0] }, 1, 0],
         },
       },
     },
-
     {
       $group: {
         _id: "$department",
@@ -333,7 +322,6 @@ export const proposalConversionByDepartmentService = async ({
         converted: { $sum: "$hasReport" },
       },
     },
-
     {
       $lookup: {
         from: "departments",
@@ -342,125 +330,57 @@ export const proposalConversionByDepartmentService = async ({
         as: "department",
       },
     },
-
     { $unwind: "$department" },
-
     {
       $addFields: {
         conversionRate: {
-          $multiply: [
-            {
-              $divide: [
-                "$converted",
-                { $max: ["$totalProposals", 1] },
-              ],
-            },
-            100,
-          ],
+          $multiply: [{ $divide: ["$converted", { $max: ["$totalProposals", 1] }] }, 100],
         },
       },
     },
-
     {
       $project: {
         departmentId: "$_id",
         departmentName: "$department.name",
         totalProposals: 1,
         converted: 1,
-        conversionRate: {
-          $round: ["$conversionRate", 1],
-        },
+        conversionRate: { $round: ["$conversionRate", 1] },
       },
     },
   ];
 
-  const countResult = await Document.aggregate([
-    ...pipeline,
-    { $count: "total" },
-  ]);
-
-  const total = countResult[0]?.total || 0;
-
-  const data = await Document.aggregate([
-    ...pipeline,
-    { $sort: sortStage },
-    { $skip: skip },
-    { $limit: limit },
-  ]);
-
-  return {
-    items: data,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-    },
-  };
+  return runPaginatedAggregate(basePipeline, { page, limit, sortBy, sortOrder });
 };
 
-/**
- * 
- * 2️⃣ 📉 KPI Xu hướng hỏng thiết bị theo tháng
-🎯 Ý nghĩa
-Đây là KPI rất quan trọng cho bệnh viện:
-tháng nào thiết bị hỏng nhiều
-dự báongân sách bảo trì
-dự báo mua sắm thiết bị
-
-🔎 Định nghĩa “thiết bị hỏng”
-
-👉 thiết bị hỏng được ghi trong:
-CHECK_DAMAGE report
-nên ta thống kê từ:
-category: REPORT
-subType: CHECK_DAMAGE
- */
-
-/**
- *  // 🏥 KPI XU HƯỚNG HỎNG THIẾT BỊ THEO THÁNG
- * Lấy xu hướng hỏng thiết bị theo tháng để giúp bệnh viện dự báo ngân sách bảo trì và mua sắm thiết bị. Chúng ta sẽ thống kê số lượng report có subType là CHECK_DAMAGE theo tháng, sau đó sắp xếp kết quả theo năm và tháng để dễ dàng nhận biết các giai đoạn có nhiều thiết bị hỏng hóc nhất trong năm.
- * Lưu ý: Đảm bảo rằng trong hệ thống của bạn, các report về hỏng thiết bị được phân loại đúng với category là "REPORT" và subType là "CHECK_DAMAGE" để có thể lọc và thống kê chính xác.
- * Trước khi thực hiện các truy vấn, chúng ta sẽ kiểm tra tính hợp lệ của departmentId để đảm bảo rằng nó là một ObjectId hợp lệ. Nếu không, chúng ta sẽ trả về lỗi Bad Request. Sau đó, chúng ta sẽ kiểm tra xem khoa có tồn tại hay không. Nếu không tìm thấy khoa, chúng ta sẽ trả về lỗi Not Found.
- * Sau khi xác nhận khoa tồn tại, chúng ta sẽ thực hiện các truy vấn để lấy dữ liệu thống kê và thông tin cần thiết cho dashboard của khoa đó. Cuối cùng, chúng ta sẽ trả về một đối tượng chứa tất cả thông tin đã thu thập được để hiển thị trên dashboard.
- * Lưu ý: Các truy vấn sử dụng aggregation để tính toán số lượng report có subType là CHECK_DAMAGE theo tháng, sau đó sắp xếp kết quả theo năm và tháng để dễ dàng nhận biết các giai đoạn có nhiều thiết bị hỏng hóc nhất trong năm. 
- * Đảm bảo rằng trong hệ thống của bạn, các report về hỏng thiết bị được phân loại đúng với category là "REPORT" và subType là "CHECK_DAMAGE" để có thể lọc và thống kê chính xác.
- * 
- * @returns 
- */
+/* =====================================================================
+   📉 KPI: XU HƯỚNG HỎNG THIẾT BỊ THEO THÁNG (dựa trên REPORT/CHECK_DAMAGE)
+===================================================================== */
 export const deviceDamageTrendByMonthService = async ({
   page = 1,
   limit = 12,
   sortBy = "monthLabel",
   sortOrder = "desc",
-}) => {
-  const skip = (page - 1) * limit;
-
-  const sortStage: any = {};
-  sortStage[sortBy] =
-    sortOrder === "asc" ? 1 : -1;
-
-  const pipeline = [
+}: {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: SortOrder;
+}): Promise<PaginationResult<any>> => {
+  const basePipeline: PipelineStage[] = [
     {
       $match: {
-        category: "REPORT",
-        subType: "CHECK_DAMAGE",
+        category: DocumentCategory.REPORT,
+        subType: DocumentSubType.CHECK_DAMAGE,
         isActive: true,
+        deletedAt: null,
       },
     },
-
     {
       $group: {
-        _id: {
-          year: { $year: "$createdAt" },
-          month: { $month: "$createdAt" },
-        },
-        totalReports: {
-          $sum: 1,
-        },
+        _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
+        totalReports: { $sum: 1 },
       },
     },
-
     {
       $project: {
         _id: 0,
@@ -474,15 +394,8 @@ export const deviceDamageTrendByMonthService = async ({
             {
               $cond: [
                 { $lt: ["$_id.month", 10] },
-                {
-                  $concat: [
-                    "0",
-                    { $toString: "$_id.month" },
-                  ],
-                },
-                {
-                  $toString: "$_id.month",
-                },
+                { $concat: ["0", { $toString: "$_id.month" }] },
+                { $toString: "$_id.month" },
               ],
             },
           ],
@@ -491,182 +404,64 @@ export const deviceDamageTrendByMonthService = async ({
     },
   ];
 
-  const countResult =
-    await Document.aggregate([
-      ...pipeline,
-      { $count: "total" },
-    ]);
-
-  const total =
-    countResult[0]?.total || 0;
-
-  const data =
-    await Document.aggregate([
-      ...pipeline,
-      { $sort: sortStage },
-      { $skip: skip },
-      { $limit: limit },
-    ]);
-
-  return {
-    items: data,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-    },
-  };
+  return runPaginatedAggregate(basePipeline, { page, limit, sortBy, sortOrder });
 };
 
-// export const deviceDamageTrendByMonthService = async () => {
-//   const result = await Document.aggregate([
-
-//     {
-//       $match: {
-//         category: "REPORT",
-//         subType: "CHECK_DAMAGE",
-//         isActive: true
-//       }
-//     },
-
-//     // 👇 tách năm + tháng
-//     {
-//       $group: {
-//         _id: {
-//           year: { $year: "$createdAt" },
-//           month: { $month: "$createdAt" }
-//         },
-//         totalReports: { $sum: 1 }
-//       }
-//     },
-
-//     {
-//       $addFields: {
-//         monthLabel: {
-//           $concat: [
-//             { $toString: "$_id.year" },
-//             "-",
-//             {
-//               $cond: [
-//                 { $lt: ["$_id.month", 10] },
-//                 { $concat: ["0", { $toString: "$_id.month" }] },
-//                 { $toString: "$_id.month" }
-//               ]
-//             }
-//           ]
-//         }
-//       }
-//     },
-
-//     {
-//       $project: {
-//         _id: 0,
-//         year: "$_id.year",
-//         month: "$_id.month",
-//         monthLabel: 1,
-//         totalReports: 1
-//       }
-//     },
-
-//     { $sort: { year: 1, month: 1 } }
-//   ]);
-
-//   return result;
-// };
-
-/**
- * Thiết bị nào hỏng nhiều nhất → cần thay thế / bảo trì định kỳ
-Mình build chuẩn theo DB bạn đang dùng:
-Thiết bị hỏng nằm trong
-CHECK_DAMAGE.meta.items[]
-mỗi item có:
-deviceName
-quantity
-note
-🚨 KPI: Top thiết bị hỏng nhiều nhất
-🎯 Ý nghĩa nghiệp vụ
-
-Admin biết:
-thiết bị nào hỏng lặp lại
-khoa nào dùng thiết bị quá tải
-nên thay thế hay bảo trì
- */
-
-// 🏥 KPI TOP THIẾT BỊ HỎNG NHIỀU NHẤT
-/**
- * Lấy top thiết bị hỏng nhiều nhất để giúp bệnh viện xác định những thiết bị nào đang gặp vấn đề thường xuyên nhất, từ đó có thể đưa ra quyết định về việc thay thế hoặc bảo trì định kỳ. Chúng ta sẽ thống kê số lượng thiết bị hỏng dựa trên các report có subType là CHECK_DAMAGE, sau đó nhóm theo tên thiết bị và tính tổng số lượng hỏng hóc của từng thiết bị. Kết quả sẽ được sắp xếp theo số lượng hỏng hóc giảm dần để dễ dàng nhận biết những thiết bị nào đang gặp vấn đề nhiều nhất.
- * Lưu ý: Đảm bảo rằng trong hệ thống của bạn, các report về hỏng thiết bị được phân loại đúng với category là "REPORT" và subType là "CHECK_DAMAGE", và thông tin về thiết bị hỏng được lưu trữ chính xác trong meta.items để có thể lọc và thống kê chính xác.
- * Trước khi thực hiện các truy vấn, chúng ta sẽ kiểm tra tính hợp lệ của departmentId để đảm bảo rằng nó là một ObjectId hợp lệ. Nếu không, chúng ta sẽ trả về lỗi Bad Request. Sau đó, chúng ta sẽ kiểm tra xem khoa có tồn tại hay không. Nếu không tìm thấy khoa, chúng ta sẽ trả về lỗi Not Found.
- * Sau khi xác nhận khoa tồn tại, chúng ta sẽ thực hiện các truy vấn để lấy dữ liệu thống kê và thông tin cần thiết cho dashboard của khoa đó. Cuối cùng, chúng ta sẽ trả về một đối tượng chứa tất cả thông tin đã thu thập được để hiển thị trên dashboard.
- * Lưu ý: Các truy vấn sử dụng aggregation để tính toán số lượng thiết bị hỏng dựa trên các report có subType là CHECK_DAMAGE, sau đó nhóm theo tên thiết bị và tính tổng số lượng hỏng hóc của từng thiết bị. Kết quả sẽ được sắp xếp theo số lượng hỏng hóc giảm dần để dễ dàng nhận biết những thiết bị nào đang gặp vấn đề nhiều nhất. Đảm bảo rằng trong hệ thống của bạn, các report về hỏng thiết bị được phân loại đúng với category là "REPORT" và subType là "CHECK_DAMAGE", và thông tin về thiết bị hỏng được lưu trữ chính xác trong meta.items để có thể lọc và thống kê chính xác.
- * 
- * @param param0 
- * @returns 
- */
-export const topDamagedDevicesService = async ({
-  department,
-  fromDate,
-  toDate,
-  page = 1,
-  limit = 10,
-  sortBy = "totalBroken",
-  sortOrder = "desc",
-}: {
+/* =====================================================================
+   🚨 KPI: TOP THIẾT BỊ / MỰC HỎNG NHIỀU NHẤT
+   Dùng chung 1 hàm cho 2 KPI (trước đây `topDamagedDevicesService` và
+   `topDamagedInkService` là 2 bản copy-paste giống hệt nhau, chỉ khác
+   `subType`). Cả 2 đều group theo `meta.items.description`.
+===================================================================== */
+interface DamageReportKpiParams {
   department?: any;
   fromDate?: Date;
   toDate?: Date;
   page?: number;
   limit?: number;
   sortBy?: string;
-  sortOrder?: "asc" | "desc";
-}) => {
+  sortOrder?: SortOrder;
+}
 
-  const skip = (page - 1) * limit;
-
-  const match: any = {
-    category: "REPORT",
-    subType: "CHECK_DAMAGE",
+const getDamageReportKpiService = async (
+  subType: DocumentSubType.CHECK_DAMAGE | DocumentSubType.CONFIRM_STATUS,
+  {
+    department,
+    fromDate,
+    toDate,
+    page = 1,
+    limit = 10,
+    sortBy = "totalBroken",
+    sortOrder = "desc",
+  }: DamageReportKpiParams,
+): Promise<PaginationResult<any>> => {
+  const match: Record<string, any> = {
+    category: DocumentCategory.REPORT,
+    subType,
     isActive: true,
+    deletedAt: null,
   };
 
-  if (department) {
-    match.department = department;
+  // 🐛 Sửa bug: convert đúng sang ObjectId, không gán thẳng string vào $match.
+  const departmentObjectId = toOptionalObjectId(department, "Department ID không hợp lệ");
+  if (departmentObjectId) {
+    match.department = departmentObjectId;
   }
 
   if (fromDate || toDate) {
     match.createdAt = {};
-
-    if (fromDate) {
-      match.createdAt.$gte = new Date(fromDate);
-    }
-
-    if (toDate) {
-      match.createdAt.$lte = new Date(toDate);
-    }
+    if (fromDate) match.createdAt.$gte = fromDate;
+    if (toDate) match.createdAt.$lte = toDate;
   }
 
-  const sortStage: any = {};
-  sortStage[sortBy] =
-    sortOrder === "asc" ? 1 : -1;
-
-  const pipeline = [
+  const basePipeline: PipelineStage[] = [
     { $match: match },
-
     { $unwind: "$meta.items" },
-
     {
       $addFields: {
-        qty: {
-          $cond: [
-            { $gt: ["$meta.items.quantity", 0] },
-            "$meta.items.quantity",
-            1,
-          ],
-        },
+        qty: { $cond: [{ $gt: ["$meta.items.quantity", 0] }, "$meta.items.quantity", 1] },
       },
     },
-
     {
       $group: {
         _id: "$meta.items.description",
@@ -674,493 +469,75 @@ export const topDamagedDevicesService = async ({
         totalReports: { $sum: 1 },
       },
     },
-
-    {
-      $project: {
-        _id: 0,
-        deviceName: "$_id",
-        totalBroken: 1,
-        totalReports: 1,
-      },
-    },
+    { $project: { _id: 0, deviceName: "$_id", totalBroken: 1, totalReports: 1 } },
   ];
 
-  const countResult =
-    await Document.aggregate([
-      ...pipeline,
-      { $count: "total" },
-    ]);
-
-  const total =
-    countResult[0]?.total || 0;
-
-  const data =
-    await Document.aggregate([
-      ...pipeline,
-      { $sort: sortStage },
-      { $skip: skip },
-      { $limit: limit },
-    ]);
-
-  return {
-    items: data,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages:
-        Math.ceil(total / limit),
-    },
-  };
+  return runPaginatedAggregate(basePipeline, { page, limit, sortBy, sortOrder });
 };
 
-// export const topDamagedDevicesService = async ({
-//   department,
-//   fromDate,
-//   toDate,
-//   limit = 10
-// }: {
-//   department?: any;
-//   fromDate?: Date;
-//   toDate?: Date;
-//   limit?: number;
-// }) => {
+export const topDamagedDevicesService = (params: DamageReportKpiParams) =>
+  getDamageReportKpiService(DocumentSubType.CHECK_DAMAGE, params);
 
-//   const match: any = {
-//     category: "REPORT",
-//     subType: "CHECK_DAMAGE",
-//     isActive: true
-//   };
+export const topDamagedInkService = (params: DamageReportKpiParams) =>
+  getDamageReportKpiService(DocumentSubType.CONFIRM_STATUS, params);
 
-//   if (department) match.department = department;
+/* =====================================================================
+   📦 THỐNG KÊ TỔNG SỐ LƯỢNG MỰC/SỬA CHỮA/DỰ TRÙ THEO THÁNG (PROPOSAL)
+===================================================================== */
+const PROPOSAL_SUBTYPES = [
+  DocumentSubType.PROPOSE_REPAIR,
+  DocumentSubType.PROPOSE_INK,
+  DocumentSubType.PROPOSE_PROCUREMENT,
+];
 
-//   if (fromDate || toDate) {
-//     match.createdAt = {};
-//     if (fromDate) match.createdAt.$gte = new Date(fromDate);
-//     if (toDate) match.createdAt.$lte = new Date(toDate);
-//   }
-
-//   const result = await Document.aggregate([
-
-//     { $match: match },
-
-//     { $unwind: "$meta.items" },
-
-//     {
-//       $addFields: {
-//         qty: {
-//           $cond: [
-//             { $gt: ["$meta.items.quantity", 0] },
-//             "$meta.items.quantity",
-//             1
-//           ]
-//         }
-//       }
-//     },
-
-//     {
-//       $group: {
-//         _id: "$meta.items.description",
-//         totalBroken: { $sum: "$qty" },
-//         totalReports: { $sum: 1 }
-//       }
-//     },
-
-//     {
-//       $project: {
-//         _id: 0,
-//         deviceName: "$_id",
-//         totalBroken: 1,
-//         totalReports: 1
-//       }
-//     },
-
-//     { $sort: { totalBroken: -1 } },
-
-//     { $limit: limit }
-//   ]);
-
-//   return result;
-// };
-
-
-// 🏥 KPI TOP THIẾT BỊ MỰC IN HỎNG NHIỀU NHẤT
-/**
- * Lấy top thiết bị hỏng nhiều nhất để giúp bệnh viện xác định những thiết bị nào đang gặp vấn đề thường xuyên nhất, từ đó có thể đưa ra quyết định về việc thay thế hoặc bảo trì định kỳ. Chúng ta sẽ thống kê số lượng thiết bị hỏng dựa trên các report có subType là CHECK_DAMAGE, sau đó nhóm theo tên thiết bị và tính tổng số lượng hỏng hóc của từng thiết bị. Kết quả sẽ được sắp xếp theo số lượng hỏng hóc giảm dần để dễ dàng nhận biết những thiết bị nào đang gặp vấn đề nhiều nhất.
- * Lưu ý: Đảm bảo rằng trong hệ thống của bạn, các report về hỏng thiết bị được phân loại đúng với category là "REPORT" và subType là "CHECK_DAMAGE", và thông tin về thiết bị hỏng được lưu trữ chính xác trong meta.items để có thể lọc và thống kê chính xác.
- * Trước khi thực hiện các truy vấn, chúng ta sẽ kiểm tra tính hợp lệ của departmentId để đảm bảo rằng nó là một ObjectId hợp lệ. Nếu không, chúng ta sẽ trả về lỗi Bad Request. Sau đó, chúng ta sẽ kiểm tra xem khoa có tồn tại hay không. Nếu không tìm thấy khoa, chúng ta sẽ trả về lỗi Not Found.
- * Sau khi xác nhận khoa tồn tại, chúng ta sẽ thực hiện các truy vấn để lấy dữ liệu thống kê và thông tin cần thiết cho dashboard của khoa đó. Cuối cùng, chúng ta sẽ trả về một đối tượng chứa tất cả thông tin đã thu thập được để hiển thị trên dashboard.
- * Lưu ý: Các truy vấn sử dụng aggregation để tính toán số lượng thiết bị hỏng dựa trên các report có subType là CHECK_DAMAGE, sau đó nhóm theo tên thiết bị và tính tổng số lượng hỏng hóc của từng thiết bị. Kết quả sẽ được sắp xếp theo số lượng hỏng hóc giảm dần để dễ dàng nhận biết những thiết bị nào đang gặp vấn đề nhiều nhất. Đảm bảo rằng trong hệ thống của bạn, các report về hỏng thiết bị được phân loại đúng với category là "REPORT" và subType là "CHECK_DAMAGE", và thông tin về thiết bị hỏng được lưu trữ chính xác trong meta.items để có thể lọc và thống kê chính xác.
- * 
- * @param param0 
- * @returns 
- */
-export const topDamagedInkService = async ({
-  department,
-  fromDate,
-  toDate,
-  page = 1,
-  limit = 10,
-  sortBy = "totalBroken",
-  sortOrder = "desc",
-}: {
-  department?: any;
-  fromDate?: Date;
-  toDate?: Date;
+export const getDashboardDeviceStats = async (query: {
+  month?: number | string;
+  year?: number | string;
   page?: number;
   limit?: number;
   sortBy?: string;
-  sortOrder?: "asc" | "desc";
-}) => {
+  sortOrder?: SortOrder;
+}): Promise<PaginationResult<any>> => {
+  const { month, year, page = 1, limit = 20, sortBy = "totalQuantity", sortOrder = "desc" } = query;
 
-  const skip = (page - 1) * limit;
-
-  const match: any = {
-    category: "REPORT",
-    subType: "CONFIRM_STATUS",
-    isActive: true,
-  };
-
-  if (department) {
-    match.department = department;
+  if (!month || !year) {
+    throw ApiError.badRequest("month và year là bắt buộc");
   }
 
-  if (fromDate || toDate) {
-    match.createdAt = {};
+  const monthNum = Number(month);
+  const yearNum = Number(year);
 
-    if (fromDate) {
-      match.createdAt.$gte = new Date(fromDate);
-    }
-
-    if (toDate) {
-      match.createdAt.$lte = new Date(toDate);
-    }
+  if (!Number.isInteger(monthNum) || monthNum < 1 || monthNum > 12) {
+    throw ApiError.badRequest("month phải là số nguyên từ 1 đến 12");
+  }
+  if (!Number.isInteger(yearNum) || yearNum < 2000 || yearNum > 2100) {
+    throw ApiError.badRequest("year không hợp lệ");
   }
 
-  const sortStage: any = {};
-  sortStage[sortBy] = sortOrder === "asc" ? 1 : -1;
+  const start = new Date(yearNum, monthNum - 1, 1);
+  const end = new Date(yearNum, monthNum, 0, 23, 59, 59);
 
-  const pipeline: any[] = [
+  const basePipeline: PipelineStage[] = [
     {
-      $match: match,
-    },
-
-    {
-      $unwind: "$meta.items",
-    },
-
-    {
-      $addFields: {
-        qty: {
-          $cond: [
-            { $gt: ["$meta.items.quantity", 0] },
-            "$meta.items.quantity",
-            1,
-          ],
-        },
+      $match: {
+        category: DocumentCategory.PROPOSAL,
+        subType: { $in: PROPOSAL_SUBTYPES },
+        isActive: true,
+        deletedAt: null,
+        createdAt: { $gte: start, $lte: end },
       },
     },
-
+    { $unwind: "$meta.items" },
     {
       $group: {
-        _id: "$meta.items.description",
-        totalBroken: {
-          $sum: "$qty",
-        },
-        totalReports: {
-          $sum: 1,
-        },
+        _id: "$meta.items.deviceName",
+        totalQuantity: { $sum: "$meta.items.quantity" },
       },
     },
-
-    {
-      $project: {
-        _id: 0,
-        deviceName: "$_id",
-        totalBroken: 1,
-        totalReports: 1,
-      },
-    },
+    { $project: { _id: 0, deviceName: "$_id", totalQuantity: 1 } },
   ];
 
-  // Đếm tổng số record sau khi group
-  const countResult = await Document.aggregate([
-    ...pipeline,
-    {
-      $count: "total",
-    },
-  ]);
-
-  const total = countResult[0]?.total || 0;
-
-  // Lấy dữ liệu theo phân trang
-  const items = await Document.aggregate([
-    ...pipeline,
-
-    {
-      $sort: sortStage,
-    },
-
-    {
-      $skip: skip,
-    },
-
-    {
-      $limit: limit,
-    },
-  ]);
-
-  return {
-    items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-    },
-  };
+  return runPaginatedAggregate(basePipeline, { page, limit, sortBy, sortOrder });
 };
 
-// export const topDamagedInkService = async ({
-//   department,
-//   fromDate,
-//   toDate,
-//   limit = 10
-// }: {
-//   department?: any;
-//   fromDate?: Date;
-//   toDate?: Date;
-//   limit?: number;
-// }) => {
-
-//   const match: any = {
-//     category: "REPORT",
-//     subType: "CONFIRM_STATUS",
-//     isActive: true
-//   };
-
-//   if (department) match.department = department;
-
-//   if (fromDate || toDate) {
-//     match.createdAt = {};
-//     if (fromDate) match.createdAt.$gte = new Date(fromDate);
-//     if (toDate) match.createdAt.$lte = new Date(toDate);
-//   }
-
-//   const result = await Document.aggregate([
-
-//     { $match: match },
-
-//     { $unwind: "$meta.items" },
-
-//     {
-//       $addFields: {
-//         qty: {
-//           $cond: [
-//             { $gt: ["$meta.items.quantity", 0] },
-//             "$meta.items.quantity",
-//             1
-//           ]
-//         }
-//       }
-//     },
-
-//     {
-//       $group: {
-//         _id: "$meta.items.description",
-//         totalBroken: { $sum: "$qty" },
-//         totalReports: { $sum: 1 }
-//       }
-//     },
-
-//     {
-//       $project: {
-//         _id: 0,
-//         deviceName: "$_id",
-//         totalBroken: 1,
-//         totalReports: 1
-//       }
-//     },
-
-//     { $sort: { totalBroken: -1 } },
-
-//     { $limit: limit }
-//   ]);
-
-//   return result;
-// };
-
-/**
- * API thống kể tổng số lượng sạc mực, sửa chữa, và dự trù
- * @param query 
- * @returns 
- */
-export const getDashboardDeviceStats =
-  async (query: any) => {
-    const {
-      month,
-      year,
-      page = 1,
-      limit = 20,
-      sortBy = "totalQuantity",
-      sortOrder = "desc",
-    } = query;
-
-    if (!month || !year) {
-      throw ApiError.badRequest(
-        "month và year là bắt buộc"
-      );
-    }
-
-    const skip =
-      (Number(page) - 1) *
-      Number(limit);
-
-    const start = new Date(
-      Number(year),
-      Number(month) - 1,
-      1
-    );
-
-    const end = new Date(
-      Number(year),
-      Number(month),
-      0,
-      23,
-      59,
-      59
-    );
-
-    const sortStage: any = {};
-    sortStage[sortBy] =
-      sortOrder === "asc" ? 1 : -1;
-
-    const pipeline = [
-      {
-        $match: {
-          category: "PROPOSAL",
-          subType: {
-            $in: [
-              "PROPOSE_REPAIR",
-              "PROPOSE_INK",
-              "PROPOSE_PROCUREMENT",
-            ],
-          },
-          isActive: true,
-          deletedAt: null,
-          createdAt: {
-            $gte: start,
-            $lte: end,
-          },
-        },
-      },
-
-      {
-        $unwind: "$meta.items",
-      },
-
-      {
-        $group: {
-          _id: "$meta.items.deviceName",
-          totalQuantity: {
-            $sum: "$meta.items.quantity",
-          },
-        },
-      },
-
-      {
-        $project: {
-          _id: 0,
-          deviceName: "$_id",
-          totalQuantity: 1,
-        },
-      },
-    ];
-
-    const countResult =
-      await Document.aggregate([
-        ...pipeline,
-        { $count: "total" },
-      ]);
-
-    const total =
-      countResult[0]?.total || 0;
-
-    const data =
-      await Document.aggregate([
-        ...pipeline,
-        { $sort: sortStage },
-        { $skip: skip },
-        { $limit: Number(limit) },
-      ]);
-
-    return {
-      items: data,
-      pagination: {
-        page: Number(page),
-        limit: Number(limit),
-        total,
-        totalPages:
-          Math.ceil(
-            total / Number(limit)
-          ),
-      },
-    };
-  };
-
-// export const getDashboardDeviceStats = async (query: any) => {
-//   const { month, year } = query;
-
-//   const start = new Date(Number(year), Number(month) - 1, 1);
-//   const end = new Date(Number(year), Number(month), 0, 23, 59, 59);
-
-//   const result = await Document.aggregate([
-//     {
-//       $match: {
-//         category: "PROPOSAL",
-//         subType: {
-//           $in: [
-//             "PROPOSE_REPAIR",
-//             "PROPOSE_INK",
-//             "PROPOSE_PROCUREMENT",
-//           ],
-//         },
-//         isActive: true,
-//         deletedAt: null,
-//         createdAt: {
-//           $gte: start,
-//           $lte: end,
-//         },
-//       },
-//     },
-
-//     {
-//       $unwind: "$meta.items",
-//     },
-
-//     {
-//       $group: {
-//         _id: "$meta.items.deviceName",
-//         totalQuantity: {
-//           $sum: "$meta.items.quantity",
-//         },
-//       },
-//     },
-
-//     {
-//       $project: {
-//         _id: 0,
-//         deviceName: "$_id",
-//         totalQuantity: 1,
-//       },
-//     },
-
-//     {
-//       $sort: {
-//         totalQuantity: -1,
-//       },
-//     },
-//   ]);
-
-//   return result;
-// };
+  
