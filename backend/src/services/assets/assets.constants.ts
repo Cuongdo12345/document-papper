@@ -37,6 +37,22 @@ export const ASSET_CATEGORY_UPDATE_WHITELIST = [
 ] as const;
 
 /**
+ * MEDICAL_DEVICE_PROFILE_UPDATE_WHITELIST — module Quản lý Thiết bị Y tế
+ * (mở rộng đồng hành với Asset). CỐ TÌNH KHÔNG có `lastCalibrationDate`,
+ * `nextCalibrationDueDate`, `calibrationAlertSentAt` — các field này chỉ
+ * đổi qua hành động "ghi nhận kiểm định mới" (Giai đoạn 2), không cho PUT
+ * thường sửa trực tiếp — cùng nguyên tắc với `ASSET_UPDATE_WHITELIST`.
+ */
+export const MEDICAL_DEVICE_PROFILE_UPDATE_WHITELIST = [
+  "deviceClass",
+  "registrationNumber",
+  "licenseExpiredAt",
+  "requiresCalibration",
+  "calibrationIntervalMonths",
+  "operatorCertificateRequired",
+] as const;
+
+/**
  * pickWhitelisted — chỉ lấy field nằm trong whitelist từ `payload`, bỏ qua
  * mọi field khác (không throw — DTO đã throw 400 cho field lạ trước khi
  * tới đây; ở service chỉ lọc âm thầm cho chắc).

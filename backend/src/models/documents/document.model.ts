@@ -26,9 +26,7 @@ export enum DocumentSubType {
 const DocumentSchema = new Schema<IDocument>(
   {
     documentCode: {
-      type: String,
-      unique: true,
-      // index: true,
+      type: String
     },
 
     category: {
@@ -57,7 +55,7 @@ const DocumentSchema = new Schema<IDocument>(
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      // required: true,
+
     },
 
     updatedBy: {

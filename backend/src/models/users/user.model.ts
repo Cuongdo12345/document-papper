@@ -107,12 +107,6 @@ keyword search	text index
 sort createdAt	compound index
  */
 
-// UserSchema.index({ username: 1 });
-// UserSchema.index({ department: 1 });
-// UserSchema.index({ role: 1 });
-// UserSchema.index({ createdAt: -1 });
-
-// UserSchema.index({ username: 1 }, { unique: true }); // login
 
 UserSchema.index({ department: 1 });
 UserSchema.index({ role: 1 });

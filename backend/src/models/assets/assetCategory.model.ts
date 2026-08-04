@@ -10,7 +10,6 @@ const AssetCategorySchema = new Schema<IAssetCategory>(
     code: {
       type: String,
       required: true,
-      unique: true,
       uppercase: true,
       trim: true,
     },

@@ -16,7 +16,7 @@ const passwordResetTokenSchema = new Schema<IPasswordResetToken>(
     token: {
       type: String,
       required: true,
-      unique: true,
+      // unique: true,
       // index: true,
     },
     expiresAt: {

@@ -21,6 +21,7 @@ import {
   CompleteWorkflowBodyDTO,
 } from "../../dto/documents/workflow.dto";
 import { IdParamDTO, makeIdParamDTO } from "../../dto/common.dto";
+import { authorizePermission } from "../../middlewares/authorizePermission.middleware";
 
 const router = express.Router();
 
@@ -36,6 +37,7 @@ const router = express.Router();
 router.post(
   "/templates",
   authenticate,
+  authorizePermission("WORKFLOW_TEMPLATE_CREATE"),
   validateBody(CreateWorkflowTemplateDTO),
   createTemplate,
 );
@@ -43,6 +45,7 @@ router.post(
 router.post(
   "/submit",
   authenticate,
+  authorizePermission("WORKFLOW_SUBMIT"),
   validateBody(SubmitWorkflowDTO),
   submit,
 );
@@ -50,6 +53,7 @@ router.post(
 router.post(
   "/:id/approve",
   authenticate,
+  authorizePermission("WORKFLOW_APPROVE"),
   validateParams(IdParamDTO),
   validateBody(ApproveRejectBodyDTO),
   approve,
@@ -58,6 +62,7 @@ router.post(
 router.post(
   "/:id/reject",
   authenticate,
+  authorizePermission("WORKFLOW_REJECT"),
   validateParams(IdParamDTO),
   validateBody(ApproveRejectBodyDTO),
   reject,
@@ -77,6 +82,7 @@ router.post(
 router.get(
   "/pending",
   authenticate,
+  authorizePermission("WORKFLOW_VIEW"),
   // validateQuery(QueryPendingApprovalsDTO),
   getPendingApprovals,
 );
@@ -84,6 +90,7 @@ router.get(
 router.get(
   "/document/:documentId",
   authenticate,
+  authorizePermission("WORKFLOW_VIEW"),
   validateParams(makeIdParamDTO("documentId", "Document ID không hợp lệ")),
   getByDocument,
 );
@@ -91,6 +98,7 @@ router.get(
 router.get(
   "/:id",
   authenticate,
+  authorizePermission("WORKFLOW_VIEW"),
   validateParams(IdParamDTO),
   getById,
 );
@@ -98,6 +106,7 @@ router.get(
 router.post(
   "/:id/cancel",
   authenticate,
+  authorizePermission("WORKFLOW_CANCEL"),
   validateParams(IdParamDTO),
   validateBody(CancelWorkflowBodyDTO),
   cancel,
@@ -106,6 +115,7 @@ router.post(
 router.post(
   "/:id/complete",
   authenticate,
+  authorizePermission("WORKFLOW_COMPLETE"),
   validateParams(IdParamDTO),
   validateBody(CompleteWorkflowBodyDTO),
   complete,
