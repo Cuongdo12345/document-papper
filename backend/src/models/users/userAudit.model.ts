@@ -31,6 +31,8 @@ const UserAuditSchema = new Schema<IUserAudit>(
         "ADMIN_BYPASS",
         "VIEW_DETAIL",
         "DELETE",
+        "REGISTER",
+        "ASSIGN_ROLE"
       ],
       required: true,
     },

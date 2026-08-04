@@ -95,7 +95,7 @@ export const findReportsByProposal = (proposalId: any) => {
   return Document.find({
     referenceTo: proposalId,
     category: "REPORT",
-    subType: "CHECK_DAMAGE",
+    subType: { $in: ["CHECK_DAMAGE", "CONFIRM_STATUS"] }, // bỏ hardcode 1 giá trị
     isActive: true,
   })
     .populate("department", "name code")

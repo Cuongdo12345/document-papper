@@ -13,6 +13,7 @@ import {
   getAssetQRCode,
   lookupAssetByCode,
   checkInAsset,
+  exportAssets
 } from "../../controllers/assets/asset.controller";
 import { authenticate } from "../../middlewares/auth.middleware";
 import { uploadExcel } from "../../middlewares/upload.middleware";
@@ -56,6 +57,21 @@ router.get(
   authorizePermission("ASSET_VIEW"),
   // validateQuery(QueryAssetDTO),
   getAllAssets,
+);
+
+/**
+ * 🔗 GIAI ĐOẠN 5 — QUAN TRỌNG: "/export" PHẢI đăng ký TRƯỚC "GET /:id" bên
+ * dưới. Express khớp route theo ĐÚNG THỨ TỰ ĐĂNG KÝ, không ưu tiên literal
+ * path hơn route param — nếu đặt SAU "GET /:id" (như bản đầu tiên đã làm,
+ * rồi phát hiện lại khi rà lại toàn bộ file), request "GET /assets/export"
+ * sẽ bị "GET /:id" nuốt mất trước (hiểu `id="export"`), khiến route export
+ * KHÔNG BAO GIỜ được gọi tới dù code không hề báo lỗi gì (âm thầm sai).
+ */
+router.get(
+  "/export",
+  authenticate,
+  authorizePermission("ASSET_EXCEL_EXPORT"),
+  exportAssets,
 );
 
 router.get(

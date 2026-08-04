@@ -1,1208 +1,2637 @@
-openapi: 3.0.0
+openapi: 3.0.3
 info:
-  title: Document Papper API
-  description: Full API Document Papper
+  title: Document Manager API
+  description: |
+    API quản lý giấy tờ, tài sản CNTT
+    workflow duyệt nhiều bước, RBAC (Role/Permission/Policy), phòng ban,
+    thông báo, import/export Excel và audit log.
+
+    **Xác thực:** Bearer JWT (access token, thời hạn ngắn)
+    
   version: 1.0.0
+  contact:
+    name: Document Manager Backend Team
 
 servers:
   - url: http://localhost:3000
+    description: Local development
 
 tags:
   - name: Auth
+    description: Đăng ký, đăng nhập, refresh token, quên/đặt lại mật khẩu
   - name: Users
-  - name: Roles
-  - name: Permissions
+    description: Quản lý tài khoản người dùng
+  - name: RBAC - Permissions
+  - name: RBAC - Roles
+  - name: RBAC - Policies
+    description: Attribute-Based Access Control (ABAC) — điều kiện động ngoài Role/Permission 
   - name: Departments
+    description: Quản lý khoa/phòng ban
   - name: Documents
+    description: Giấy đề xuất và biên bản
+  - name: Workflow
+    description: Luồng duyệt nhiều bước cho Document
+  - name: Assets
+    description: Quản lý tài sản CNTT
+  - name: Asset Categories
+  - name: Asset Assignment
+    description: Cấp phát / luân chuyển / thu hồi tài sản
   - name: Dashboard
-  - name: Excel Doc
-  - name: LogAudit
+    description: Thống kê tổng hợp và KPI
+  - name: Notifications
+  - name: Excel
+    description: Import/Export dữ liệu qua file Excel
+  - name: Upload
+    description: Upload file 
+  - name: User Audit
+    description: Nhật ký thao tác hệ thống 
+  - name: Performance
+    description: Thống kê hiệu năng API 
+
+security:
+  - bearerAuth: []
 
 paths:
   # ================= AUTH =================
-  /api/auths/login:
+  /api/auths/register:
     post:
       tags: [Auth]
-      summary: Login
+      summary: Đăng ký tài khoản mới
+      security: []
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              properties:
-                username:
-                  type: string
-                  example: admin
-                password:
-                  type: string
-                  example: "admin@123"
+            schema: { $ref: "#/components/schemas/RegisterRequest" }
+      responses:
+        "201":
+          description: Đăng ký thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  user: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/auths/login:
+    post:
+      tags: [Auth]
+      summary: Đăng nhập
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
       responses:
         "200":
-          description: Login success
+          description: Đăng nhập thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/AuthLoginResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
 
   /api/auths/refresh-token:
     post:
       tags: [Auth]
-      summary: Refresh token
+      summary: Làm mới access token bằng refresh token
+      security: []
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              properties:
-                refreshToken:
-                  type: string
+            schema: { $ref: "#/components/schemas/RefreshTokenRequest" }
       responses:
         "200":
-          description: Refresh success
+          description: Access token mới
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
 
   /api/auths/logout:
     post:
       tags: [Auth]
-      summary: Logout
-      security:
-        - bearerAuth: []
+      summary: Đăng xuất (thu hồi refresh token hiện tại)
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              properties:
-                refreshToken:
-                  type: string
+            schema: { $ref: "#/components/schemas/RefreshTokenRequest" }
       responses:
         "200":
-          description: Logout success
+          description: Đăng xuất thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
 
   /api/auths/forgot-password:
     post:
       tags: [Auth]
-      summary: Forgot password
+      summary: Gửi email hướng dẫn đặt lại mật khẩu
+      description: >
+        Luôn trả về message chung (không tiết lộ username có tồn tại hay
+        không — chống user enumeration).
+      security: []
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              properties:
-                username:
-                  type: string
-                  example: cuongit
+            schema: { $ref: "#/components/schemas/ForgotPasswordRequest" }
       responses:
         "200":
-          description: Email sent
+          description: Luôn trả 200 kể cả username không tồn tại
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "400": { $ref: "#/components/responses/BadRequest" }
 
   /api/auths/reset-password:
     post:
       tags: [Auth]
-      summary: Reset password
+      summary: Đặt lại mật khẩu bằng token nhận qua email
+      security: []
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              properties:
-                token:
-                  type: string
-                newPassword:
-                  type: string
+            schema: { $ref: "#/components/schemas/ResetPasswordRequest" }
       responses:
         "200":
-          description: Password reset success
+          description: Đặt lại mật khẩu thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "400": { $ref: "#/components/responses/BadRequest" }
 
-  # ===================== USERS =====================
-
+  # ================= USERS =================
   /api/users:
-    get:
-      tags: [Users]
-      summary: Get all users
-      security:
-        - bearerAuth: []
-
-      parameters:
-        - name: page
-          in: query
-          description: Trang hiện tại
-          schema:
-            type: integer
-            example: 1
-
-        - name: limit
-          in: query
-          description: Số lượng mỗi trang
-          schema:
-            type: integer
-            example: 20
-
-        - name: keyword
-          in: query
-          description: Tìm theo username hoặc fullName
-          schema:
-            type: string
-            example: admin
-
-        - name: role
-          in: query
-          description: Lọc theo role
-          schema:
-            type: string
-            enum: [ADMIN, USER, IT]
-            example: USER
-
-        - name: department
-          in: query
-          description: ID khoa/phòng
-          schema:
-            type: string
-            example: "6982b38294d9a655aeec8cce"
-
-        - name: isActive
-          in: query
-          description: Trạng thái hoạt động
-          schema:
-            type: boolean
-            example: true
-
-        - name: fromDate
-          in: query
-          description: Lọc từ ngày tạo (YYYY-MM-DD)
-          schema:
-            type: string
-            example: "2026-01-01"
-
-        - name: toDate
-          in: query
-          description: Lọc đến ngày tạo (YYYY-MM-DD)
-          schema:
-            type: string
-            example: "2026-01-31"
-
-        # - name: sortBy
-        #   in: query
-        #   description: Field để sort
-        #   schema:
-        #     type: string
-        #     example: createdAt
-
-        - name: order
-          in: query
-          description: Thứ tự sort
-          schema:
-            type: string
-            enum: [asc, desc]
-            example: desc
-
-      responses:
-        "200":
-          description: Succes
-
     post:
       tags: [Users]
-      summary: Create user
-      security:
-        - bearerAuth: []
+      summary: Tạo user mới (permission USER_CREATE)
       requestBody:
+        required: true
         content:
           application/json:
-            schema:
-              example:
-                username: dung
-                password: "12345"
-                fullName: Lương Tiến Dũng
-                role: USER
-                department: "department_id"
+            schema: { $ref: "#/components/schemas/CreateUserRequest" }
       responses:
         "200":
-          description: Success
+          description: Tạo user thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      id: { $ref: "#/components/schemas/ObjectIdRef" }
+                      username: { type: string }
+                      role: { type: object }
+                      department: { type: object }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    get:
+      tags: [Users]
+      summary: Danh sách user (permission USER_READ)
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: role
+          in: query
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: department
+          in: query
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: isActive
+          in: query
+          schema: { type: string, enum: ["true", "false"] }
+        - $ref: "#/components/parameters/KeywordParam"
+        - name: sortBy
+          in: query
+          schema: { type: string, enum: [createdAt, updatedAt, username, fullName], default: createdAt }
+        - $ref: "#/components/parameters/OrderParam"
+        - name: fromDate
+          in: query
+          schema: { type: string, format: date }
+        - name: toDate
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: Danh sách user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: boolean }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/User" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /api/users/me:
     get:
       tags: [Users]
-      summary: Get profile
-      security:
-        - bearerAuth: []
+      summary: Thông tin cá nhân (user đang đăng nhập)
       responses:
         "200":
-          description: Success
-
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: string }
+                  data: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
     patch:
       tags: [Users]
-      summary: Update profile
-      security:
-        - bearerAuth: []
+      summary: Cập nhật thông tin cá nhân
+      description: >
+        ⚠️ Route dùng chung DTO `UpdateUserDTO` ở tầng validate (chấp nhận cả
+        role/department/isActive trong body mà không báo lỗi), nhưng tầng
+        service (`updateMeService`) chỉ thực sự áp dụng 2 field
+        `fullName`/`username` — mọi field khác bị whitelist âm thầm bỏ qua.
+        Schema request bên dưới phản ánh đúng field CÓ TÁC DỤNG thật.
       requestBody:
+        required: true
         content:
           application/json:
-            schema:
-              example:
-                fullName: Admin Updated
-                isActive: true
+            schema: { $ref: "#/components/schemas/UpdateMeRequest" }
       responses:
         "200":
-          description: Success
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
 
   /api/users/{id}:
     get:
       tags: [Users]
-      summary: Get user by ID
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
+      summary: Chi tiết user (permission USER_DETAIL)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
       responses:
         "200":
-          description: Success
-
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
     put:
       tags: [Users]
-      summary: Update user
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
+      summary: Cập nhật user (permission USER_UPDATE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
       requestBody:
+        required: true
         content:
           application/json:
-            schema:
-              example:
-                username: updatedUser
-                role: ADMIN
+            schema: { $ref: "#/components/schemas/UpdateUserRequest" }
       responses:
         "200":
-          description: Success
-
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
     delete:
       tags: [Users]
-      summary: Delete user
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
+      summary: Vô hiệu hoá user - soft delete (permission USER_DELETE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
       responses:
         "200":
-          description: Success
+          description: Vô hiệu hoá thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/users/restore/{id}:
     patch:
       tags: [Users]
-      summary: Restore user
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
+      summary: Khôi phục user đã bị vô hiệu hoá (permission USER_RESTORE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
       responses:
         "200":
-          description: Success
+          description: Khôi phục thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/users/change-password:
     patch:
       tags: [Users]
-      summary: Change password
-      security:
-        - bearerAuth: []
+      summary: Tự đổi mật khẩu (permission USER_CHANGE_PASSWORD)
       requestBody:
+        required: true
         content:
           application/json:
-            schema:
-              example:
-                oldPassword: "123456"
-                newPassword: "12345"
+            schema: { $ref: "#/components/schemas/ChangePasswordRequest" }
       responses:
         "200":
-          description: Success
+          description: Đổi mật khẩu thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /api/users/reset-password/{id}:
     patch:
       tags: [Users]
-      summary: Reset password (admin)
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-      requestBody:
-        content:
-          application/json:
-            schema:
-              example:
-                newPassword: "12345"
-      responses:
-        "200":
-          description: Success
-
-  # ===================== ROLES (RBAC) =====================
-
-  /api/rbac/roles:
-    get:
-      tags: [Roles]
-      summary: Get all roles
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Success
-
-    post:
-      tags: [Roles]
-      summary: Create role
-      security:
-        - bearerAuth: []
-      requestBody:
-        content:
-          application/json:
-            schema:
-              example:
-                name: IT
-      responses:
-        "200":
-          description: Created
-
-    # /api/rbac/roles/{id}:
-    #   get:
-    #     tags: [Roles]
-    #     summary: Get role by ID
-    #     security:
-    #       - bearerAuth: []
-    #     parameters:
-    #       - name: id
-    #         in: path
-    #         required: true
-    #         schema:
-    #           type: string
-    #     responses:
-    #       "200":
-    #         description: Success
-
-    put:
-      tags: [Roles]
-      summary: Update role
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              example:
-                name: ADMIN
-      responses:
-        "200":
-          description: Updated
-
-    delete:
-      tags: [Roles]
-      summary: Delete role
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-      responses:
-        "200":
-          description: Deleted
-
-  /api/rbac/roles/{id}/assign-permissions:
-    post:
-      tags: [Roles]
-      summary: Assign permissions to role
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              example:
-                permissionIds:
-                  - "69e9dbfdf7f2cd6098e5ce1"
-                  - "69e9db60fd7f2cd6098e5ccd"
-                  - "69e9deb3fd7f2cd6098e5d2c"
-      responses:
-        "200":
-          description: Assign success
-
-    # ===================== PERMISSIONS (RBAC) =====================
-
-  /api/rbac/permissions:
-    get:
-      tags: [Permissions]
-      summary: Get all permissions
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Success
-
-    post:
-      tags: [Permissions]
-      summary: Create permission
-      security:
-        - bearerAuth: []
-      requestBody:
-        content:
-          application/json:
-            schema:
-              example:
-                name: USER_DETAIL
-                resource: user
-                action: detail
-                description: Detail user
-      responses:
-        "200":
-          description: Created
-
-  /api/rbac/permissions/{id}:
-    get:
-      tags: [Permissions]
-      summary: Get permission by ID
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-
-    put:
-      tags: [Permissions]
-      summary: Update permission
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              example:
-                name: USER_DETAIL
-                resource: user
-                action: detail
-                description: Detail user
-      responses:
-        "200":
-          description: Updated
-
-    delete:
-      tags: [Permissions]
-      summary: Delete permission
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-      responses:
-        "200":
-          description: Deleted
-
-  # ================= DOCUMENT =================
-  /api/documents/proposal:
-    post:
-      tags: [Documents]
-      summary: Create document
-      security:
-        - bearerAuth: []
+      summary: Admin reset mật khẩu cho 1 user (permission USER_RESET_PASSWORD)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              properties:
-                category:
-                  type: string
-                  example: PROPOSAL
-                subType:
-                  type: string
-                  example: PROPOSE_PROCUREMENT
-                title:
-                  type: string
-                department:
-                  type: string
-                meta:
-                  type: object
-                  properties:
-                    items:
-                      type: array
-                      items:
-                        type: object
-                        properties:
-                          deviceName:
-                            type: string
-                          quantity:
-                            type: number
-                          note:
-                            type: string
+            schema: { $ref: "#/components/schemas/ResetPasswordByAdminRequest" }
       responses:
         "200":
-          description: Created
+          description: Reset mật khẩu thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
-  /api/documents:
+  # ================= RBAC — PERMISSIONS =================
+  /api/rbac/permissions:
+    post:
+      tags: [RBAC - Permissions]
+      summary: Tạo permission mới (permission PERMISSION_CREATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreatePermissionRequest" }
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Permission" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
     get:
-      tags: [Documents]
-      summary: Get all documents
-      security:
-        - bearerAuth: []
+      tags: [RBAC - Permissions]
+      summary: Danh sách permission (permission PERMISSION_VIEW)
       parameters:
-        - name: page
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OrderParam"
+        - name: sortBy
           in: query
-          description: Trang hiện tại
-          schema:
-            type: integer
-            example: 1
-
-        - name: limit
+          schema: { type: string, enum: [createdAt, name, resource, action], default: createdAt }
+        - $ref: "#/components/parameters/KeywordParam"
+        - name: resource
           in: query
-          description: Số lượng mỗi trang
-          schema:
-            type: integer
-            example: 20
-
-        - name: keyword
+          schema: { type: string, maxLength: 100 }
+        - name: action
           in: query
-          description: Tìm theo title hoặc documentCode
-          schema:
-            type: string
-            example: Giấy đề xuất sạc mực
-
-        - name: fromDate
-          in: query
-          description: Ngày bắt đầu (YYYY-MM-DD)
-          schema:
-            type: string
-            example: "2026-01-01"
-
-        - name: toDate
-          in: query
-          description: Ngày kết thúc (YYYY-MM-DD)
-          schema:
-            type: string
-            example: "2026-01-31"
-
-        - name: isActive
-          in: query
-          description: Trạng thái hoạt động
-          schema:
-            type: boolean
-            example: true
-
-        - name: category
-          in: query
-          description: Loại document (PROPOSAL, REPAIR,...)
-          schema:
-            type: string
-            example: PROPOSAL
-
-        - name: subType
-          in: query
-          description: Loại con (PROPOSE_PROCUREMENT,...)
-          schema:
-            type: string
-            example: PROPOSE_PROCUREMENT
-
-        - name: department
-          in: query
-          description: ID khoa/phòng
-          schema:
-            type: string
-            example: "6982b38294d9a655aeec8cce"
-
-        - name: order
-          in: query
-          description: Thứ tự sort
-          schema:
-            type: string
-            enum: [asc, desc]
-            example: desc
-
+          schema: { type: string, maxLength: 100 }
       responses:
         "200":
-          description: Success
+          description: Danh sách permission
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Permission" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
-  /api/documents/{id}:
+  /api/rbac/permissions/{id}:
     get:
-      tags: [Documents]
-      summary: Get document by ID
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-          example: 698d9240f0b67d3f1ff2a85f
+      tags: [RBAC - Permissions]
+      summary: Chi tiết permission (permission PERMISSION_VIEW)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
       responses:
         "200":
-          description: Success
-
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Permission" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
     put:
-      tags: [Documents]
-      summary: Update document
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
+      tags: [RBAC - Permissions]
+      summary: Cập nhật permission (permission PERMISSION_UPDATE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
       requestBody:
+        required: true
         content:
           application/json:
-            schema:
-              type: object
-              example:
-                title: Đề xuất sửa chữa máy in HP
-                meta:
-                  device:
-                    name: Hộp mực HP
-                    quantity: 1
+            schema: { $ref: "#/components/schemas/UpdatePermissionRequest" }
       responses:
         "200":
-          description: Updated
-
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Permission" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
     delete:
-      tags: [Documents]
-      summary: Delete document
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
+      tags: [RBAC - Permissions]
+      summary: Xoá permission (permission PERMISSION_DELETE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
       responses:
         "200":
-          description: Deleted
+          description: Xoá thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
-  # /api/documents/{id}/status:
-  #   put:
-  #     tags: [Documents]
-  #     summary: Update status
-  #     security:
-  #       - bearerAuth: []
-  #     parameters:
-  #       - name: id
-  #         in: path
-  #         required: true
-  #         schema:
-  #           type: string
-  #     requestBody:
-  #       content:
-  #         application/json:
-  #           schema:
-  #             type: object
-  #             properties:
-  #               status:
-  #                 type: string
-  #                 example: IN_PROGRESS
-  #     responses:
-  #       "200":
-  #         description: Updated
-
-  /api/documents/{id}/reports:
+  # ================= RBAC — ROLES =================
+  /api/rbac/roles:
+    post:
+      tags: [RBAC - Roles]
+      summary: Tạo role mới (permission ROLE_CREATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateRoleRequest" }
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Role" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
     get:
-      tags: [Documents]
-      summary: Get reports
-      security:
-        - bearerAuth: []
+      tags: [RBAC - Roles]
+      summary: Danh sách role (permission ROLE_VIEW)
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OrderParam"
+        - name: sortBy
+          in: query
+          schema: { type: string, enum: [createdAt, name], default: createdAt }
+        - $ref: "#/components/parameters/KeywordParam"
       responses:
         "200":
-          description: Success
+          description: Danh sách role
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Role" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
-  /api/documents/restore/{id}:
-    patch:
-      tags: [Documents]
-      summary: Restore document
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
+  /api/rbac/roles/{id}:
+    get:
+      tags: [RBAC - Roles]
+      summary: Chi tiết role, kèm populate permissions (permission ROLE_VIEW)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
       responses:
         "200":
-          description: Restored
-
-  /api/documents/delete-by-month:
-    delete:
-      tags: [Documents]
-      summary: Delete by month
-      security:
-        - bearerAuth: []
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Role" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [RBAC - Roles]
+      summary: Đổi tên role (permission ROLE_UPDATE). Không đổi permissions ở đây.
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
       requestBody:
+        required: true
         content:
           application/json:
-            schema:
-              type: object
-              properties:
-                month:
-                  type: string
-                  example: "03"
-                year:
-                  type: string
-                  example: "2026"
+            schema: { $ref: "#/components/schemas/UpdateRoleRequest" }
       responses:
         "200":
-          description: Deleted
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Role" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [RBAC - Roles]
+      summary: Xoá role (permission ROLE_DELETE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Xoá thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
-    # ================= DEPARTMENT =================
+  /api/rbac/roles/{id}/assign-permissions:
+    post:
+      tags: [RBAC - Roles]
+      summary: Gán danh sách permission cho role (permission ROLE_ASSIGN_PERMISSIONS)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssignPermissionsRequest" }
+      responses:
+        "200":
+          description: Gán thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Role" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ================= RBAC — POLICIES (ABAC) =================
+  /api/rbac/policies:
+    post:
+      tags: [RBAC - Policies]
+      summary: Tạo policy mới (permission POLICY_CREATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreatePolicyRequest" }
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Policy" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    get:
+      tags: [RBAC - Policies]
+      summary: Danh sách policy (permission POLICY_VIEW)
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OrderParam"
+        - name: sortBy
+          in: query
+          schema: { type: string, enum: [createdAt, name, resource, action], default: createdAt }
+        - $ref: "#/components/parameters/KeywordParam"
+        - name: resource
+          in: query
+          schema: { type: string, maxLength: 100 }
+        - name: action
+          in: query
+          schema: { type: string, maxLength: 100 }
+      responses:
+        "200":
+          description: Danh sách policy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Policy" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/rbac/policies/{id}:
+    get:
+      tags: [RBAC - Policies]
+      summary: Chi tiết policy (permission POLICY_VIEW)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Policy" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [RBAC - Policies]
+      summary: Cập nhật policy (permission POLICY_UPDATE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdatePolicyRequest" }
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Policy" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [RBAC - Policies]
+      summary: Xoá policy (permission POLICY_DELETE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Xoá thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ================= DEPARTMENTS =================
   /api/departments:
-    get:
-      tags: [Departments]
-      summary: Get all departments
-      description: |
-        SEARCH: ?keyword=IT  
-        FILTER: ?code=HC / ?name=...  
-        SORT: ?sortBy=name&order=desc
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: keyword
-          in: query
-          schema:
-            type: string
-        - name: code
-          in: query
-          schema:
-            type: string
-        - name: name
-          in: query
-          schema:
-            type: string
-        # - name: sortBy
-        #   in: query
-        #   schema:
-        #     type: string
-        - name: order
-          in: query
-          description: Thứ tự sort
-          schema:
-            type: string
-            enum: [asc, desc]
-            example: desc
-      responses:
-        "200":
-          description: Success
-
     post:
       tags: [Departments]
-      summary: Create department
-      security:
-        - bearerAuth: []
+      summary: Tạo khoa/phòng ban (permission DEPARTMENT_CREATE)
       requestBody:
+        required: true
         content:
           application/json:
-            schema:
-              type: object
-              properties:
-                code:
-                  type: string
-                  example: BGĐ
-                name:
-                  type: string
-                  example: Ban Giám Đốc
+            schema: { $ref: "#/components/schemas/CreateDepartmentRequest" }
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Department" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    get:
+      tags: [Departments]
+      summary: Danh sách khoa/phòng ban (permission DEPARTMENT_VIEW)
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, default: 10 }
+        - $ref: "#/components/parameters/KeywordParam"
       responses:
         "200":
-          description: Created
+          description: Danh sách khoa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Department" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /api/departments/{id}:
     get:
       tags: [Departments]
-      summary: Get department by ID
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
+      summary: Chi tiết khoa (permission DEPARTMENT_VIEW_DETAIL)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
       responses:
         "200":
-          description: Success
-
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Department" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
     put:
       tags: [Departments]
-      summary: Update department
-      security:
-        - bearerAuth: []
+      summary: Cập nhật khoa (permission DEPARTMENT_UPDATE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateDepartmentRequest" }
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Department" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Departments]
+      summary: Xoá khoa (permission DEPARTMENT_DELETE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Xoá thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ================= DOCUMENTS =================
+  /api/documents/proposal:
+    post:
+      tags: [Documents]
+      summary: Tạo Document (Proposal/Report)
+      description: >
+        ⚠️ GHI CHÚ TỪ REVIEW BẢO MẬT: route này hiện chỉ yêu cầu `authenticate`,
+        middleware `authorizePermission("DOCUMENT_CREATE")` đang bị comment
+        trong code — mọi user đã đăng nhập đều tạo được Document bất kể quyền.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateDocumentRequest" }
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Document" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/documents:
+    get:
+      tags: [Documents]
+      summary: Danh sách Document (permission DOCUMENT_READ)
+      description: >
+        ⚠️ GHI CHÚ TỪ REVIEW: `validateQuery(QueryDocumentDTO)` hiện bị
+        comment ở route — các query bên dưới KHÔNG thực sự được Zod validate/
+        coerce trước khi vào service (dù DTO đã viết đầy đủ). Ngoài ra,
+        `getAllDocumentsService` có 2 lỗi logic đã biết: (1) filter
+        `isActive` bị gán nhầm biến nên luôn ép `true` bất kể query truyền
+        gì; (2) `Object.assign(filter, filters)` không whitelist field, tăng
+        rủi ro filter Mongo không kiểm soát.
       parameters:
-        - name: id
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: sortBy
+          in: query
+          schema: { type: string, enum: [createdAt, updatedAt, title, documentCode, serviceDate, actualCost], default: createdAt }
+        - $ref: "#/components/parameters/OrderParam"
+        - $ref: "#/components/parameters/KeywordParam"
+        - name: isActive
+          in: query
+          schema: { type: string, enum: ["true", "false"] }
+        - name: category
+          in: query
+          schema: { type: string, enum: [PROPOSAL, REPORT] }
+        - name: subType
+          in: query
+          schema: { type: string }
+        - name: department
+          in: query
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: createdBy
+          in: query
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: relatedAsset
+          in: query
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: workflowStatus
+          in: query
+          schema: { type: string, enum: [pending, approved, rejected, cancelled, completed] }
+        - name: fromDate
+          in: query
+          schema: { type: string, format: date }
+        - name: toDate
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: Danh sách Document
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Document" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/documents/{id}:
+    get:
+      tags: [Documents]
+      summary: Chi tiết Document (permission DOCUMENT_DETAIL)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Document" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Documents]
+      summary: Cập nhật Document (permission DOCUMENT_UPDATE)
+      description: >
+        Chỉ `title`/`meta` thực sự có tác dụng (whitelist tầng service).
+        Bị khoá nếu Document đã workflowStatus=approved, hoặc khác department
+        của người gọi (trừ ADMIN).
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateDocumentRequest" }
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Document" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Documents]
+      summary: Xoá mềm Document (permission DOCUMENT_DELETE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Xoá thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/ObjectIdRef" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/documents/delete-by-month:
+    delete:
+      tags: [Documents]
+      summary: Xoá hàng loạt Document theo tháng/năm (permission DOCUMENT_DELETE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DeleteByMonthRequest" }
+      responses:
+        "200":
+          description: Xoá thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { type: object, additionalProperties: true }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/documents/restore/{id}:
+    patch:
+      tags: [Documents]
+      summary: Khôi phục Document đã xoá mềm (permission DOCUMENT_UPDATE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Khôi phục thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Document" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/documents/{proposalId}/reports:
+    get:
+      tags: [Documents]
+      summary: Danh sách Report (biên bản) tham chiếu tới 1 Proposal (permission DOCUMENT_READ)
+      parameters:
+        - name: proposalId
           in: path
           required: true
+          schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      proposal: { $ref: "#/components/schemas/Document" }
+                      totalReports: { type: integer }
+                      reports:
+                        type: array
+                        items: { $ref: "#/components/schemas/Document" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ================= WORKFLOW =================
+  /api/workflows/templates:
+    post:
+      tags: [Workflow]
+      summary: Tạo workflow template
+      description: >
+        ⚠️ GHI CHÚ TỪ REVIEW BẢO MẬT: toàn bộ nhóm route `/api/workflows/*`
+        hiện chỉ yêu cầu `authenticate`, CHƯA gắn `authorizePermission` —
+        bất kỳ user đã đăng nhập nào cũng gọi được endpoint này.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateWorkflowTemplateRequest" }
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/WorkflowTemplate" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/workflows/submit:
+    post:
+      tags: [Workflow]
+      summary: Gắn 1 Document vào workflow template để bắt đầu luồng duyệt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubmitWorkflowRequest" }
+      responses:
+        "200":
+          description: Submit thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/WorkflowInstance" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/workflows/pending:
+    get:
+      tags: [Workflow]
+      summary: Danh sách workflow đang chờ duyệt cho role của user hiện tại
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, default: 10 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/WorkflowInstance" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/workflows/document/{documentId}:
+    get:
+      tags: [Workflow]
+      summary: Lấy workflow instance theo Document
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/WorkflowInstance" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/workflows/{id}:
+    get:
+      tags: [Workflow]
+      summary: Chi tiết workflow instance
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/WorkflowInstance" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/workflows/{id}/approve:
+    post:
+      tags: [Workflow]
+      summary: Duyệt bước hiện tại (role người gọi phải khớp step.role)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
       requestBody:
         content:
           application/json:
+            schema: { $ref: "#/components/schemas/ApproveRejectBody" }
+      responses:
+        "200":
+          description: Duyệt thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/WorkflowInstance" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/workflows/{id}/reject:
+    post:
+      tags: [Workflow]
+      summary: Từ chối bước hiện tại (role người gọi phải khớp step.role)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApproveRejectBody" }
+      responses:
+        "200":
+          description: Từ chối thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/WorkflowInstance" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/workflows/{id}/cancel:
+    post:
+      tags: [Workflow]
+      summary: Huỷ workflow (chỉ người tạo Document, trước khi có bước nào được duyệt)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApproveRejectBody" }
+      responses:
+        "200":
+          description: Huỷ thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/WorkflowInstance" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ================= ASSETS =================
+  /api/assets:
+    post:
+      tags: [Assets]
+      summary: Tạo tài sản mới (permission ASSET_CREATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateAssetRequest" }
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Asset" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    get:
+      tags: [Assets]
+      summary: Danh sách tài sản (permission ASSET_VIEW)
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, default: 10 }
+        - $ref: "#/components/parameters/KeywordParam"
+        - name: department
+          in: query
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: category
+          in: query
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/AssetStatus" }
+        - name: sortBy
+          in: query
+          schema: { type: string, default: createdAt }
+        - $ref: "#/components/parameters/OrderParam"
+      responses:
+        "200":
+          description: Danh sách tài sản
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Asset" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/assets/export:
+    get:
+      tags: [Assets]
+      summary: Export danh sách tài sản ra file Excel (streaming) (permission ASSET_EXCEL_EXPORT)
+      description: >
+        ⚠️ GHI CHÚ TỪ REVIEW: route này BẮT BUỘC phải đăng ký TRƯỚC
+        `GET /:id` trong Express — nếu đặt sau, `GET /assets/export` sẽ bị
+        `GET /:id` "nuốt" mất (hiểu `id="export"`), route export sẽ không
+        bao giờ được gọi tới mà không báo lỗi gì. Đã xác nhận thứ tự đăng
+        ký trong route file là đúng (source tự ghi chú lại lỗi này đã từng
+        xảy ra ở bản đầu tiên). Permission `ASSET_EXCEL_EXPORT` cũng chưa
+        thấy trong `permission.constant.ts` ở các lần review trước — có thể
+        gặp cùng lỗi permission-string-mismatch như `ASSET_EXCEL_IMPORT`/
+        `ASSET_INVENTORY_CHECK`.
+      parameters:
+        - name: department
+          in: query
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: category
+          in: query
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/AssetStatus" }
+        - $ref: "#/components/parameters/KeywordParam"
+      responses:
+        "200":
+          description: File Excel (.xlsx) — streamed
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/assets/{id}:
+    get:
+      tags: [Assets]
+      summary: Chi tiết tài sản (permission ASSET_VIEW_DETAIL)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Asset" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Assets]
+      summary: Cập nhật tài sản (permission ASSET_UPDATE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateAssetRequest" }
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Asset" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Assets]
+      summary: Xoá mềm tài sản (permission ASSET_DELETE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Xoá thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/assets/{id}/permanent:
+    delete:
+      tags: [Assets]
+      summary: Xoá vĩnh viễn tài sản — chỉ áp dụng cho asset đã soft-delete (permission ASSET_DELETE_PERMANENT)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Xoá vĩnh viễn thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/assets/{id}/restore:
+    patch:
+      tags: [Assets]
+      summary: Khôi phục tài sản đã soft-delete (permission ASSET_UPDATE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Khôi phục thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Asset" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/assets/alerts/run:
+    post:
+      tags: [Assets]
+      summary: Chạy tay kiểm tra cảnh báo bảo hành/bảo trì sắp hết hạn (permission ASSET_ALERTS_TRIGGER)
+      description: Bình thường chạy tự động qua cron lúc 8h sáng hàng ngày — endpoint này để test/demo.
+      responses:
+        "200":
+          description: Chạy thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { type: object, additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/assets/import/template:
+    get:
+      tags: [Assets]
+      summary: Tải file Excel mẫu để import tài sản hàng loạt (permission ASSET_EXCEL_IMPORT)
+      description: >
+        ⚠️ GHI CHÚ TỪ REVIEW: permission `ASSET_EXCEL_IMPORT` không có trong
+        `permission.constant.ts` (chỉ thấy trong lần review trước) — nếu
+        chưa được bổ sung, đây là cùng dạng lỗi permission-string-mismatch
+        đã phát hiện ở các module khác (không role nào ngoài ADMIN gán được
+        quyền này qua seed data mặc định).
+      responses:
+        "200":
+          description: File Excel mẫu (.xlsx)
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/assets/import:
+    post:
+      tags: [Assets]
+      summary: Import tài sản hàng loạt từ Excel (permission ASSET_EXCEL_IMPORT)
+      description: >
+        CHỈ TẠO MỚI (không update tài sản đã tồn tại) — cố tình không cho đổi
+        department/status/assignedTo qua import để không bỏ qua audit trail
+        của assign/transfer/return. Dùng `?dryRun=true` để xem trước, không
+        ghi DB. File mẫu: cột Danh mục (mã)/Tên tài sản/Khoa-phòng (mã)/Số
+        serial/Model/Hãng SX/Vị trí/Ngày mua/Giá mua/Hạn bảo hành/Nhà cung
+        cấp — 3 cột đầu bắt buộc.
+      parameters:
+        - name: dryRun
+          in: query
+          schema: { type: boolean, default: false }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
             schema:
               type: object
+              required: [file]
               properties:
-                code:
-                  type: string
-                name:
-                  type: string
+                file: { type: string, format: binary, description: "File .xlsx/.xls, tối đa 5MB" }
       responses:
         "200":
-          description: Updated
+          description: Kết quả import (hoặc preview nếu dryRun)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/ImportAssetsResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
-    delete:
-      tags: [Departments]
-      summary: Delete department
-      security:
-        - bearerAuth: []
+  /api/assets/lookup/{assetCode}:
+    get:
+      tags: [Assets]
+      summary: Tra cứu tài sản theo assetCode (permission ASSET_INVENTORY_CHECK)
+      description: >
+        Dùng ngay sau khi quét QR (đầu đọc mã vạch/QR hoạt động như bàn
+        phím). Trả về đầy đủ thông tin để FE hiển thị cho nhân viên XÁC NHẬN
+        trước khi gọi tiếp `POST /:id/check-in` — tránh quét nhầm mã.
       parameters:
-        - name: id
+        - name: assetCode
           in: path
           required: true
+          schema: { type: string }
       responses:
         "200":
-          description: Deleted
+          description: Tìm thấy tài sản
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Asset" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
-  ########################
-  # DASHBOARD
-  ########################
+  /api/assets/{id}/qrcode:
+    get:
+      tags: [Assets]
+      summary: Sinh ảnh QR code (PNG) cho 1 tài sản (permission ASSET_VIEW_DETAIL)
+      description: >
+        QR code encode NGUYÊN VĂN `assetCode` (mã người đọc được, in trên
+        tem dán vật lý) — không phải `assetId`/URL, để không phụ thuộc domain
+        môi trường và có thể đối chiếu bằng mắt khi máy quét lỗi.
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Ảnh QR code PNG
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/assets/{id}/check-in:
+    post:
+      tags: [Assets]
+      summary: Ghi nhận kiểm kê — xác nhận vẫn thấy tài sản (permission ASSET_INVENTORY_CHECK)
+      description: >
+        Chỉ cập nhật `lastInventoryCheckAt`/`lastInventoryCheckBy` — KHÔNG
+        đổi status/department/assignedTo (kiểm kê là xác nhận sự tồn tại,
+        không phải thay đổi vòng đời; dùng assign/transfer/return cho việc đó).
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Ghi nhận kiểm kê thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Asset" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ================= ASSET ASSIGNMENT =================
+  /api/assets/{id}/assign:
+    post:
+      tags: [Asset Assignment]
+      summary: Cấp phát tài sản từ kho cho khoa/phòng (permission ASSET_ASSIGN)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssignAssetRequest" }
+      responses:
+        "200":
+          description: Cấp phát thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Asset" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/assets/{id}/transfer:
+    post:
+      tags: [Asset Assignment]
+      summary: Luân chuyển tài sản đang sử dụng (permission ASSET_ASSIGN)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TransferAssetRequest" }
+      responses:
+        "200":
+          description: Luân chuyển thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Asset" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/assets/{id}/return:
+    post:
+      tags: [Asset Assignment]
+      summary: Thu hồi tài sản về kho (permission ASSET_ASSIGN)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReturnAssetRequest" }
+      responses:
+        "200":
+          description: Thu hồi thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Asset" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/assets/{id}/assignment-history:
+    get:
+      tags: [Asset Assignment]
+      summary: Lịch sử cấp phát/luân chuyển/thu hồi của 1 tài sản (permission ASSET_VIEW_DETAIL)
+      parameters:
+        - { $ref: "#/components/parameters/IdParam" }
+        - $ref: "#/components/parameters/PageParam"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/AssetAssignmentHistory" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ================= ASSET CATEGORIES =================
+  /api/asset-categories:
+    post:
+      tags: [Asset Categories]
+      summary: Tạo danh mục tài sản (permission ASSET_CATEGORY_CREATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateAssetCategoryRequest" }
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/AssetCategory" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    get:
+      tags: [Asset Categories]
+      summary: Danh sách danh mục tài sản (permission ASSET_CATEGORY_VIEW)
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, default: 10 }
+        - $ref: "#/components/parameters/KeywordParam"
+      responses:
+        "200":
+          description: Danh sách danh mục
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/AssetCategory" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/asset-categories/{id}:
+    get:
+      tags: [Asset Categories]
+      summary: Chi tiết danh mục tài sản (permission ASSET_CATEGORY_VIEW)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/AssetCategory" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Asset Categories]
+      summary: Cập nhật danh mục tài sản (permission ASSET_CATEGORY_UPDATE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateAssetCategoryRequest" }
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/AssetCategory" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Asset Categories]
+      summary: Xoá mềm danh mục tài sản (permission ASSET_CATEGORY_DELETE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Xoá thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/asset-categories/{id}/permanent:
+    delete:
+      tags: [Asset Categories]
+      summary: Xoá vĩnh viễn danh mục tài sản (permission ASSET_CATEGORY_DELETE_PERMANENT)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Xoá vĩnh viễn thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/asset-categories/{id}/restore:
+    patch:
+      tags: [Asset Categories]
+      summary: Khôi phục danh mục đã soft-delete (permission ASSET_CATEGORY_UPDATE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Khôi phục thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/AssetCategory" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ================= DASHBOARD =================
   /api/dashboard/admin-summary:
     get:
       tags: [Dashboard]
-      summary: Admin summary
-      security:
-        - bearerAuth: []
+      summary: Tổng quan toàn hệ thống (permission DASHBOARD_READ, chỉ ADMIN)
       responses:
         "200":
-          description: Summary
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data: { type: object, additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /api/dashboard/department/{departmentId}:
     get:
       tags: [Dashboard]
-      summary: Department stats
-      security:
-        - bearerAuth: []
+      summary: Thống kê theo 1 khoa/phòng ban (permission DASHBOARD_READ)
       parameters:
         - name: departmentId
           in: path
           required: true
-          schema:
-            type: string
+          schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
       responses:
         "200":
-          description: Stats
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data: { type: object, additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/dashboard/kpi/proposal-conversion:
     get:
       tags: [Dashboard]
-      summary: Proposal conversion KPI
-      security:
-        - bearerAuth: []
+      summary: KPI tỉ lệ chuyển đổi Proposal → Report theo khoa (permission DASHBOARD_READ)
       parameters:
-        - name: month
-          in: query
-          schema:
-            type: integer
-        - name: year
-          in: query
-          schema:
-            type: integer
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
       responses:
         "200":
-          description: KPI
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data: { type: object, additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /api/dashboard/kpi/device-damage-trend:
     get:
       tags: [Dashboard]
-      summary: Device damage trend
-      security:
-        - bearerAuth: []
+      summary: Xu hướng hư hỏng thiết bị theo tháng (permission DASHBOARD_READ)
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
       responses:
         "200":
-          description: Trend
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data: { type: object, additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /api/dashboard/kpi/top-damaged-devices:
     get:
       tags: [Dashboard]
-      summary: Top damaged devices
-      security:
-        - bearerAuth: []
+      summary: Top thiết bị hư hỏng nhiều nhất (permission DASHBOARD_READ)
       parameters:
-        - name: month
+        - name: department
           in: query
-          schema:
-            type: integer
-        - name: year
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: fromDate
           in: query
-          schema:
-            type: integer
+          schema: { type: string, format: date }
+        - name: toDate
+          in: query
+          schema: { type: string, format: date }
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
       responses:
         "200":
-          description: Top devices
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data: { type: object, additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /api/dashboard/kpi/top-damaged-inks:
     get:
       tags: [Dashboard]
-      summary: Top damaged inks
-      security:
-        - bearerAuth: []
+      summary: Top mực in hư hỏng/thay thế nhiều nhất (permission DASHBOARD_READ)
+      parameters:
+        - name: department
+          in: query
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: fromDate
+          in: query
+          schema: { type: string, format: date }
+        - name: toDate
+          in: query
+          schema: { type: string, format: date }
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
       responses:
         "200":
-          description: Ink stats
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data: { type: object, additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /api/dashboard/device-stats:
     get:
       tags: [Dashboard]
-      summary: Device stats
-      security:
-        - bearerAuth: []
+      summary: Thống kê số lượng mực/sửa chữa/dự trù theo tháng-năm (permission DASHBOARD_READ)
       parameters:
         - name: month
           in: query
-          schema:
-            type: integer
+          schema: { type: integer, minimum: 1, maximum: 12 }
         - name: year
           in: query
-          schema:
-            type: integer
+          schema: { type: integer }
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
       responses:
         "200":
-          description: Stats
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data: { type: object, additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
-  # ===================== IMPORT DOC =====================
+  /api/dashboard/assets/summary:
+    get:
+      tags: [Dashboard]
+      summary: Tổng quan tài sản (permission DASHBOARD_READ)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data: { type: object, additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/dashboard/assets/warranty-expiring:
+    get:
+      tags: [Dashboard]
+      summary: Danh sách tài sản sắp hết hạn bảo hành (permission DASHBOARD_READ)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Asset" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/dashboard/assets/maintenance-overdue:
+    get:
+      tags: [Dashboard]
+      summary: Danh sách tài sản quá hạn bảo trì (permission DASHBOARD_READ)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Asset" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  # ================= NOTIFICATIONS =================
+  /api/notifications:
+    get:
+      tags: [Notifications]
+      summary: Danh sách thông báo của user đang đăng nhập
+      description: >
+        `recipient` luôn lấy từ token đăng nhập, không nhận qua query
+        (chống IDOR — không xem được thông báo của người khác).
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: isRead
+          in: query
+          schema: { type: string, enum: ["true", "false"] }
+        - name: type
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/Notification" }
+                      pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/notifications/unread-count:
+    get:
+      tags: [Notifications]
+      summary: Số lượng thông báo chưa đọc
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      count: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      summary: Đánh dấu 1 thông báo đã đọc
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Notification" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/notifications/read-all:
+    patch:
+      tags: [Notifications]
+      summary: Đánh dấu tất cả thông báo đã đọc
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { type: object, additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/notifications/{id}:
+    delete:
+      tags: [Notifications]
+      summary: Xoá 1 thông báo (của chính user)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Xoá thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { type: object, additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ================= EXCEL =================
+  /api/export/export-documents-excel:
+    get:
+      tags: [Excel]
+      summary: Export danh sách Document ra file Excel (streaming)
+      description: >
+        User không phải ADMIN bị ép cứng filter theo `department` của chính
+        mình (không đổi được qua query string).
+      parameters:
+        - name: department
+          in: query
+          description: Chỉ ADMIN mới tự do dùng filter này
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: category
+          in: query
+          schema: { type: string, enum: [PROPOSAL, REPORT] }
+        - name: subType
+          in: query
+          schema: { type: string }
+        - name: fromDate
+          in: query
+          schema: { type: string, format: date }
+        - name: toDate
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: File Excel (.xlsx) — streamed
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/export/template:
+    get:
+      tags: [Excel]
+      summary: Tải file Excel mẫu để import Document
+      responses:
+        "200":
+          description: File Excel mẫu (.xlsx)
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthorized" }
 
   /api/export/import-proposal:
     post:
-      tags: [Excel Doc]
-      summary: Import proposal from Excel
-      security:
-        - bearerAuth: []
+      tags: [Excel]
+      summary: Import Document (Proposal) hàng loạt từ file Excel
+      description: >
+        ⚠️ GHI CHÚ TỪ REVIEW BẢO MẬT: chỉ yêu cầu `authenticate`, KHÔNG có
+        `authorizePermission` — mọi user đăng nhập đều import được.
+        Dùng `?dryRun=true` để xem trước, không ghi DB.
+      parameters:
+        - name: dryRun
+          in: query
+          schema: { type: boolean, default: false }
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
               type: object
-              required:
-                - file
+              required: [file]
               properties:
                 file:
                   type: string
                   format: binary
+                  description: File .xlsx theo đúng mẫu tải ở /api/export/template
       responses:
         "200":
-          description: Import success
+          description: Kết quả import (hoặc preview nếu dryRun)
           content:
             application/json:
               schema:
                 type: object
-                example:
-                  message: Import successful
-
-  # ===================== Export DOC =====================
-
-  /api/export/export-documents-excel:
-    get:
-      tags: [Excel Doc]
-      summary: Export documents to Excel
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: month
-          in: query
-          schema:
-            type: integer
-          example: 2
-        - name: year
-          in: query
-          schema:
-            type: integer
-          example: 2026
-      responses:
-        "200":
-          description: Excel file
-          content:
-            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
-              schema:
-                type: string
-                format: binary
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/ImportDocumentsResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
 
   /api/export/departments/sync-from-excel:
     post:
-      tags: [Excel Doc]
-      summary: Sync departments from Excel
-      security:
-        - bearerAuth: []
+      tags: [Excel]
+      summary: Đồng bộ/tạo mới Department hàng loạt từ file Excel
+      description: >
+        ⚠️ GHI CHÚ TỪ REVIEW BẢO MẬT: chỉ yêu cầu `authenticate`, KHÔNG có
+        `authorizePermission` — mọi user đăng nhập đều thao tác được.
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
               type: object
-              required:
-                - file
+              required: [file]
               properties:
-                file:
-                  type: string
-                  format: binary
+                file: { type: string, format: binary }
       responses:
         "200":
-          description: Sync success
+          description: Đồng bộ thành công
           content:
             application/json:
               schema:
                 type: object
-                example:
-                  message: Sync completed
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { type: object, additionalProperties: true }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
 
-      # ===================== GET ALL AUDIT LOG =====================
+  /api/export/import-history:
+    get:
+      tags: [Excel]
+      summary: Lịch sử import Excel (ADMIN xem tất cả; user thường chỉ xem của mình)
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/ImportHistory" }
+                      pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  # ================= UPLOAD =================
+  /api/upload:
+    post:
+      tags: [Upload]
+      summary: Upload file đính kèm chung
+      description: >
+        ⚠️ CẢNH BÁO BẢO MẬT NGHIÊM TRỌNG (từ review): route này trong code
+        hiện tại KHÔNG có `authenticate` — bất kỳ ai (kể cả chưa đăng nhập)
+        cũng upload/xem/xoá được file. Không giới hạn mime-type mặc định.
+        Khuyến nghị: thêm `authenticate` + `authorizePermission` +
+        whitelist `allowedTypes` trước khi lên production — xem báo cáo
+        review bảo mật mục 10.1/13.2.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                files:
+                  type: array
+                  items: { type: string, format: binary }
+      responses:
+        "200":
+          description: Upload thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/UploadFile" }
+        "500":
+          description: Lỗi upload (module này chưa dùng ApiError chuẩn hoá)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+    get:
+      tags: [Upload]
+      summary: Danh sách file đã upload (chưa xoá)
+      description: "⚠️ Hiện KHÔNG yêu cầu đăng nhập — xem cảnh báo ở POST /api/upload."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/UploadFile" }
+
+  /api/upload/{id}:
+    get:
+      tags: [Upload]
+      summary: Chi tiết 1 file đã upload
+      description: "⚠️ Hiện KHÔNG yêu cầu đăng nhập — xem cảnh báo ở POST /api/upload."
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UploadFile" }
+        "404":
+          description: Không tìm thấy file
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+    delete:
+      tags: [Upload]
+      summary: Xoá mềm 1 file đã upload
+      description: "⚠️ Hiện KHÔNG yêu cầu đăng nhập — bất kỳ ai cũng xoá được file của người khác."
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Xoá thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "404":
+          description: Không tìm thấy file
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+
+  # ================= USER AUDIT =================
   /api/user-audits:
     get:
-      tags: [LogAudit]
-      summary: Get all user audit logs
-      description: Lấy danh sách lịch sử thao tác người dùng (có phân trang + filter)
-      security:
-        - bearerAuth: []
+      tags: [User Audit]
+      summary: Danh sách audit log (permission AUDIT_VIEW)
       parameters:
-        - name: page
-          in: query
-          schema:
-            type: integer
-          example: 1
-
-        - name: limit
-          in: query
-          schema:
-            type: integer
-          example: 20
-
-        - name: userId
-          in: query
-          schema:
-            type: string
-          example: 698313689ce9dc3ab3821d1b
-
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
         - name: action
           in: query
-          schema:
-            type: string
-          example: CREATE_DOCUMENT
-
+          description: 1 giá trị, hoặc nhiều giá trị cách nhau bởi dấu phẩy (vd LOGIN,LOGOUT)
+          schema: { type: string }
+        - name: performedBy
+          in: query
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: user
+          in: query
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
         - name: fromDate
           in: query
-          schema:
-            type: string
-            format: date
-          example: 2026-01-01
-
+          schema: { type: string, format: date }
         - name: toDate
           in: query
-          schema:
-            type: string
-            format: date
-          example: 2026-01-31
-
+          schema: { type: string, format: date }
       responses:
         "200":
-          description: Get audit logs success
+          description: OK
           content:
             application/json:
               schema:
                 type: object
-                example:
+                properties:
                   data:
-                    - _id: 1
-                      userId: 698313689ce9dc3ab3821d1b
-                      action: CREATE_DOCUMENT
-                      description: Tạo document
-                      createdAt: 2026-01-01T10:00:00Z
-                  pagination:
-                    page: 1
-                    limit: 20
-                    total: 100
+                    type: array
+                    items: { $ref: "#/components/schemas/UserAudit" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
-  # ===================== AUDIT DASHBOARD =====================
+  /api/user-audits/export:
+    get:
+      tags: [User Audit]
+      summary: Export audit log ra Excel/CSV (permission AUDIT_VIEW)
+      description: Giới hạn tối đa 20.000 dòng/lần export.
+      parameters:
+        - name: format
+          in: query
+          schema: { type: string, enum: [xlsx, csv], default: xlsx }
+        - name: action
+          in: query
+          schema: { type: string }
+        - name: performedBy
+          in: query
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: user
+          in: query
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: fromDate
+          in: query
+          schema: { type: string, format: date }
+        - name: toDate
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: File Excel hoặc CSV — streamed
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+            text/csv:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /api/user-audits/dashboard:
     get:
-      tags: [LogAudit]
-      summary: Audit dashboard statistics
-      description: Thống kê hoạt động người dùng (dashboard logs)
-      security:
-        - bearerAuth: []
+      tags: [User Audit]
+      summary: Thống kê audit log theo action/theo ngày (permission AUDIT_VIEW_DASHBOARD)
       parameters:
         - name: fromDate
           in: query
-          schema:
-            type: string
-            format: date
-          example: 2026-01-01
-
+          schema: { type: string, format: date }
         - name: toDate
           in: query
-          schema:
-            type: string
-            format: date
-          example: 2026-01-31
-
+          schema: { type: string, format: date }
       responses:
         "200":
-          description: Dashboard data
+          description: OK
           content:
             application/json:
               schema:
                 type: object
-                example:
-                  totalActions: 1200
-                  topUsers:
-                    - userId: 123
-                      total: 300
-                  actionsBreakdown:
-                    CREATE_DOCUMENT: 500
-                    UPDATE_DOCUMENT: 300
-                    DELETE_DOCUMENT: 100
+                properties:
+                  total: { type: integer }
+                  byAction:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        _id: { type: string, description: "Giá trị action" }
+                        count: { type: integer }
+                  byDay:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        _id: { type: string, description: "Ngày dạng YYYY-MM-DD" }
+                        count: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  # ================= PERFORMANCE =================
+  /api/performances/dashboard:
+    get:
+      tags: [Performance]
+      summary: Thống kê hiệu năng API theo endpoint (chỉ ADMIN)
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/ApiPerformanceStat" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/workflows/{id}/complete:
+    post:
+      tags: [Workflow]
+      summary: Đánh dấu workflow đã hoàn tất công việc thực tế (chỉ người tạo Document)
+      description: >
+        KHÁC với "approved": "approved" nghĩa là ĐÃ ĐƯỢC CHO PHÉP thực hiện,
+        chưa chắc việc đã làm xong ngoài thực tế (vd chưa mua/nhận hàng).
+        "complete" đóng hẳn quy trình sau khi việc thực tế đã xong. Chỉ áp
+        dụng được khi workflow đang ở đúng trạng thái `approved`. Cập nhật
+        đồng thời `WorkflowInstance.status` và `Document.workflowStatus`
+        sang `completed` (bọc trong transaction).
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApproveRejectBody" }
+      responses:
+        "200":
+          description: Đánh dấu hoàn tất thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data:
+                    allOf:
+                      - $ref: "#/components/schemas/WorkflowInstance"
+                      - type: object
+                        properties:
+                          completionComment:
+                            type: string
+                            nullable: true
+                            description: Chỉ trả về trong response — KHÔNG có chỗ lưu cố định trong schema WorkflowInstance hiện tại.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
 components:
   securitySchemes:
@@ -1210,3 +2639,847 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: >
+        Access token JWT lấy từ `POST /api/auths/login`. Gửi kèm header
+        `Authorization: Bearer <accessToken>`.
+
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      description: MongoDB ObjectId (24 ký tự hex)
+      schema:
+        type: string
+        pattern: '^[0-9a-fA-F]{24}$'
+      example: "665f1a2b8c9d3e4f5a6b7c8d"
+    PageParam:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    LimitParam:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+    KeywordParam:
+      name: keyword
+      in: query
+      schema: { type: string, maxLength: 100 }
+    OrderParam:
+      name: order
+      in: query
+      schema: { type: string, enum: [asc, desc], default: desc }
+
+  responses:
+    BadRequest:
+      description: Dữ liệu đầu vào không hợp lệ (lỗi validate Zod)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    Unauthorized:
+      description: Chưa đăng nhập / access token không hợp lệ hoặc đã hết hạn
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    Forbidden:
+      description: Đã đăng nhập nhưng không đủ quyền (RBAC/ABAC từ chối)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    NotFound:
+      description: Không tìm thấy tài nguyên
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    Conflict:
+      description: Xung đột dữ liệu (vd trùng mã/tên đã tồn tại)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    TooManyRequests:
+      description: Vượt quá giới hạn rate-limit (áp dụng cho nhóm route /api/auths)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  schemas:
+    # ============================================================
+    # COMMON / ENVELOPE
+    # ============================================================
+    ErrorResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        message: { type: string, example: "Dữ liệu không hợp lệ" }
+        errorCode: { type: string, example: "VALIDATION_ERROR" }
+        details:
+          type: array
+          nullable: true
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              message: { type: string }
+
+    PaginationMeta:
+      type: object
+      properties:
+        total: { type: integer, example: 42 }
+        page: { type: integer, example: 1 }
+        limit: { type: integer, example: 10 }
+        totalPages: { type: integer, example: 5 }
+
+    ObjectIdRef:
+      type: string
+      pattern: '^[0-9a-fA-F]{24}$'
+      example: "665f1a2b8c9d3e4f5a6b7c8d"
+
+    # ============================================================
+    # AUTH
+    # ============================================================
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, minLength: 3, maxLength: 50, pattern: '^[a-zA-Z0-9_]+$' }
+        password: { type: string, minLength: 5 }
+
+    RegisterRequest:
+      type: object
+      required: [username, email, password, confirmPassword, fullName]
+      properties:
+        username: { type: string, minLength: 3, maxLength: 50, pattern: '^[a-zA-Z0-9_]+$' }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 5 }
+        confirmPassword: { type: string, minLength: 5 }
+        fullName: { type: string, minLength: 1 }
+
+    RefreshTokenRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string }
+
+    ForgotPasswordRequest:
+      type: object
+      required: [username]
+      properties:
+        username: { type: string, maxLength: 50 }
+
+    ResetPasswordRequest:
+      type: object
+      required: [token, newPassword]
+      properties:
+        token: { type: string }
+        newPassword: { type: string, minLength: 5 }
+
+    AuthLoginResult:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        user: { $ref: "#/components/schemas/User" }
+
+    # ============================================================
+    # USER
+    # ============================================================
+    User:
+      type: object
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        username: { type: string }
+        fullName: { type: string }
+        email: { type: string, nullable: true }
+        role:
+          oneOf:
+            - $ref: "#/components/schemas/ObjectIdRef"
+            - $ref: "#/components/schemas/Role"
+        department:
+          oneOf:
+            - $ref: "#/components/schemas/ObjectIdRef"
+            - $ref: "#/components/schemas/Department"
+        extraPermissions:
+          type: array
+          items: { $ref: "#/components/schemas/ObjectIdRef" }
+        denyPermissions:
+          type: array
+          items: { $ref: "#/components/schemas/ObjectIdRef" }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateUserRequest:
+      type: object
+      required: [username, password, fullName, role]
+      properties:
+        username: { type: string, minLength: 5, pattern: '^[a-zA-Z0-9_]+$' }
+        password: { type: string, minLength: 5 }
+        fullName: { type: string, minLength: 1 }
+        role: { $ref: "#/components/schemas/ObjectIdRef" }
+        department: { $ref: "#/components/schemas/ObjectIdRef" }
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        fullName: { type: string, minLength: 1 }
+        username: { type: string, minLength: 5, pattern: '^[a-zA-Z0-9_]+$' }
+        role: { $ref: "#/components/schemas/ObjectIdRef" }
+        department: { $ref: "#/components/schemas/ObjectIdRef" }
+        isActive: { type: boolean }
+
+    UpdateMeRequest:
+      type: object
+      description: Chỉ 2 field này thực sự có tác dụng khi tự cập nhật (xem mô tả ở endpoint).
+      properties:
+        fullName: { type: string, minLength: 1 }
+        username: { type: string, minLength: 5, pattern: '^[a-zA-Z0-9_]+$' }
+
+    ChangePasswordRequest:
+      type: object
+      required: [oldPassword, newPassword, confirmPassword]
+      properties:
+        oldPassword: { type: string, minLength: 5 }
+        newPassword: { type: string, minLength: 5 }
+        confirmPassword: { type: string, minLength: 5 }
+
+    ResetPasswordByAdminRequest:
+      type: object
+      required: [newPassword]
+      properties:
+        newPassword: { type: string, minLength: 5 }
+
+    # ============================================================
+    # RBAC — PERMISSION / ROLE / POLICY
+    # ============================================================
+    Permission:
+      type: object
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        name: { type: string, example: "DOCUMENT_VIEW" }
+        resource: { type: string, example: "DOCUMENT" }
+        action: { type: string, example: "VIEW" }
+        description: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreatePermissionRequest:
+      type: object
+      required: [name, resource, action]
+      properties:
+        name: { type: string, maxLength: 100 }
+        resource: { type: string, maxLength: 100 }
+        action: { type: string, maxLength: 100 }
+        description: { type: string, maxLength: 500 }
+
+    UpdatePermissionRequest:
+      type: object
+      description: Cần ít nhất 1 field
+      properties:
+        name: { type: string, maxLength: 100 }
+        resource: { type: string, maxLength: 100 }
+        action: { type: string, maxLength: 100 }
+        description: { type: string, maxLength: 500 }
+
+    Role:
+      type: object
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        name: { type: string, example: "IT" }
+        permissions:
+          type: array
+          items:
+            oneOf:
+              - $ref: "#/components/schemas/ObjectIdRef"
+              - $ref: "#/components/schemas/Permission"
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateRoleRequest:
+      type: object
+      required: [name]
+      description: >
+        CHỦ Ý chỉ có `name` — không cho gán `permissions` trực tiếp lúc tạo
+        (chống mass assignment). Muốn gán permission, dùng
+        `POST /api/rbac/roles/{id}/assign-permissions`.
+      properties:
+        name: { type: string, maxLength: 100 }
+
+    UpdateRoleRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 100 }
+
+    AssignPermissionsRequest:
+      type: object
+      required: [permissionIds]
+      properties:
+        permissionIds:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/ObjectIdRef" }
+
+    Policy:
+      type: object
+      description: >
+        Quy tắc ABAC — chỉ được áp dụng khi Role/Permission tĩnh không đủ
+        (đánh giá `condition` bằng evaluator tự viết, an toàn, không dùng eval).
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        name: { type: string }
+        resource: { type: string }
+        action: { type: string }
+        condition:
+          type: string
+          maxLength: 1000
+          example: "user.department == resource.department"
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreatePolicyRequest:
+      type: object
+      required: [name, resource, action, condition]
+      properties:
+        name: { type: string, maxLength: 100 }
+        resource: { type: string, maxLength: 100 }
+        action: { type: string, maxLength: 100 }
+        condition: { type: string, maxLength: 1000 }
+
+    UpdatePolicyRequest:
+      type: object
+      description: Cần ít nhất 1 field
+      properties:
+        name: { type: string, maxLength: 100 }
+        resource: { type: string, maxLength: 100 }
+        action: { type: string, maxLength: 100 }
+        condition: { type: string, maxLength: 1000 }
+
+    # ============================================================
+    # DEPARTMENT
+    # ============================================================
+    Department:
+      type: object
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        code: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateDepartmentRequest:
+      type: object
+      required: [name, code]
+      properties:
+        name: { type: string, minLength: 1 }
+        code: { type: string, minLength: 1 }
+        description: { type: string }
+
+    UpdateDepartmentRequest:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        code: { type: string }
+        description: { type: string }
+        isActive: { type: boolean }
+
+    # ============================================================
+    # DOCUMENT
+    # ============================================================
+    Document:
+      type: object
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        documentCode: { type: string, example: "PR-KVLTL-2026-0121" }
+        category: { type: string, enum: [PROPOSAL, REPORT] }
+        subType:
+          type: string
+          example: "PROPOSE_INK"
+          description: >
+            Tuỳ theo `category`: PROPOSAL có PROPOSE_INK/PROPOSE_REPAIR...;
+            REPORT có CHECK_DAMAGE/CONFIRM_STATUS...
+        title: { type: string }
+        department:
+          oneOf:
+            - $ref: "#/components/schemas/ObjectIdRef"
+            - $ref: "#/components/schemas/Department"
+        createdBy:
+          oneOf:
+            - $ref: "#/components/schemas/ObjectIdRef"
+            - $ref: "#/components/schemas/User"
+        referenceTo:
+          type: array
+          description: Tối đa 1 phần tử — REPORT tham chiếu đúng 1 PROPOSAL
+          items: { $ref: "#/components/schemas/ObjectIdRef" }
+        relatedAsset:
+          $ref: "#/components/schemas/ObjectIdRef"
+          nullable: true
+        meta:
+          type: object
+          additionalProperties: true
+          description: Cấu trúc động tuỳ theo subType (items, deviceName, quantity, unitPrice...)
+        workflowStatus:
+          type: string
+          enum: [pending, approved, rejected, cancelled, completed]
+        isActive: { type: boolean }
+        signedBy:
+          type: array
+          items: { $ref: "#/components/schemas/ObjectIdRef" }
+        deletedAt: { type: string, format: date-time, nullable: true }
+        deletedBy: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateDocumentRequest:
+      type: object
+      required: [category, subType, title, department]
+      properties:
+        category: { type: string, enum: [PROPOSAL, REPORT] }
+        subType: { type: string }
+        title: { type: string, minLength: 1 }
+        department: { $ref: "#/components/schemas/ObjectIdRef" }
+        referenceTo:
+          type: string
+          description: ObjectId của Proposal (chỉ 1 giá trị, bắt buộc với REPORT tham chiếu Proposal)
+        meta:
+          type: object
+          additionalProperties: true
+        relatedAsset:
+          type: string
+          description: Bắt buộc khi subType = PROPOSE_REPAIR
+
+    UpdateDocumentRequest:
+      type: object
+      description: Cần ít nhất 1 field. CHỈ `title`/`meta` thực sự có tác dụng (whitelist tầng service).
+      properties:
+        title: { type: string, minLength: 1 }
+        meta:
+          type: object
+          additionalProperties: true
+
+    DeleteByMonthRequest:
+      type: object
+      required: [month, year]
+      properties:
+        month: { type: integer, minimum: 1, maximum: 12 }
+        year: { type: integer }
+        category: { type: string, enum: [PROPOSAL, REPORT] }
+        subType: { type: string }
+        department: { $ref: "#/components/schemas/ObjectIdRef" }
+
+    # ============================================================
+    # WORKFLOW
+    # ============================================================
+    WorkflowStep:
+      type: object
+      properties:
+        stepOrder: { type: integer }
+        name: { type: string }
+        role: { type: string, description: "Tên Role phải khớp step" }
+
+    WorkflowTemplate:
+      type: object
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        name: { type: string }
+        steps:
+          type: array
+          items: { $ref: "#/components/schemas/WorkflowStep" }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateWorkflowTemplateRequest:
+      type: object
+      required: [name, steps]
+      properties:
+        name: { type: string, minLength: 1 }
+        steps:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [stepOrder, name, role]
+            properties:
+              stepOrder: { type: integer, minimum: 0 }
+              name: { type: string, minLength: 1 }
+              role: { type: string, minLength: 1 }
+        isActive: { type: boolean }
+
+    WorkflowInstanceStep:
+      type: object
+      properties:
+        stepOrder: { type: integer }
+        name: { type: string }
+        role: { type: string }
+        approvedBy: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        status: { type: string, enum: [pending, approved, rejected, cancelled] }
+        comment: { type: string, nullable: true }
+        approvedAt: { type: string, format: date-time, nullable: true }
+
+    WorkflowInstance:
+      type: object
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        documentId: { $ref: "#/components/schemas/ObjectIdRef" }
+        templateId: { $ref: "#/components/schemas/ObjectIdRef" }
+        currentStep: { type: integer }
+        status: { type: string, enum: [pending, approved, rejected, cancelled, completed] }
+        steps:
+          type: array
+          items: { $ref: "#/components/schemas/WorkflowInstanceStep" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    SubmitWorkflowRequest:
+      type: object
+      required: [documentId, templateId]
+      properties:
+        documentId: { $ref: "#/components/schemas/ObjectIdRef" }
+        templateId: { $ref: "#/components/schemas/ObjectIdRef" }
+
+    ApproveRejectBody:
+      type: object
+      properties:
+        comment: { type: string, maxLength: 1000 }
+
+    # ============================================================
+    # ASSET
+    # ============================================================
+    AssetStatus:
+      type: string
+      enum: [IN_STOCK, RESERVED, IN_USE, UNDER_MAINTENANCE, DISPOSED]
+
+    Asset:
+      type: object
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        assetCode: { type: string }
+        name: { type: string }
+        category:
+          oneOf:
+            - $ref: "#/components/schemas/ObjectIdRef"
+            - $ref: "#/components/schemas/AssetCategory"
+        department:
+          oneOf:
+            - $ref: "#/components/schemas/ObjectIdRef"
+            - $ref: "#/components/schemas/Department"
+        assignedTo:
+          $ref: "#/components/schemas/ObjectIdRef"
+          nullable: true
+        status: { $ref: "#/components/schemas/AssetStatus" }
+        serialNumber: { type: string, nullable: true }
+        model: { type: string, nullable: true }
+        manufacturer: { type: string, nullable: true }
+        location: { type: string, nullable: true }
+        purchaseDate: { type: string, format: date-time, nullable: true }
+        purchasePrice: { type: number, nullable: true }
+        warrantyExpiredAt: { type: string, format: date-time, nullable: true }
+        supplier: { type: string, nullable: true }
+        maintenanceStartedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Set khi chuyển UNDER_MAINTENANCE, xoá khi bảo trì xử lý xong — dùng tính thời gian bảo trì quá hạn.
+        warrantyAlertSentAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Lần gần nhất cron đã gửi cảnh báo sắp hết hạn bảo hành cho asset này (chống gửi trùng).
+        lastInventoryCheckAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Lần kiểm kê (quét QR check-in) gần nhất.
+        lastInventoryCheckBy: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        specs:
+          type: object
+          additionalProperties: true
+        isActive: { type: boolean }
+        createdBy: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        updatedBy: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        deletedAt: { type: string, format: date-time, nullable: true }
+        deletedBy: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateAssetRequest:
+      type: object
+      required: [category, department, name]
+      properties:
+        category: { $ref: "#/components/schemas/ObjectIdRef" }
+        department: { $ref: "#/components/schemas/ObjectIdRef" }
+        name: { type: string, minLength: 1 }
+        serialNumber: { type: string }
+        model: { type: string }
+        manufacturer: { type: string }
+        location: { type: string }
+        purchaseDate: { type: string, format: date }
+        purchasePrice: { type: number, minimum: 0 }
+        warrantyExpiredAt: { type: string, format: date }
+        supplier: { type: string }
+        specs:
+          type: object
+          additionalProperties: true
+
+    UpdateAssetRequest:
+      type: object
+      description: >
+        CHỦ Ý không cho sửa status/assignedTo/department qua route này —
+        phải qua endpoint assign/transfer/return riêng.
+      properties:
+        category: { $ref: "#/components/schemas/ObjectIdRef" }
+        name: { type: string, minLength: 1 }
+        serialNumber: { type: string }
+        model: { type: string }
+        manufacturer: { type: string }
+        location: { type: string }
+        purchaseDate: { type: string, format: date }
+        purchasePrice: { type: number, minimum: 0 }
+        warrantyExpiredAt: { type: string, format: date }
+        supplier: { type: string }
+        specs:
+          type: object
+          additionalProperties: true
+        isActive: { type: boolean }
+
+    AssetCategory:
+      type: object
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        code: { type: string }
+        name: { type: string }
+        parentCategory: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        defaultWarrantyMonths: { type: integer, nullable: true }
+        isActive: { type: boolean }
+        deletedAt: { type: string, format: date-time, nullable: true }
+        deletedBy: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateAssetCategoryRequest:
+      type: object
+      required: [code, name]
+      properties:
+        code: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        parentCategory: { $ref: "#/components/schemas/ObjectIdRef" }
+        defaultWarrantyMonths: { type: integer, minimum: 0 }
+
+    UpdateAssetCategoryRequest:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        parentCategory: { $ref: "#/components/schemas/ObjectIdRef" }
+        defaultWarrantyMonths: { type: integer, minimum: 0 }
+        isActive: { type: boolean }
+
+    AssignAssetRequest:
+      type: object
+      required: [toDepartment]
+      properties:
+        toDepartment: { $ref: "#/components/schemas/ObjectIdRef" }
+        toUser: { $ref: "#/components/schemas/ObjectIdRef" }
+        reason: { type: string }
+
+    TransferAssetRequest:
+      type: object
+      description: Phải cung cấp ít nhất 1 trong 2 field toDepartment/toUser
+      properties:
+        toDepartment: { $ref: "#/components/schemas/ObjectIdRef" }
+        toUser:
+          type: string
+          description: 'Truyền ObjectId để đổi user, hoặc chuỗi rỗng "" để chủ ý gỡ user hiện tại'
+        reason: { type: string }
+
+    ReturnAssetRequest:
+      type: object
+      properties:
+        toDepartment: { $ref: "#/components/schemas/ObjectIdRef" }
+        reason: { type: string }
+
+    AssetAssignmentHistory:
+      type: object
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        asset: { $ref: "#/components/schemas/ObjectIdRef" }
+        actionType: { type: string, enum: [ASSIGN, TRANSFER, RETURN] }
+        fromDepartment: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        toDepartment: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        fromUser: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        toUser: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        handedOverBy: { $ref: "#/components/schemas/ObjectIdRef" }
+        reason: { type: string, nullable: true }
+        effectiveAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+
+    # ============================================================
+    # NOTIFICATION
+    # ============================================================
+    Notification:
+      type: object
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        recipient: { $ref: "#/components/schemas/ObjectIdRef" }
+        createdBy: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        type:
+          type: string
+          enum:
+            - WORKFLOW_STEP_ASSIGNED
+            - WORKFLOW_APPROVED
+            - WORKFLOW_REJECTED
+            - DOCUMENT_SUBMITTED
+            - IMPORT_COMPLETED
+            - IMPORT_FAILED
+            - RBAC_CHANGED
+            - SYSTEM
+            - ASSET_WARRANTY_EXPIRING
+            - ASSET_MAINTENANCE_OVERDUE
+        title: { type: string }
+        message: { type: string }
+        resourceType: { type: string, enum: [Document, WorkflowInstance, ImportHistory, Asset], nullable: true }
+        resourceId: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        isRead: { type: boolean }
+        readAt: { type: string, format: date-time, nullable: true }
+        channelsSent:
+          type: array
+          items: { type: string, enum: [in_app, email] }
+          description: Kênh ĐÃ gửi thành công (không phải kênh dự định gửi)
+        priority: { type: string, enum: [low, normal, high], default: normal }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    # ============================================================
+    # EXCEL / IMPORT HISTORY
+    # ============================================================
+    ImportHistory:
+      type: object
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        importedBy:
+          oneOf:
+            - $ref: "#/components/schemas/ObjectIdRef"
+            - $ref: "#/components/schemas/User"
+        fileName: { type: string }
+        mode: { type: string, enum: [dryRun, commit] }
+        status: { type: string, enum: [success, partial, failed] }
+        totalRows: { type: integer }
+        created: { type: integer }
+        updated: { type: integer }
+        reportsCreated: { type: integer }
+        errorCount: { type: integer }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              row: { type: integer }
+              message: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    ImportAssetsResult:
+      type: object
+      properties:
+        dryRun: { type: boolean }
+        created: { type: integer }
+        updated: { type: integer, description: "Luôn = 0 — import Asset chỉ tạo mới, giữ field cho khớp shape chung." }
+        reportsCreated: { type: integer, description: "Luôn = 0 — không áp dụng cho Asset, giữ field cho khớp shape chung." }
+        totalRows: { type: integer }
+        preview:
+          type: array
+          items: { type: object, additionalProperties: true }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              row: { type: integer }
+              message: { type: string }
+
+    ImportDocumentsResult:
+      type: object
+      properties:
+        created: { type: integer }
+        updated: { type: integer }
+        reportsCreated: { type: integer }
+        preview:
+          type: array
+          items: { type: object, additionalProperties: true }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              row: { type: integer }
+              message: { type: string }
+
+    # ============================================================
+    # UPLOAD
+    # ============================================================
+    UploadFile:
+      type: object
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        fileName: { type: string }
+        fileUrl: { type: string }
+        fileSize: { type: integer }
+        mimeType: { type: string }
+        storage: { type: string, enum: [local, s3] }
+        uploadedBy: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        isUsed: { type: boolean }
+        isDeleted: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    # ============================================================
+    # USER AUDIT
+    # ============================================================
+    UserAudit:
+      type: object
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        action:
+          type: string
+          enum:
+            - CREATE
+            - UPDATE
+            - DISABLE
+            - RESTORE
+            - LOGIN
+            - LOGOUT
+            - RESET_PASSWORD
+            - CHANGE_PASSWORD
+            - FORGOT_PASSWORD
+            - AUDIT_DASHBOARD_VIEW
+            - ADMIN_BYPASS
+            - VIEW_DETAIL
+            - DELETE
+            - REGISTER
+            - ASSIGN_ROLE
+        performedBy:
+          oneOf:
+            - $ref: "#/components/schemas/ObjectIdRef"
+            - $ref: "#/components/schemas/User"
+        user:
+          oneOf:
+            - $ref: "#/components/schemas/ObjectIdRef"
+            - $ref: "#/components/schemas/User"
+        note: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    # ============================================================
+    # DASHBOARD / PERFORMANCE (kết quả tổng hợp — không map trực tiếp 1 model)
+    # ============================================================
+    ApiPerformanceStat:
+      type: object
+      properties:
+        endpoint: { type: string }
+        totalCalls: { type: integer }
+        avgTime: { type: number }
+        maxTime: { type: number }
+        avgDb: { type: number }
+        avgService: { type: number }
+        avgController: { type: number }
+        slowCount: { type: integer }
+        errorCount: { type: integer }
