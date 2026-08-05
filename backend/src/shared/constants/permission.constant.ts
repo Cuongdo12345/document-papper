@@ -22,14 +22,13 @@ export const PERMISSIONS = {
   PERMISSION_CREATE: "PERMISSION_CREATE",
   PERMISSION_UPDATE: "PERMISSION_UPDATE",
   PERMISSION_DELETE: "PERMISSION_DELETE",
-  
+
   // DOCUMENT
   DOCUMENT_VIEW: "DOCUMENT_VIEW",
   DOCUMENT_CREATE: "DOCUMENT_CREATE",
   DOCUMENT_VIEW_DETAIL: "DOCUMENT_VIEW_DETAIL",
   DOCUMENT_UPDATE: "DOCUMENT_UPDATE",
   DOCUMENT_DELETE: "DOCUMENT_DELETE",
-
 
   // DEPARTMENT
   DEPARTMENT_VIEW: "DEPARTMENT_VIEW",
@@ -38,12 +37,10 @@ export const PERMISSIONS = {
   DEPARTMENT_UPDATE: "DEPARTMENT_UPDATE",
   DEPARTMENT_DELETE: "DEPARTMENT_DELETE",
 
-
   // AUDIT
   AUDIT_VIEW: "AUDIT_VIEW",
   AUDIT_VIEW_DETAIL: "AUDIT_VIEW_DETAIL",
   AUDIT_VIEW_DASHBOARD: "AUDIT_VIEW_DASHBOARD",
-
 
   // SYSTEM
   SYSTEM_SETTING: "SYSTEM_SETTING",
@@ -69,33 +66,33 @@ export const PERMISSIONS = {
   ASSET_CATEGORY_UPDATE: "ASSET_CATEGORY_UPDATE",
   ASSET_CATEGORY_DELETE: "ASSET_CATEGORY_DELETE",
   ASSET_CATEGORY_DELETE_PERMANENT: "ASSET_CATEGORY_DELETE_PERMANENT", // xoá vĩnh viễn — rủi ro cao, cùng nguyên tắc với ASSET_DELETE_PERMANENT
-  
+
   /**
- * Medical Equipment — Permission constants
- *
- * QUAN TRỌNG — cách tích hợp vào codebase thật:
- * File này được thiết kế để MERGE vào constant `PERMISSIONS` hiện có của dự án
- * (03_CODEBASE_MAP.md nhắc tới "Constants: ... permissions ...", nhưng đường dẫn
- * file thật chưa được xác nhận trong project memory — cần bạn xác nhận path thật,
- * VD: `src/shared/constants/permission.constant.ts`).
- *
- * KHÔNG merge chung namespace với `ASSET_*` — lý do đã chốt ở
- * 18_MEDICAL_EQUIPMENT_DESIGN.md §6 (D-MED-003): tránh làm nặng thêm nợ kỹ thuật
- * permission naming drift (SEC-002/D-010) đang là backlog P0 cần dọn riêng.
- *
- * Cách merge đề xuất (KHÔNG tự động làm — cần review PR):
- * ```ts
- * // permission.constant.ts (file hiện có)
- * import { MEDICAL_EQUIPMENT_PERMISSIONS } from "./medicalEquipment.permission.constant";
- *
- * export const PERMISSIONS = {
- *   ...existingPermissionsObject,
- *   ...MEDICAL_EQUIPMENT_PERMISSIONS,
- * } as const;
- * ```
- *
- * Nguồn thiết kế: 18_MEDICAL_EQUIPMENT_DESIGN.md §6
- */
+   * Medical Equipment — Permission constants
+   *
+   * QUAN TRỌNG — cách tích hợp vào codebase thật:
+   * File này được thiết kế để MERGE vào constant `PERMISSIONS` hiện có của dự án
+   * (03_CODEBASE_MAP.md nhắc tới "Constants: ... permissions ...", nhưng đường dẫn
+   * file thật chưa được xác nhận trong project memory — cần bạn xác nhận path thật,
+   * VD: `src/shared/constants/permission.constant.ts`).
+   *
+   * KHÔNG merge chung namespace với `ASSET_*` — lý do đã chốt ở
+   * 18_MEDICAL_EQUIPMENT_DESIGN.md §6 (D-MED-003): tránh làm nặng thêm nợ kỹ thuật
+   * permission naming drift (SEC-002/D-010) đang là backlog P0 cần dọn riêng.
+   *
+   * Cách merge đề xuất (KHÔNG tự động làm — cần review PR):
+   * ```ts
+   * // permission.constant.ts (file hiện có)
+   * import { MEDICAL_EQUIPMENT_PERMISSIONS } from "./medicalEquipment.permission.constant";
+   *
+   * export const PERMISSIONS = {
+   *   ...existingPermissionsObject,
+   *   ...MEDICAL_EQUIPMENT_PERMISSIONS,
+   * } as const;
+   * ```
+   *
+   * Nguồn thiết kế: 18_MEDICAL_EQUIPMENT_DESIGN.md §6
+   */
   // Equipment
   MEDICAL_EQUIPMENT_VIEW: "MEDICAL_EQUIPMENT_VIEW",
   MEDICAL_EQUIPMENT_VIEW_DETAIL: "MEDICAL_EQUIPMENT_VIEW_DETAIL",
@@ -103,23 +100,28 @@ export const PERMISSIONS = {
   MEDICAL_EQUIPMENT_UPDATE: "MEDICAL_EQUIPMENT_UPDATE",
   MEDICAL_EQUIPMENT_DELETE: "MEDICAL_EQUIPMENT_DELETE",
   MEDICAL_EQUIPMENT_DELETE_PERMANENT: "MEDICAL_EQUIPMENT_DELETE_PERMANENT",
- 
+
   // Relocate (đổi department/location) — D-MED-007, action riêng, KHÔNG đi qua
   // MEDICAL_EQUIPMENT_UPDATE, nhất quán với nguyên tắc "generic update không đổi
   // department" áp dụng cho Asset (07_BUSINESS_RULES.md).
   MEDICAL_EQUIPMENT_RELOCATE: "MEDICAL_EQUIPMENT_RELOCATE",
- 
+
   // Calibration / Inspection
   MEDICAL_EQUIPMENT_CALIBRATE: "MEDICAL_EQUIPMENT_CALIBRATE",
-  MEDICAL_EQUIPMENT_QUARANTINE_OVERRIDE: "MEDICAL_EQUIPMENT_QUARANTINE_OVERRIDE",
- 
+  MEDICAL_EQUIPMENT_QUARANTINE_OVERRIDE:
+    "MEDICAL_EQUIPMENT_QUARANTINE_OVERRIDE",
+
   // Category
   MEDICAL_EQUIPMENT_CATEGORY_VIEW: "MEDICAL_EQUIPMENT_CATEGORY_VIEW",
   MEDICAL_EQUIPMENT_CATEGORY_CREATE: "MEDICAL_EQUIPMENT_CATEGORY_CREATE",
   MEDICAL_EQUIPMENT_CATEGORY_UPDATE: "MEDICAL_EQUIPMENT_CATEGORY_UPDATE",
   MEDICAL_EQUIPMENT_CATEGORY_DELETE: "MEDICAL_EQUIPMENT_CATEGORY_DELETE",
+
+  // UPLOAD
+  UPLOAD_FILES: "UPLOAD_FILES",
+  VIEW_FILES: "VIEW_FILES",
+  VIEW_FILE_DETAIL: "VIEW_FILE_DETAIL",
+  DELETE_FILE: "DELETE_FILE",
 } as const;
 
-
-export type Permission =
-  (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

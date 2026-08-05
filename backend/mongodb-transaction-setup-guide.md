@@ -1,3 +1,14 @@
+<!-- #Ví dụ khi dùng policy trong tần middare
+router.get(
+  "/documents/:id",
+  authorizePermission("DOCUMENT_VIEW", {
+    enablePolicies: true,
+    resource: "DOCUMENT",
+    action: "VIEW",
+  }),
+  controller.getDocument
+); -->
+
 # MongoDB Transactions — Setup & Troubleshooting cho DocPapper (Windows local dev)
 
 ## 1. Transaction là gì

@@ -21,6 +21,7 @@ import rbacRoutes from "./routes/rbac/rbac.routes";
 import notificationRoutes from "./routes/notifications/notification.routes";
 import assetRoutes from "./routes/assets/asset.routes";
 import assetCategoryRoutes from "./routes/assets/assetCategory.routes";
+import medicalDeviceRoutes from "./routes/assets/medicalDevice.routes";
 
 import { performanceMiddleware } from "./middlewares/performance.middleware";
 import { errorHandler } from "./middlewares/error.middleware";
@@ -110,7 +111,8 @@ app.use("/api/workflows", workflowRoutes);
 app.use("/api/rbac", rbacRoutes)
 app.use("/api/notifications", notificationRoutes)
 app.use("/api/assets", assetRoutes)
-app.use("/api/asset-categories", assetCategoryRoutes)
+app.use("/api/assets/asset-categories", assetCategoryRoutes)
+app.use("/api/assets/medical-devices", medicalDeviceRoutes)
 
 /* ===============================
    ❌ GLOBAL ERROR HANDLER

@@ -2,12 +2,12 @@ openapi: 3.0.3
 info:
   title: Document Manager API
   description: |
-    API quản lý giấy tờ, tài sản CNTT
+    API quản lý giấy tờ (Document/Proposal/Report), tài sản CNTT (Asset),
     workflow duyệt nhiều bước, RBAC (Role/Permission/Policy), phòng ban,
     thông báo, import/export Excel và audit log.
 
-    **Xác thực:** Bearer JWT (access token, thời hạn ngắn)
-    
+    **Xác thực:** Bearer JWT (access token, thời hạn ngắn) — lấy qua
+    `POST /api/auths/login`, làm mới qua `POST /api/auths/refresh-token`.
   version: 1.0.0
   contact:
     name: Document Manager Backend Team
@@ -24,11 +24,11 @@ tags:
   - name: RBAC - Permissions
   - name: RBAC - Roles
   - name: RBAC - Policies
-    description: Attribute-Based Access Control (ABAC) — điều kiện động ngoài Role/Permission 
+    description: Attribute-Based Access Control (ABAC) — điều kiện động ngoài Role/Permission tĩnh
   - name: Departments
     description: Quản lý khoa/phòng ban
   - name: Documents
-    description: Giấy đề xuất và biên bản
+    description: Giấy đề xuất (PROPOSAL) và biên bản (REPORT)
   - name: Workflow
     description: Luồng duyệt nhiều bước cho Document
   - name: Assets
@@ -36,17 +36,23 @@ tags:
   - name: Asset Categories
   - name: Asset Assignment
     description: Cấp phát / luân chuyển / thu hồi tài sản
+  - name: Medical Device
+    description: >
+      Profile tuân thủ pháp lý cho thiết bị y tế — mở rộng đồng hành với
+      Asset (quan hệ 1-1, KHÔNG phải collection/API tách biệt). Mọi thao
+      tác vòng đời khác của thiết bị (CRUD, cấp phát, Excel, QR code...)
+      vẫn dùng API Assets sẵn có.
   - name: Dashboard
     description: Thống kê tổng hợp và KPI
   - name: Notifications
   - name: Excel
     description: Import/Export dữ liệu qua file Excel
   - name: Upload
-    description: Upload file 
+    description: Upload file đính kèm chung
   - name: User Audit
-    description: Nhật ký thao tác hệ thống 
+    description: Nhật ký thao tác hệ thống (audit trail)
   - name: Performance
-    description: Thống kê hiệu năng API 
+    description: Thống kê hiệu năng API (nội bộ)
 
 security:
   - bearerAuth: []
@@ -120,6 +126,7 @@ paths:
                 type: object
                 properties:
                   accessToken: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
 
@@ -127,6 +134,10 @@ paths:
     post:
       tags: [Auth]
       summary: Đăng xuất (thu hồi refresh token hiện tại)
+      description: >
+        ⚠️ Route này KHÔNG có `validateBody` (khác các route auth khác) —
+        `refreshToken` được service tự kiểm tra thủ công (không qua Zod),
+        vẫn trả 400 nếu thiếu nhưng không có DTO validate format.
       requestBody:
         required: true
         content:
@@ -140,6 +151,7 @@ paths:
               schema:
                 type: object
                 properties: { message: { type: string } }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   /api/auths/forgot-password:
@@ -1381,10 +1393,10 @@ paths:
         `GET /:id` "nuốt" mất (hiểu `id="export"`), route export sẽ không
         bao giờ được gọi tới mà không báo lỗi gì. Đã xác nhận thứ tự đăng
         ký trong route file là đúng (source tự ghi chú lại lỗi này đã từng
-        xảy ra ở bản đầu tiên). Permission `ASSET_EXCEL_EXPORT` cũng chưa
-        thấy trong `permission.constant.ts` ở các lần review trước — có thể
-        gặp cùng lỗi permission-string-mismatch như `ASSET_EXCEL_IMPORT`/
-        `ASSET_INVENTORY_CHECK`.
+        xảy ra ở bản đầu tiên). ĐÃ XÁC NHẬN LẠI: permission
+        `ASSET_EXCEL_EXPORT` có trong `permission.constant.ts` (verify từ
+        source cập nhật) — không còn nghi vấn mismatch như ghi chú review
+        trước đây.
       parameters:
         - name: department
           in: query
@@ -1521,12 +1533,6 @@ paths:
     get:
       tags: [Assets]
       summary: Tải file Excel mẫu để import tài sản hàng loạt (permission ASSET_EXCEL_IMPORT)
-      description: >
-        ⚠️ GHI CHÚ TỪ REVIEW: permission `ASSET_EXCEL_IMPORT` không có trong
-        `permission.constant.ts` (chỉ thấy trong lần review trước) — nếu
-        chưa được bổ sung, đây là cùng dạng lỗi permission-string-mismatch
-        đã phát hiện ở các module khác (không role nào ngoài ADMIN gán được
-        quyền này qua seed data mặc định).
       responses:
         "200":
           description: File Excel mẫu (.xlsx)
@@ -1746,8 +1752,105 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  # ================= MEDICAL DEVICE =================
+  # ⚠️ GHI CHÚ: route file gốc (`medicalDevice.routes.ts`) chỉ định nghĩa
+  # path tương đối "/:assetId/profile" — file `app.ts` (nơi mount prefix)
+  # KHÔNG có trong lần cung cấp source này. Prefix `/api/medical-devices`
+  # dưới đây là GIẢ ĐỊNH theo đúng quy ước đặt tên đang dùng trong dự án
+  # (số nhiều, kebab-case — như `/api/asset-categories`). Vui lòng xác nhận
+  # lại đúng prefix thật trong `app.ts` (dòng `app.use("/api/...", ...)`)
+  # và báo lại nếu khác, để cập nhật chính xác.
+  /api/assets/medical-devices/{assetId}/profile:
+    post:
+      tags: [Medical Device]
+      summary: Gắn profile thiết bị y tế cho 1 Asset đã tồn tại (permission MEDICAL_DEVICE_CREATE)
+      description: >
+        Yêu cầu Asset phải tồn tại và đang active, và CHƯA có profile nào
+        khác gắn vào (unique 1-1) — nếu đã có, dùng PUT để cập nhật thay vì
+        gọi lại POST.
+      parameters:
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateMedicalDeviceProfileRequest" }
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/MedicalDeviceProfile" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    get:
+      tags: [Medical Device]
+      summary: Xem profile thiết bị y tế theo Asset (permission MEDICAL_DEVICE_VIEW)
+      parameters:
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/MedicalDeviceProfile" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: Asset không tồn tại, hoặc Asset chưa có profile thiết bị y tế nào (dùng POST để tạo trước)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    put:
+      tags: [Medical Device]
+      summary: Cập nhật profile thiết bị y tế (permission MEDICAL_DEVICE_UPDATE)
+      description: >
+        Whitelist field ở tầng service — chỉ deviceClass/registrationNumber/
+        licenseExpiredAt/requiresCalibration/calibrationIntervalMonths/
+        operatorCertificateRequired thực sự có tác dụng.
+      parameters:
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateMedicalDeviceProfileRequest" }
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/MedicalDeviceProfile" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   # ================= ASSET CATEGORIES =================
-  /api/asset-categories:
+  /api/assets/asset-categories:
     post:
       tags: [Asset Categories]
       summary: Tạo danh mục tài sản (permission ASSET_CATEGORY_CREATE)
@@ -1795,7 +1898,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
-  /api/asset-categories/{id}:
+  /api/assets/asset-categories/{id}:
     get:
       tags: [Asset Categories]
       summary: Chi tiết danh mục tài sản (permission ASSET_CATEGORY_VIEW)
@@ -2361,17 +2464,26 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   # ================= UPLOAD =================
+  # ⚠️ GHI CHÚ: đã có source route thật (upload.routes.ts). Đã cập nhật
+  # đúng authenticate + authorizePermission theo code thật — KHÔNG còn là
+  # đề xuất. NHƯNG: 4 permission string dùng ở đây (UPLOAD_FILES/
+  # VIEW_FILES/VIEW_FILE_DETAIL/DELETE_FILE) KHÔNG có trong
+  # `permission.constant.ts` (bản mới nhất đã đọc, từ file cập nhật RBAC
+  # medical device) — cùng lỗi permission-string-mismatch đã phát hiện ở
+  # Document/User/Policy/Dashboard (báo cáo review mục 10.5/13.3). Nếu
+  # PERMISSIONS chưa được bổ sung 4 giá trị này, route KHÔNG role nào
+  # (ngoài ADMIN bypass) gán được quyền qua seed mặc định.
   /api/upload:
     post:
       tags: [Upload]
-      summary: Upload file đính kèm chung
+      summary: Upload file đính kèm chung (permission UPLOAD_FILES)
       description: >
-        ⚠️ CẢNH BÁO BẢO MẬT NGHIÊM TRỌNG (từ review): route này trong code
-        hiện tại KHÔNG có `authenticate` — bất kỳ ai (kể cả chưa đăng nhập)
-        cũng upload/xem/xoá được file. Không giới hạn mime-type mặc định.
-        Khuyến nghị: thêm `authenticate` + `authorizePermission` +
-        whitelist `allowedTypes` trước khi lên production — xem báo cáo
-        review bảo mật mục 10.1/13.2.
+        Đã có `authenticate` + `authorizePermission("UPLOAD_FILES")` —
+        khắc phục lỗ hổng public trước đây (mục 10.1/13.2 báo cáo review).
+        ⚠️ Permission `UPLOAD_FILES` chưa thấy trong `permission.constant.ts`
+        — xem ghi chú đầu mục Upload. `createUploader()` vẫn gọi KHÔNG
+        tham số (không whitelist `allowedTypes`) — vẫn nhận mọi mime-type,
+        khuyến nghị cũ ở mục 13.2 về việc này vẫn còn nguyên giá trị.
       requestBody:
         required: true
         content:
@@ -2394,6 +2506,9 @@ paths:
                   data:
                     type: array
                     items: { $ref: "#/components/schemas/UploadFile" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "500":
           description: Lỗi upload (module này chưa dùng ApiError chuẩn hoá)
           content:
@@ -2403,8 +2518,11 @@ paths:
                 properties: { message: { type: string } }
     get:
       tags: [Upload]
-      summary: Danh sách file đã upload (chưa xoá)
-      description: "⚠️ Hiện KHÔNG yêu cầu đăng nhập — xem cảnh báo ở POST /api/upload."
+      summary: Danh sách file đã upload, chưa xoá (permission VIEW_FILES)
+      description: >
+        Đã có `authenticate` + `authorizePermission("VIEW_FILES")`. ⚠️
+        Permission `VIEW_FILES` chưa thấy trong `permission.constant.ts` —
+        xem ghi chú đầu mục Upload.
       responses:
         "200":
           description: OK
@@ -2413,12 +2531,17 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/UploadFile" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /api/upload/{id}:
     get:
       tags: [Upload]
-      summary: Chi tiết 1 file đã upload
-      description: "⚠️ Hiện KHÔNG yêu cầu đăng nhập — xem cảnh báo ở POST /api/upload."
+      summary: Chi tiết 1 file đã upload (permission VIEW_FILE_DETAIL)
+      description: >
+        Đã có `authenticate` + `authorizePermission("VIEW_FILE_DETAIL")`.
+        ⚠️ Permission `VIEW_FILE_DETAIL` chưa thấy trong
+        `permission.constant.ts` — xem ghi chú đầu mục Upload.
       parameters: [{ $ref: "#/components/parameters/IdParam" }]
       responses:
         "200":
@@ -2426,6 +2549,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/UploadFile" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404":
           description: Không tìm thấy file
           content:
@@ -2435,8 +2560,15 @@ paths:
                 properties: { message: { type: string } }
     delete:
       tags: [Upload]
-      summary: Xoá mềm 1 file đã upload
-      description: "⚠️ Hiện KHÔNG yêu cầu đăng nhập — bất kỳ ai cũng xoá được file của người khác."
+      summary: Xoá mềm 1 file đã upload (permission DELETE_FILE)
+      description: >
+        Đã có `authenticate` + `authorizePermission("DELETE_FILE")`. ⚠️
+        Permission `DELETE_FILE` chưa thấy trong `permission.constant.ts` —
+        xem ghi chú đầu mục Upload. Khuyến nghị cũ (mục 13.2) vẫn còn giá
+        trị: nên giới hạn thêm ở tầng service — chỉ chính người đã upload
+        file đó hoặc ADMIN mới xoá được (chống IDOR) — chưa xác nhận được
+        đã áp dụng hay chưa vì chỉ có route file, chưa có
+        `upload.controller.ts`/`upload.service.ts` mới.
       parameters: [{ $ref: "#/components/parameters/IdParam" }]
       responses:
         "200":
@@ -2446,6 +2578,8 @@ paths:
               schema:
                 type: object
                 properties: { message: { type: string } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404":
           description: Không tìm thấy file
           content:
@@ -3298,6 +3432,72 @@ components:
       properties:
         toDepartment: { $ref: "#/components/schemas/ObjectIdRef" }
         reason: { type: string }
+
+    MedicalDeviceClass:
+      type: string
+      enum: [A, B, C, D]
+      description: >
+        Phân loại rủi ro thiết bị y tế (A: thấp → D: cao). ⚠️ Số hiệu văn
+        bản pháp lý làm căn cứ phân loại lấy từ kiến thức chung của hệ
+        thống, CHƯA được xác minh lại — cần bộ phận vật tư y tế/pháp lý xác
+        nhận trước khi dùng làm căn cứ tuân thủ thật.
+
+    MedicalDeviceProfile:
+      type: object
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        asset:
+          description: Quan hệ 1-1 với Asset — unique index trên field này.
+          oneOf:
+            - $ref: "#/components/schemas/ObjectIdRef"
+            - $ref: "#/components/schemas/Asset"
+        deviceClass: { $ref: "#/components/schemas/MedicalDeviceClass" }
+        registrationNumber: { type: string, nullable: true, description: Số đăng ký lưu hành do Bộ Y tế cấp }
+        licenseExpiredAt: { type: string, format: date-time, nullable: true }
+        requiresCalibration: { type: boolean, default: false }
+        calibrationIntervalMonths: { type: integer, nullable: true, minimum: 1 }
+        lastCalibrationDate: { type: string, format: date-time, nullable: true }
+        nextCalibrationDueDate: { type: string, format: date-time, nullable: true }
+        calibrationAlertSentAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Chỉ server set (chống gửi trùng cảnh báo kiểm định) — không expose qua request body.
+        operatorCertificateRequired: { type: boolean, default: false }
+        createdBy: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        updatedBy: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateMedicalDeviceProfileRequest:
+      type: object
+      required: [deviceClass]
+      description: >
+        Nếu `requiresCalibration = true` thì `calibrationIntervalMonths`
+        bắt buộc (validate ở service, không phải Zod — ràng buộc phụ thuộc
+        giá trị field khác).
+      properties:
+        deviceClass: { $ref: "#/components/schemas/MedicalDeviceClass" }
+        registrationNumber: { type: string }
+        licenseExpiredAt: { type: string, format: date }
+        requiresCalibration: { type: boolean, default: false }
+        calibrationIntervalMonths: { type: integer, minimum: 1 }
+        operatorCertificateRequired: { type: boolean, default: false }
+
+    UpdateMedicalDeviceProfileRequest:
+      type: object
+      description: >
+        Không có `lastCalibrationDate`/`nextCalibrationDueDate`/
+        `calibrationAlertSentAt` — các field này chỉ đổi qua hành động
+        "ghi nhận kiểm định mới" (chưa thấy endpoint trong lần cung cấp
+        source này, có thể thuộc giai đoạn phát triển tiếp theo).
+      properties:
+        deviceClass: { $ref: "#/components/schemas/MedicalDeviceClass" }
+        registrationNumber: { type: string }
+        licenseExpiredAt: { type: string, format: date }
+        requiresCalibration: { type: boolean }
+        calibrationIntervalMonths: { type: integer, minimum: 1 }
+        operatorCertificateRequired: { type: boolean }
 
     AssetAssignmentHistory:
       type: object
