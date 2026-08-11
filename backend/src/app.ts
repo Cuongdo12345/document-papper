@@ -19,9 +19,9 @@ import uploadRoutes from "./routes/upload/upload.routes";
 import workflowRoutes from "./routes/documents/workflow.routes";
 import rbacRoutes from "./routes/rbac/rbac.routes";
 import notificationRoutes from "./routes/notifications/notification.routes";
-import assetRoutes from "./routes/assets/asset.routes";
 import assetCategoryRoutes from "./routes/assets/assetCategory.routes";
 import medicalDeviceRoutes from "./routes/assets/medicalDevice.routes";
+import assetRoutes from "./routes/assets/asset.routes";
 
 import { performanceMiddleware } from "./middlewares/performance.middleware";
 import { errorHandler } from "./middlewares/error.middleware";
@@ -110,9 +110,9 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/workflows", workflowRoutes);
 app.use("/api/rbac", rbacRoutes)
 app.use("/api/notifications", notificationRoutes)
-app.use("/api/assets", assetRoutes)
 app.use("/api/assets/asset-categories", assetCategoryRoutes)
 app.use("/api/assets/medical-devices", medicalDeviceRoutes)
+app.use("/api/assets", assetRoutes)
 
 /* ===============================
    ❌ GLOBAL ERROR HANDLER

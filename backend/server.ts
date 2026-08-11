@@ -7,8 +7,7 @@ import { connectDB } from "./src/config/database/database";
 import { registerMongoEvents } from "./src/config/database/database.events";
 import { registerMongoShutdown } from "./src/config/database/database.shutdown";
 import { registerCronJobs } from "./src/shared/cron/assetAlerts.cron";
-// import { setupSwagger } from "./src/config/swagger";
-// import { errorHandler } from "./src/shared/errors/errorHandler";
+
 
 // ==============================
 // Validate ENV
@@ -39,15 +38,12 @@ const startServer = async () => {
     // DB kết nối xong vì cron job cần query được DB ngay khi tới lịch chạy.
     registerCronJobs();
 
-    // 2️⃣ Swagger
-    // setupSwagger(app);
-
     // 4️⃣ Create HTTP server
     const server = http.createServer(app);
 
     server.listen(PORT, () => {
       console.log(`🚀 Server running at http://localhost:${PORT}`);
-      // console.log(`📘 Swagger docs at http://localhost:${PORT}/api-docs`);
+      console.log(`📘 Swagger docs at http://localhost:${PORT}/api-docs`);
     });
 
     // ==============================
