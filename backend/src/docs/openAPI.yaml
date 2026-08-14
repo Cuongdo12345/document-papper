@@ -2,7 +2,9 @@ openapi: 3.0.3
 info:
   title: Document Manager API
   description: |
-    API quản lý giấy tờ , tài sản CNTT
+    API quản lý giấy tờ (Document/Proposal/Report), tài sản CNTT (Asset),
+    workflow duyệt nhiều bước, RBAC (Role/Permission/Policy), phòng ban,
+    thông báo, import/export Excel và audit log.
 
     **Xác thực:** Bearer JWT (access token, thời hạn ngắn) — lấy qua
     `POST /api/auths/login`, làm mới qua `POST /api/auths/refresh-token`.
@@ -950,7 +952,7 @@ paths:
           schema: { type: string, enum: [PROPOSAL, REPORT] }
         - name: subType
           in: query
-          schema: { type: string }
+          schema: { type: string, enum: [PROPOSE_REPAIR, PROPOSE_INK, PROPOSE_PROCUREMENT, CHECK_DAMAGE, CONFIRM_STATUS] }
         - name: department
           in: query
           schema: { $ref: "#/components/schemas/ObjectIdRef" }
@@ -1130,7 +1132,7 @@ paths:
   /api/workflows/templates:
     post:
       tags: [Workflow]
-      summary: Tạo workflow template
+      summary: Tạo workflow template (permission WORKFLOW_TEMPLATE_CREATE)
       description: >
         ⚠️ GHI CHÚ TỪ REVIEW BẢO MẬT: toàn bộ nhóm route `/api/workflows/*`
         hiện chỉ yêu cầu `authenticate`, CHƯA gắn `authorizePermission` —
@@ -1157,7 +1159,7 @@ paths:
   /api/workflows/submit:
     post:
       tags: [Workflow]
-      summary: Gắn 1 Document vào workflow template để bắt đầu luồng duyệt
+      summary: Gắn 1 Document vào workflow template để bắt đầu luồng duyệt (permission WORKFLOW_SUBMIT)
       requestBody:
         required: true
         content:
@@ -1181,7 +1183,7 @@ paths:
   /api/workflows/pending:
     get:
       tags: [Workflow]
-      summary: Danh sách workflow đang chờ duyệt cho role của user hiện tại
+      summary: Danh sách workflow đang chờ duyệt cho role của user hiện tại (permission WORKFLOW_VIEW)
       parameters:
         - $ref: "#/components/parameters/PageParam"
         - name: limit
@@ -1206,7 +1208,7 @@ paths:
   /api/workflows/document/{documentId}:
     get:
       tags: [Workflow]
-      summary: Lấy workflow instance theo Document
+      summary: Lấy workflow instance theo Document (permission WORKFLOW_VIEW)
       parameters:
         - name: documentId
           in: path
@@ -1229,7 +1231,7 @@ paths:
   /api/workflows/{id}:
     get:
       tags: [Workflow]
-      summary: Chi tiết workflow instance
+      summary: Chi tiết workflow instance (permission WORKFLOW_VIEW)
       parameters: [{ $ref: "#/components/parameters/IdParam" }]
       responses:
         "200":
@@ -1248,7 +1250,7 @@ paths:
   /api/workflows/{id}/approve:
     post:
       tags: [Workflow]
-      summary: Duyệt bước hiện tại (role người gọi phải khớp step.role)
+      summary: Duyệt bước hiện tại (permission WORKFLOW_APPROVE; role người gọi phải khớp step.role)
       parameters: [{ $ref: "#/components/parameters/IdParam" }]
       requestBody:
         content:
@@ -1273,7 +1275,7 @@ paths:
   /api/workflows/{id}/reject:
     post:
       tags: [Workflow]
-      summary: Từ chối bước hiện tại (role người gọi phải khớp step.role)
+      summary: Từ chối bước hiện tại (permission WORKFLOW_REJECT; role người gọi phải khớp step.role)
       parameters: [{ $ref: "#/components/parameters/IdParam" }]
       requestBody:
         content:
@@ -1298,7 +1300,7 @@ paths:
   /api/workflows/{id}/cancel:
     post:
       tags: [Workflow]
-      summary: Huỷ workflow (chỉ người tạo Document, trước khi có bước nào được duyệt)
+      summary: Huỷ workflow (permission WORKFLOW_CANCEL; chỉ người tạo Document, trước khi có bước nào được duyệt)
       parameters: [{ $ref: "#/components/parameters/IdParam" }]
       requestBody:
         content:
@@ -1847,6 +1849,92 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  # ---- GIAI ĐOẠN 2 — Ghi nhận kiểm định (Calibration Record) ----
+  /api/assets/medical-devices/{assetId}/calibration-records:
+    post:
+      tags: [Medical Device]
+      summary: >-
+        Ghi nhận 1 lần kiểm định mới (permission MEDICAL_DEVICE_CALIBRATE)
+      description: >
+        Permission RIÊNG biệt với MEDICAL_DEVICE_UPDATE (PUT /profile) — đây
+        là hành động nghiệp vụ có tính pháp lý (bằng chứng thanh tra), không
+        phải chỉnh sửa thông tin thông thường. Asset phải đang active và đã
+        có Medical Device Profile từ trước (dùng POST .../profile để tạo
+        nếu chưa có). Tự động cập nhật `lastCalibrationDate` /
+        `nextCalibrationDueDate` trên profile và reset
+        `calibrationAlertSentAt` (cho phép cron gửi cảnh báo mới khi tới hạn
+        kế tiếp).
+      parameters:
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateCalibrationRecordRequest" }
+      responses:
+        "201":
+          description: Ghi nhận thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/CalibrationRecord" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: Asset không tồn tại/không active, hoặc chưa có Medical Device Profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: >-
+            calibratedAt không mới hơn lần kiểm định gần nhất đã ghi nhận
+            cho thiết bị này
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    get:
+      tags: [Medical Device]
+      summary: Lịch sử kiểm định theo thiết bị (permission MEDICAL_DEVICE_VIEW)
+      description: Có phân trang, sắp xếp mới nhất trước theo `calibratedAt`.
+      parameters:
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/CalibrationRecord" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: Asset không tồn tại, hoặc chưa có Medical Device Profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
   # ================= ASSET CATEGORIES =================
   /api/assets/asset-categories:
     post:
@@ -1953,7 +2041,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /api/asset-categories/{id}/permanent:
+  /api/assets/asset-categories/{id}/permanent:
     delete:
       tags: [Asset Categories]
       summary: Xoá vĩnh viễn danh mục tài sản (permission ASSET_CATEGORY_DELETE_PERMANENT)
@@ -1970,7 +2058,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /api/asset-categories/{id}/restore:
+  /api/assets/asset-categories/{id}/restore:
     patch:
       tags: [Asset Categories]
       summary: Khôi phục danh mục đã soft-delete (permission ASSET_CATEGORY_UPDATE)
@@ -2326,7 +2414,7 @@ paths:
   /api/export/export-documents-excel:
     get:
       tags: [Excel]
-      summary: Export danh sách Document ra file Excel (streaming)
+      summary: Export danh sách Document ra file Excel (streaming) (permission DOCUMENT_EXCEL_EXPORT)
       description: >
         User không phải ADMIN bị ép cứng filter theo `department` của chính
         mình (không đổi được qua query string).
@@ -2340,7 +2428,7 @@ paths:
           schema: { type: string, enum: [PROPOSAL, REPORT] }
         - name: subType
           in: query
-          schema: { type: string }
+          schema: { type: string, enum: [PROPOSE_REPAIR, PROPOSE_INK, PROPOSE_PROCUREMENT, CHECK_DAMAGE, CONFIRM_STATUS] }
         - name: fromDate
           in: query
           schema: { type: string, format: date }
@@ -2359,7 +2447,7 @@ paths:
   /api/export/template:
     get:
       tags: [Excel]
-      summary: Tải file Excel mẫu để import Document
+      summary: Tải file Excel mẫu để import Document (permission DOCUMENT_EXCEL_TEMPLATE)
       responses:
         "200":
           description: File Excel mẫu (.xlsx)
@@ -2371,7 +2459,7 @@ paths:
   /api/export/import-proposal:
     post:
       tags: [Excel]
-      summary: Import Document (Proposal) hàng loạt từ file Excel
+      summary: Import Document (Proposal) hàng loạt từ file Excel (permission DOCUMENT_EXCEL_IMPORT)
       description: >
         ⚠️ GHI CHÚ TỪ REVIEW BẢO MẬT: chỉ yêu cầu `authenticate`, KHÔNG có
         `authorizePermission` — mọi user đăng nhập đều import được.
@@ -2409,7 +2497,7 @@ paths:
   /api/export/departments/sync-from-excel:
     post:
       tags: [Excel]
-      summary: Đồng bộ/tạo mới Department hàng loạt từ file Excel
+      summary: Đồng bộ/tạo mới Department hàng loạt từ file Excel (permission EXCEL_DEPARTMENT_SYNC)
       description: >
         ⚠️ GHI CHÚ TỪ REVIEW BẢO MẬT: chỉ yêu cầu `authenticate`, KHÔNG có
         `authorizePermission` — mọi user đăng nhập đều thao tác được.
@@ -2439,7 +2527,7 @@ paths:
   /api/export/import-history:
     get:
       tags: [Excel]
-      summary: Lịch sử import Excel (ADMIN xem tất cả; user thường chỉ xem của mình)
+      summary: Lịch sử import Excel (permission DOCUMENT_EXCEL_HISTORY; ADMIN xem tất cả, user thường chỉ xem của mình)
       parameters:
         - $ref: "#/components/parameters/PageParam"
         - $ref: "#/components/parameters/LimitParam"
@@ -2728,7 +2816,7 @@ paths:
   /api/workflows/{id}/complete:
     post:
       tags: [Workflow]
-      summary: Đánh dấu workflow đã hoàn tất công việc thực tế (chỉ người tạo Document)
+      summary: Đánh dấu workflow đã hoàn tất công việc thực tế (permission WORKFLOW_COMPLETE; chỉ người tạo Document)
       description: >
         KHÁC với "approved": "approved" nghĩa là ĐÃ ĐƯỢC CHO PHÉP thực hiện,
         chưa chắc việc đã làm xong ngoài thực tế (vd chưa mua/nhận hàng).
@@ -3127,6 +3215,7 @@ components:
         category: { type: string, enum: [PROPOSAL, REPORT] }
         subType:
           type: string
+          enum: [PROPOSE_REPAIR, PROPOSE_INK, PROPOSE_PROCUREMENT, CHECK_DAMAGE, CONFIRM_STATUS]
           example: "PROPOSE_INK"
           description: >
             Tuỳ theo `category`: PROPOSAL có PROPOSE_INK/PROPOSE_REPAIR...;
@@ -3168,7 +3257,7 @@ components:
       required: [category, subType, title, department]
       properties:
         category: { type: string, enum: [PROPOSAL, REPORT] }
-        subType: { type: string }
+        subType: { type: string, enum: [PROPOSE_REPAIR, PROPOSE_INK, PROPOSE_PROCUREMENT, CHECK_DAMAGE, CONFIRM_STATUS] }
         title: { type: string, minLength: 1 }
         department: { $ref: "#/components/schemas/ObjectIdRef" }
         referenceTo:
@@ -3197,7 +3286,7 @@ components:
         month: { type: integer, minimum: 1, maximum: 12 }
         year: { type: integer }
         category: { type: string, enum: [PROPOSAL, REPORT] }
-        subType: { type: string }
+        subType: { type: string, enum: [PROPOSE_REPAIR, PROPOSE_INK, PROPOSE_PROCUREMENT, CHECK_DAMAGE, CONFIRM_STATUS] }
         department: { $ref: "#/components/schemas/ObjectIdRef" }
 
     # ============================================================
@@ -3486,9 +3575,9 @@ components:
       type: object
       description: >
         Không có `lastCalibrationDate`/`nextCalibrationDueDate`/
-        `calibrationAlertSentAt` — các field này chỉ đổi qua hành động
-        "ghi nhận kiểm định mới" (chưa thấy endpoint trong lần cung cấp
-        source này, có thể thuộc giai đoạn phát triển tiếp theo).
+        `calibrationAlertSentAt` — các field này CHỈ đổi qua hành động
+        "ghi nhận kiểm định mới" (`POST /{assetId}/calibration-records`,
+        xem bên dưới), không cho client tự PATCH thẳng qua route này.
       properties:
         deviceClass: { $ref: "#/components/schemas/MedicalDeviceClass" }
         registrationNumber: { type: string }
@@ -3496,6 +3585,53 @@ components:
         requiresCalibration: { type: boolean }
         calibrationIntervalMonths: { type: integer, minimum: 1 }
         operatorCertificateRequired: { type: boolean }
+
+    CalibrationResult:
+      type: string
+      enum: [PASS, FAIL, CONDITIONAL_PASS]
+
+    CalibrationRecord:
+      type: object
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        deviceProfile: { $ref: "#/components/schemas/ObjectIdRef" }
+        calibratedAt: { type: string, format: date-time }
+        calibratedBy:
+          type: string
+          description: Tên đơn vị kiểm định bên ngoài hệ thống (không phải tài khoản User).
+        result: { $ref: "#/components/schemas/CalibrationResult" }
+        certificateFileUrl: { type: string, nullable: true, description: Link file giấy chứng nhận kiểm định (PDF scan). }
+        nextDueDate: { type: string, format: date-time }
+        recordedBy:
+          description: User hệ thống đã nhập bản ghi này (khác calibratedBy).
+          oneOf:
+            - $ref: "#/components/schemas/ObjectIdRef"
+            - type: object
+              properties:
+                _id: { $ref: "#/components/schemas/ObjectIdRef" }
+                username: { type: string }
+                fullName: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateCalibrationRecordRequest:
+      type: object
+      required: [calibratedAt, calibratedBy, result, nextDueDate]
+      description: >
+        `nextDueDate` bắt buộc nhập tay (không tự suy ra từ
+        calibrationIntervalMonths — kết quả FAIL/CONDITIONAL_PASS có thể rút
+        ngắn hạn kiểm định kế tiếp) và phải SAU `calibratedAt`.
+        `calibratedAt` cũng phải mới hơn lần kiểm định gần nhất đã ghi nhận
+        cho thiết bị này (409 nếu không thoả).
+      properties:
+        calibratedAt: { type: string, format: date-time }
+        calibratedBy:
+          type: string
+          minLength: 1
+          description: Tên đơn vị kiểm định bên ngoài hệ thống.
+        result: { $ref: "#/components/schemas/CalibrationResult" }
+        certificateFileUrl: { type: string }
+        nextDueDate: { type: string, format: date-time }
 
     AssetAssignmentHistory:
       type: object
