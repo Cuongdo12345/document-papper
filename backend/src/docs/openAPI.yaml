@@ -2,9 +2,7 @@ openapi: 3.0.3
 info:
   title: Document Manager API
   description: |
-    API quản lý giấy tờ (Document/Proposal/Report), tài sản CNTT (Asset),
-    workflow duyệt nhiều bước, RBAC (Role/Permission/Policy), phòng ban,
-    thông báo, import/export Excel và audit log.
+    API quản lý giấy tờ , tài sản CNTT
 
     **Xác thực:** Bearer JWT (access token, thời hạn ngắn) — lấy qua
     `POST /api/auths/login`, làm mới qua `POST /api/auths/refresh-token`.

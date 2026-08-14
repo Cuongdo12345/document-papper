@@ -70,10 +70,20 @@ export const createMedicalDeviceProfileService = async (
 
 /**
  * 📌 GET — xem profile theo assetId.
+ *
+ * ⚠️ SỬA (theo yêu cầu đồng bộ khi review lại Giai đoạn 2): trước đây hàm
+ * này KHÔNG kiểm tra `Asset.isActive` — khác với `createMedicalDeviceProfileService`
+ * (có check). Nay đồng bộ: Asset đã bị vô hiệu hoá/xoá mềm thì coi như
+ * không xem được profile qua đây nữa.
  */
 export const getMedicalDeviceProfileService = async (assetId: any) => {
   if (!mongoose.Types.ObjectId.isValid(assetId)) {
     throw ApiError.badRequest("ID tài sản không hợp lệ");
+  }
+
+  const asset = await Asset.findOne({ _id: assetId, isActive: true });
+  if (!asset) {
+    throw ApiError.notFound("Không tìm thấy tài sản");
   }
 
   const profile = await MedicalDeviceProfile.findOne({
@@ -93,6 +103,9 @@ export const getMedicalDeviceProfileService = async (assetId: any) => {
  * 📌 UPDATE — chỉ nhận field trong whitelist (xem giải thích ở
  * `assets.constants.ts`). Không cho sửa `nextCalibrationDueDate` và các
  * field liên quan lịch kiểm định qua đây.
+ *
+ * ⚠️ SỬA (theo yêu cầu đồng bộ khi review lại Giai đoạn 2): bổ sung check
+ * `Asset.isActive`, cùng lý do đã sửa ở `getMedicalDeviceProfileService`.
  */
 export const updateMedicalDeviceProfileService = async (
   assetId: any,
@@ -101,6 +114,11 @@ export const updateMedicalDeviceProfileService = async (
 ) => {
   if (!mongoose.Types.ObjectId.isValid(assetId)) {
     throw ApiError.badRequest("ID tài sản không hợp lệ");
+  }
+
+  const asset = await Asset.findOne({ _id: assetId, isActive: true });
+  if (!asset) {
+    throw ApiError.notFound("Không tìm thấy tài sản");
   }
 
   const safePayload = pickWhitelisted(
