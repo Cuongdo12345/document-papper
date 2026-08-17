@@ -45,17 +45,6 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     // ASSET_CATEGORY_DELETE_PERMANENT cũng CỐ TÌNH KHÔNG gán ở đây, cùng lý
     // do với ASSET_DELETE_PERMANENT ở trên.
     
-    PERMISSIONS.MEDICAL_EQUIPMENT_VIEW,
-    PERMISSIONS.MEDICAL_EQUIPMENT_VIEW_DETAIL,
-    PERMISSIONS.MEDICAL_EQUIPMENT_CREATE,
-    PERMISSIONS.MEDICAL_EQUIPMENT_UPDATE,
-    PERMISSIONS.MEDICAL_EQUIPMENT_DELETE,
-    PERMISSIONS.MEDICAL_EQUIPMENT_RELOCATE,
-    PERMISSIONS.MEDICAL_EQUIPMENT_CALIBRATE,
-    PERMISSIONS.MEDICAL_EQUIPMENT_CATEGORY_VIEW,
-    PERMISSIONS.MEDICAL_EQUIPMENT_CATEGORY_CREATE,
-    PERMISSIONS.MEDICAL_EQUIPMENT_CATEGORY_UPDATE,
-    PERMISSIONS.MEDICAL_EQUIPMENT_CATEGORY_DELETE,
 
     // Medical Device — module THẬT đang chạy (khác Equipment ở trên, xem
     // cảnh báo chi tiết ở permission.constant.ts). IT là bộ phận quản lý
@@ -120,10 +109,6 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     // hiện (không chỉ IT), vì nhân viên khoa/phòng mới là người trực tiếp
     // cầm máy quét kiểm kê thiết bị của khoa mình.
     PERMISSIONS.ASSET_INVENTORY_CHECK,
-
-    PERMISSIONS.MEDICAL_EQUIPMENT_VIEW,
-    PERMISSIONS.MEDICAL_EQUIPMENT_VIEW_DETAIL,
-    PERMISSIONS.MEDICAL_EQUIPMENT_CATEGORY_VIEW,
 
     // Medical Device: user thường chỉ xem hồ sơ tuân thủ (vd: xem thiết bị
     // mình đang vận hành có cần chứng chỉ vận hành riêng không).

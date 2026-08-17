@@ -245,7 +245,12 @@ paths:
         - $ref: "#/components/parameters/KeywordParam"
         - name: sortBy
           in: query
-          schema: { type: string, enum: [createdAt, updatedAt, username, fullName], default: createdAt }
+          schema:
+            {
+              type: string,
+              enum: [createdAt, updatedAt, username, fullName],
+              default: createdAt,
+            }
         - $ref: "#/components/parameters/OrderParam"
         - name: fromDate
           in: query
@@ -463,7 +468,12 @@ paths:
         - $ref: "#/components/parameters/OrderParam"
         - name: sortBy
           in: query
-          schema: { type: string, enum: [createdAt, name, resource, action], default: createdAt }
+          schema:
+            {
+              type: string,
+              enum: [createdAt, name, resource, action],
+              default: createdAt,
+            }
         - $ref: "#/components/parameters/KeywordParam"
         - name: resource
           in: query
@@ -709,7 +719,12 @@ paths:
         - $ref: "#/components/parameters/OrderParam"
         - name: sortBy
           in: query
-          schema: { type: string, enum: [createdAt, name, resource, action], default: createdAt }
+          schema:
+            {
+              type: string,
+              enum: [createdAt, name, resource, action],
+              default: createdAt,
+            }
         - $ref: "#/components/parameters/KeywordParam"
         - name: resource
           in: query
@@ -941,7 +956,20 @@ paths:
         - $ref: "#/components/parameters/LimitParam"
         - name: sortBy
           in: query
-          schema: { type: string, enum: [createdAt, updatedAt, title, documentCode, serviceDate, actualCost], default: createdAt }
+          schema:
+            {
+              type: string,
+              enum:
+                [
+                  createdAt,
+                  updatedAt,
+                  title,
+                  documentCode,
+                  serviceDate,
+                  actualCost,
+                ],
+              default: createdAt,
+            }
         - $ref: "#/components/parameters/OrderParam"
         - $ref: "#/components/parameters/KeywordParam"
         - name: isActive
@@ -952,7 +980,18 @@ paths:
           schema: { type: string, enum: [PROPOSAL, REPORT] }
         - name: subType
           in: query
-          schema: { type: string, enum: [PROPOSE_REPAIR, PROPOSE_INK, PROPOSE_PROCUREMENT, CHECK_DAMAGE, CONFIRM_STATUS] }
+          schema:
+            {
+              type: string,
+              enum:
+                [
+                  PROPOSE_REPAIR,
+                  PROPOSE_INK,
+                  PROPOSE_PROCUREMENT,
+                  CHECK_DAMAGE,
+                  CONFIRM_STATUS,
+                ],
+            }
         - name: department
           in: query
           schema: { $ref: "#/components/schemas/ObjectIdRef" }
@@ -964,7 +1003,11 @@ paths:
           schema: { $ref: "#/components/schemas/ObjectIdRef" }
         - name: workflowStatus
           in: query
-          schema: { type: string, enum: [pending, approved, rejected, cancelled, completed] }
+          schema:
+            {
+              type: string,
+              enum: [pending, approved, rejected, cancelled, completed],
+            }
         - name: fromDate
           in: query
           schema: { type: string, format: date }
@@ -1105,7 +1148,7 @@ paths:
         - name: proposalId
           in: path
           required: true
-          schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
       responses:
         "200":
           description: OK
@@ -1141,7 +1184,8 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/CreateWorkflowTemplateRequest" }
+            schema:
+              { $ref: "#/components/schemas/CreateWorkflowTemplateRequest" }
       responses:
         "201":
           description: Tạo thành công
@@ -1213,7 +1257,7 @@ paths:
         - name: documentId
           in: path
           required: true
-          schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
       responses:
         "200":
           description: OK
@@ -1565,7 +1609,12 @@ paths:
               type: object
               required: [file]
               properties:
-                file: { type: string, format: binary, description: "File .xlsx/.xls, tối đa 5MB" }
+                file:
+                  {
+                    type: string,
+                    format: binary,
+                    description: "File .xlsx/.xls, tối đa 5MB",
+                  }
       responses:
         "200":
           description: Kết quả import (hoặc preview nếu dryRun)
@@ -1746,7 +1795,8 @@ paths:
                   message: { type: string }
                   data:
                     type: array
-                    items: { $ref: "#/components/schemas/AssetAssignmentHistory" }
+                    items:
+                      { $ref: "#/components/schemas/AssetAssignmentHistory" }
                   pagination: { $ref: "#/components/schemas/PaginationMeta" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -1772,12 +1822,13 @@ paths:
         - name: assetId
           in: path
           required: true
-          schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/CreateMedicalDeviceProfileRequest" }
+            schema:
+              { $ref: "#/components/schemas/CreateMedicalDeviceProfileRequest" }
       responses:
         "201":
           description: Tạo thành công
@@ -1799,7 +1850,7 @@ paths:
         - name: assetId
           in: path
           required: true
-          schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
       responses:
         "200":
           description: OK
@@ -1828,12 +1879,13 @@ paths:
         - name: assetId
           in: path
           required: true
-          schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/UpdateMedicalDeviceProfileRequest" }
+            schema:
+              { $ref: "#/components/schemas/UpdateMedicalDeviceProfileRequest" }
       responses:
         "200":
           description: Cập nhật thành công
@@ -1868,12 +1920,13 @@ paths:
         - name: assetId
           in: path
           required: true
-          schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/CreateCalibrationRecordRequest" }
+            schema:
+              { $ref: "#/components/schemas/CreateCalibrationRecordRequest" }
       responses:
         "201":
           description: Ghi nhận thành công
@@ -1907,7 +1960,7 @@ paths:
         - name: assetId
           in: path
           required: true
-          schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
         - name: page
           in: query
           schema: { type: integer, minimum: 1, default: 1 }
@@ -1934,7 +1987,35 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
-
+  /api/assets/medical-devices/alerts/run:
+    post:
+      tags: [Medical Device]
+      summary: Chạy tay kiểm tra cảnh báo kiểm định sắp/đã quá hạn (permission MEDICAL_DEVICE_ALERTS_TRIGGER)
+      description: >
+        Bình thường chạy tự động qua cron — endpoint này để test/demo thủ
+        công. Chỉ quét profile có `requiresCalibration = true` và Asset liên
+        kết đang active. Gửi thông báo cho role "IT" khi thiết bị còn ≤30
+        ngày tới hạn kiểm định (hoặc đã quá hạn), đúng 1 lần cho mỗi profile
+        (dùng `calibrationAlertSentAt` để chống gửi trùng).
+      responses:
+        "200":
+          description: Chạy thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      calibration:
+                        type: object
+                        properties:
+                          checked: { type: integer }
+                          notified: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   # ================= ASSET CATEGORIES =================
   /api/assets/asset-categories:
     post:
@@ -2103,7 +2184,7 @@ paths:
         - name: departmentId
           in: path
           required: true
-          schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
       responses:
         "200":
           description: OK
@@ -2296,7 +2377,116 @@ paths:
                     items: { $ref: "#/components/schemas/Asset" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+  /api/dashboard/medical-devices/summary:
+    get:
+      tags: [Dashboard]
+      summary: Tổng quan Thiết bị Y tế — theo class + tỷ lệ tuân thủ kiểm định (permission DASHBOARD_READ)
+      description: >
+        Tổng số thiết bị theo `deviceClass` (A/B/C/D), tổng số profile, và
+        tỷ lệ đã/chưa kiểm định đúng hạn (`calibrationCompliance`). Chỉ tính
+        profile có Asset liên kết đang active. `complianceRate = null`
+        (không phải 0) khi không có thiết bị nào yêu cầu kiểm định.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      byClass:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            deviceClass:
+                              {
+                                $ref: "#/components/schemas/MedicalDeviceClass",
+                              }
+                            count: { type: integer }
+                      totalProfiles: { type: integer }
+                      calibrationCompliance:
+                        type: object
+                        properties:
+                          totalRequiresCalibration: { type: integer }
+                          onTime: { type: integer }
+                          overdue: { type: integer }
+                          complianceRate:
+                            type: number
+                            nullable: true
+                            description: "null khi không có thiết bị nào yêu cầu kiểm định"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
+  /api/dashboard/medical-devices/calibration-due:
+    get:
+      tags: [Dashboard]
+      summary: Danh sách thiết bị sắp/đã quá hạn kiểm định (permission DASHBOARD_READ)
+      description: >
+        Xem TOÀN BỘ danh sách sắp/đã quá hạn kiểm định cho dashboard (KHÁC
+        với cron alert — không lọc theo `calibrationAlertSentAt`). Mặc định
+        sort tăng dần theo `nextCalibrationDueDate` (sắp tới hạn sớm nhất
+        lên đầu).
+      parameters:
+        - name: daysAhead
+          in: query
+          schema: { type: integer, minimum: 0, default: 30 }
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: sortBy
+          in: query
+          schema:
+            {
+              type: string,
+              enum: [nextCalibrationDueDate, deviceClass],
+              default: nextCalibrationDueDate,
+            }
+        - $ref: "#/components/parameters/OrderParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        deviceClass:
+                          { $ref: "#/components/schemas/MedicalDeviceClass" }
+                        registrationNumber: { type: string, nullable: true }
+                        requiresCalibration: { type: boolean }
+                        calibrationIntervalMonths:
+                          { type: integer, nullable: true }
+                        lastCalibrationDate:
+                          { type: string, format: date-time, nullable: true }
+                        nextCalibrationDueDate:
+                          { type: string, format: date-time }
+                        isOverdue: { type: boolean }
+                        asset:
+                          type: object
+                          properties:
+                            _id: { $ref: "#/components/schemas/ObjectIdRef" }
+                            name: { type: string }
+                            assetCode: { type: string }
+                            department:
+                              type: object
+                              properties:
+                                _id:
+                                  { $ref: "#/components/schemas/ObjectIdRef" }
+                                code: { type: string }
+                                name: { type: string }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   # ================= NOTIFICATIONS =================
   /api/notifications:
     get:
@@ -2332,7 +2522,8 @@ paths:
                       items:
                         type: array
                         items: { $ref: "#/components/schemas/Notification" }
-                      pagination: { $ref: "#/components/schemas/PaginationMeta" }
+                      pagination:
+                        { $ref: "#/components/schemas/PaginationMeta" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   /api/notifications/unread-count:
@@ -2428,7 +2619,18 @@ paths:
           schema: { type: string, enum: [PROPOSAL, REPORT] }
         - name: subType
           in: query
-          schema: { type: string, enum: [PROPOSE_REPAIR, PROPOSE_INK, PROPOSE_PROCUREMENT, CHECK_DAMAGE, CONFIRM_STATUS] }
+          schema:
+            {
+              type: string,
+              enum:
+                [
+                  PROPOSE_REPAIR,
+                  PROPOSE_INK,
+                  PROPOSE_PROCUREMENT,
+                  CHECK_DAMAGE,
+                  CONFIRM_STATUS,
+                ],
+            }
         - name: fromDate
           in: query
           schema: { type: string, format: date }
@@ -2546,7 +2748,8 @@ paths:
                       items:
                         type: array
                         items: { $ref: "#/components/schemas/ImportHistory" }
-                      pagination: { $ref: "#/components/schemas/PaginationMeta" }
+                      pagination:
+                        { $ref: "#/components/schemas/PaginationMeta" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   # ================= UPLOAD =================
@@ -2781,7 +2984,8 @@ paths:
                     items:
                       type: object
                       properties:
-                        _id: { type: string, description: "Ngày dạng YYYY-MM-DD" }
+                        _id:
+                          { type: string, description: "Ngày dạng YYYY-MM-DD" }
                         count: { type: integer }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -2871,7 +3075,7 @@ components:
       description: MongoDB ObjectId (24 ký tự hex)
       schema:
         type: string
-        pattern: '^[0-9a-fA-F]{24}$'
+        pattern: "^[0-9a-fA-F]{24}$"
       example: "665f1a2b8c9d3e4f5a6b7c8d"
     PageParam:
       name: page
@@ -2951,7 +3155,7 @@ components:
 
     ObjectIdRef:
       type: string
-      pattern: '^[0-9a-fA-F]{24}$'
+      pattern: "^[0-9a-fA-F]{24}$"
       example: "665f1a2b8c9d3e4f5a6b7c8d"
 
     # ============================================================
@@ -2961,14 +3165,26 @@ components:
       type: object
       required: [username, password]
       properties:
-        username: { type: string, minLength: 3, maxLength: 50, pattern: '^[a-zA-Z0-9_]+$' }
+        username:
+          {
+            type: string,
+            minLength: 3,
+            maxLength: 50,
+            pattern: "^[a-zA-Z0-9_]+$",
+          }
         password: { type: string, minLength: 5 }
 
     RegisterRequest:
       type: object
       required: [username, email, password, confirmPassword, fullName]
       properties:
-        username: { type: string, minLength: 3, maxLength: 50, pattern: '^[a-zA-Z0-9_]+$' }
+        username:
+          {
+            type: string,
+            minLength: 3,
+            maxLength: 50,
+            pattern: "^[a-zA-Z0-9_]+$",
+          }
         email: { type: string, format: email }
         password: { type: string, minLength: 5 }
         confirmPassword: { type: string, minLength: 5 }
@@ -3032,7 +3248,7 @@ components:
       type: object
       required: [username, password, fullName, role]
       properties:
-        username: { type: string, minLength: 5, pattern: '^[a-zA-Z0-9_]+$' }
+        username: { type: string, minLength: 5, pattern: "^[a-zA-Z0-9_]+$" }
         password: { type: string, minLength: 5 }
         fullName: { type: string, minLength: 1 }
         role: { $ref: "#/components/schemas/ObjectIdRef" }
@@ -3042,7 +3258,7 @@ components:
       type: object
       properties:
         fullName: { type: string, minLength: 1 }
-        username: { type: string, minLength: 5, pattern: '^[a-zA-Z0-9_]+$' }
+        username: { type: string, minLength: 5, pattern: "^[a-zA-Z0-9_]+$" }
         role: { $ref: "#/components/schemas/ObjectIdRef" }
         department: { $ref: "#/components/schemas/ObjectIdRef" }
         isActive: { type: boolean }
@@ -3052,7 +3268,7 @@ components:
       description: Chỉ 2 field này thực sự có tác dụng khi tự cập nhật (xem mô tả ở endpoint).
       properties:
         fullName: { type: string, minLength: 1 }
-        username: { type: string, minLength: 5, pattern: '^[a-zA-Z0-9_]+$' }
+        username: { type: string, minLength: 5, pattern: "^[a-zA-Z0-9_]+$" }
 
     ChangePasswordRequest:
       type: object
@@ -3215,7 +3431,14 @@ components:
         category: { type: string, enum: [PROPOSAL, REPORT] }
         subType:
           type: string
-          enum: [PROPOSE_REPAIR, PROPOSE_INK, PROPOSE_PROCUREMENT, CHECK_DAMAGE, CONFIRM_STATUS]
+          enum:
+            [
+              PROPOSE_REPAIR,
+              PROPOSE_INK,
+              PROPOSE_PROCUREMENT,
+              CHECK_DAMAGE,
+              CONFIRM_STATUS,
+            ]
           example: "PROPOSE_INK"
           description: >
             Tuỳ theo `category`: PROPOSAL có PROPOSE_INK/PROPOSE_REPAIR...;
@@ -3257,7 +3480,18 @@ components:
       required: [category, subType, title, department]
       properties:
         category: { type: string, enum: [PROPOSAL, REPORT] }
-        subType: { type: string, enum: [PROPOSE_REPAIR, PROPOSE_INK, PROPOSE_PROCUREMENT, CHECK_DAMAGE, CONFIRM_STATUS] }
+        subType:
+          {
+            type: string,
+            enum:
+              [
+                PROPOSE_REPAIR,
+                PROPOSE_INK,
+                PROPOSE_PROCUREMENT,
+                CHECK_DAMAGE,
+                CONFIRM_STATUS,
+              ],
+          }
         title: { type: string, minLength: 1 }
         department: { $ref: "#/components/schemas/ObjectIdRef" }
         referenceTo:
@@ -3286,7 +3520,18 @@ components:
         month: { type: integer, minimum: 1, maximum: 12 }
         year: { type: integer }
         category: { type: string, enum: [PROPOSAL, REPORT] }
-        subType: { type: string, enum: [PROPOSE_REPAIR, PROPOSE_INK, PROPOSE_PROCUREMENT, CHECK_DAMAGE, CONFIRM_STATUS] }
+        subType:
+          {
+            type: string,
+            enum:
+              [
+                PROPOSE_REPAIR,
+                PROPOSE_INK,
+                PROPOSE_PROCUREMENT,
+                CHECK_DAMAGE,
+                CONFIRM_STATUS,
+              ],
+          }
         department: { $ref: "#/components/schemas/ObjectIdRef" }
 
     # ============================================================
@@ -3346,7 +3591,11 @@ components:
         documentId: { $ref: "#/components/schemas/ObjectIdRef" }
         templateId: { $ref: "#/components/schemas/ObjectIdRef" }
         currentStep: { type: integer }
-        status: { type: string, enum: [pending, approved, rejected, cancelled, completed] }
+        status:
+          {
+            type: string,
+            enum: [pending, approved, rejected, cancelled, completed],
+          }
         steps:
           type: array
           items: { $ref: "#/components/schemas/WorkflowInstanceStep" }
@@ -3413,7 +3662,8 @@ components:
           format: date-time
           nullable: true
           description: Lần kiểm kê (quét QR check-in) gần nhất.
-        lastInventoryCheckBy: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        lastInventoryCheckBy:
+          { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
         specs:
           type: object
           additionalProperties: true
@@ -3471,7 +3721,8 @@ components:
         _id: { $ref: "#/components/schemas/ObjectIdRef" }
         code: { type: string }
         name: { type: string }
-        parentCategory: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        parentCategory:
+          { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
         defaultWarrantyMonths: { type: integer, nullable: true }
         isActive: { type: boolean }
         deletedAt: { type: string, format: date-time, nullable: true }
@@ -3539,12 +3790,18 @@ components:
             - $ref: "#/components/schemas/ObjectIdRef"
             - $ref: "#/components/schemas/Asset"
         deviceClass: { $ref: "#/components/schemas/MedicalDeviceClass" }
-        registrationNumber: { type: string, nullable: true, description: Số đăng ký lưu hành do Bộ Y tế cấp }
+        registrationNumber:
+          {
+            type: string,
+            nullable: true,
+            description: Số đăng ký lưu hành do Bộ Y tế cấp,
+          }
         licenseExpiredAt: { type: string, format: date-time, nullable: true }
         requiresCalibration: { type: boolean, default: false }
         calibrationIntervalMonths: { type: integer, nullable: true, minimum: 1 }
         lastCalibrationDate: { type: string, format: date-time, nullable: true }
-        nextCalibrationDueDate: { type: string, format: date-time, nullable: true }
+        nextCalibrationDueDate:
+          { type: string, format: date-time, nullable: true }
         calibrationAlertSentAt:
           type: string
           format: date-time
@@ -3600,7 +3857,12 @@ components:
           type: string
           description: Tên đơn vị kiểm định bên ngoài hệ thống (không phải tài khoản User).
         result: { $ref: "#/components/schemas/CalibrationResult" }
-        certificateFileUrl: { type: string, nullable: true, description: Link file giấy chứng nhận kiểm định (PDF scan). }
+        certificateFileUrl:
+          {
+            type: string,
+            nullable: true,
+            description: Link file giấy chứng nhận kiểm định (PDF scan).,
+          }
         nextDueDate: { type: string, format: date-time }
         recordedBy:
           description: User hệ thống đã nhập bản ghi này (khác calibratedBy).
@@ -3639,8 +3901,10 @@ components:
         _id: { $ref: "#/components/schemas/ObjectIdRef" }
         asset: { $ref: "#/components/schemas/ObjectIdRef" }
         actionType: { type: string, enum: [ASSIGN, TRANSFER, RETURN] }
-        fromDepartment: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
-        toDepartment: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        fromDepartment:
+          { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        toDepartment:
+          { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
         fromUser: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
         toUser: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
         handedOverBy: { $ref: "#/components/schemas/ObjectIdRef" }
@@ -3672,7 +3936,12 @@ components:
             - ASSET_MAINTENANCE_OVERDUE
         title: { type: string }
         message: { type: string }
-        resourceType: { type: string, enum: [Document, WorkflowInstance, ImportHistory, Asset], nullable: true }
+        resourceType:
+          {
+            type: string,
+            enum: [Document, WorkflowInstance, ImportHistory, Asset],
+            nullable: true,
+          }
         resourceId: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
         isRead: { type: boolean }
         readAt: { type: string, format: date-time, nullable: true }
@@ -3717,8 +3986,16 @@ components:
       properties:
         dryRun: { type: boolean }
         created: { type: integer }
-        updated: { type: integer, description: "Luôn = 0 — import Asset chỉ tạo mới, giữ field cho khớp shape chung." }
-        reportsCreated: { type: integer, description: "Luôn = 0 — không áp dụng cho Asset, giữ field cho khớp shape chung." }
+        updated:
+          {
+            type: integer,
+            description: "Luôn = 0 — import Asset chỉ tạo mới, giữ field cho khớp shape chung.",
+          }
+        reportsCreated:
+          {
+            type: integer,
+            description: "Luôn = 0 — không áp dụng cho Asset, giữ field cho khớp shape chung.",
+          }
         totalRows: { type: integer }
         preview:
           type: array

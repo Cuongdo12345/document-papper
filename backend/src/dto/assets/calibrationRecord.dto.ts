@@ -1,6 +1,6 @@
 // dto/assets/calibrationRecord.dto.ts
 import { z } from "zod";
-import { CalibrationResult } from "../../models/assets/calibrationRecord.model";
+import { CalibrationResult } from "../../interfaces/assets/calibrationRecord.interface";
 
 /**
  * CreateCalibrationRecordDTO — ghi nhận 1 lần kiểm định mới.

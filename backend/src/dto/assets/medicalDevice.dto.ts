@@ -1,6 +1,6 @@
 // dto/medicalDevice.dto.ts
 import { z } from "zod";
-import { MedicalDeviceClass } from "../../models/assets/medicalDeviceProfile.model";
+import { MedicalDeviceClass } from "../../interfaces/assets/medicalDevice.interface";
 
 export const CreateMedicalDeviceProfileDTO = z.object({
   deviceClass: z.nativeEnum(MedicalDeviceClass),
