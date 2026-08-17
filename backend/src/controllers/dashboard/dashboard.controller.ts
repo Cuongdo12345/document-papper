@@ -8,11 +8,19 @@ import {
   getDashboardDeviceStats,
   topDamagedInkService,
 } from "../../services/dashboard/dashboard.service";
+
 import {
   getAssetDashboardSummaryService,
   getWarrantyExpiringListService,
   getMaintenanceOverdueListService,
-} from "../../services/assets/assetDashboard.service";
+} from "../../services/dashboard/assetDashboard.service";
+
+import {
+  getMedicalDeviceDashboardSummaryService,
+  getCalibrationDueListService,
+  CALIBRATION_DUE_ALLOWED_SORT_BY,
+} from "../../services/dashboard/medicalDeviceDashboard.service";
+
 import ApiError from "../../shared/errors/ApiError";
 import { parsePaginationQuery, parseOptionalDate } from "../../shared/utils/Queryparsing.util";
 import { catchAsync } from "../../shared/utils/catchAsync"; 
@@ -191,5 +199,39 @@ export const getAssetMaintenanceOverdue = catchAsync(async (req: Request, res: R
   const daysThreshold = Number.isFinite(parsedDaysThreshold) && parsedDaysThreshold >= 0 ? parsedDaysThreshold : 7;
   const data = await getMaintenanceOverdueListService(daysThreshold, req.query);
 
+  res.json({ success: true, ...data });
+});
+
+/* =====================================================================
+   GIAI ĐOẠN 4 (module Quản lý Thiết bị Y tế) — Dashboard compliance
+===================================================================== */
+ 
+// 🏥 MEDICAL DEVICE SUMMARY — tổng theo class + tỷ lệ đã/chưa kiểm định đúng hạn
+export const getMedicalDeviceDashboardSummary = catchAsync(async (req: Request, res: Response) => {
+  const data = await getMedicalDeviceDashboardSummaryService();
+ 
+  res.json({ success: true, data });
+});
+ 
+// ⚠️ MEDICAL DEVICE SẮP/ĐÃ QUÁ HẠN KIỂM ĐỊNH
+export const getMedicalDeviceCalibrationDue = catchAsync(async (req: Request, res: Response) => {
+  const parsedDaysAhead = Number(req.query.daysAhead);
+  const daysAhead = Number.isFinite(parsedDaysAhead) && parsedDaysAhead >= 0 ? parsedDaysAhead : 30;
+ 
+  const { page, limit, sortBy, sortOrder } = parsePaginationQuery(req.query, {
+    allowedSortBy: CALIBRATION_DUE_ALLOWED_SORT_BY,
+    defaultSortBy: "nextCalibrationDueDate",
+    defaultSortOrder: "asc", // sắp tới hạn SỚM NHẤT lên đầu, mirror đúng getWarrantyExpiringListService
+    defaultLimit: 10,
+    maxLimit: 100,
+  });
+ 
+  const data = await getCalibrationDueListService(daysAhead, {
+    page,
+    limit,
+    sortBy,
+    sortOrder,
+  });
+ 
   res.json({ success: true, ...data });
 });

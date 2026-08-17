@@ -1,11 +1,11 @@
 import mongoose from "mongoose";
-import { AssetCategory } from "../../models/assets/assetCategory.model";
-import { Asset } from "../../models/assets/asset.model";
-import ApiError from "../../shared/errors/ApiError";
+import { AssetCategory } from "../../../models/assets/assetCategory.model";
+import { Asset } from "../../../models/assets/asset.model";
+import ApiError from "../../../shared/errors/ApiError";
 import {
   ASSET_CATEGORY_UPDATE_WHITELIST,
   pickWhitelisted,
-} from "./assets.constants";
+} from "../assets.constants";
 
 /**
  * 📌 CREATE ASSET CATEGORY

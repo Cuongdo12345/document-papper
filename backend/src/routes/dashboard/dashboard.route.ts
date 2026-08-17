@@ -10,6 +10,8 @@ import {
     getAssetDashboardSummary,
     getAssetWarrantyExpiring,
     getAssetMaintenanceOverdue,
+    getMedicalDeviceDashboardSummary,
+    getMedicalDeviceCalibrationDue
 } from "../../controllers/dashboard/dashboard.controller";
 import { authenticate } from "../../middlewares/auth.middleware";
 import { authorizePermission } from "../../middlewares/authorizePermission.middleware";
@@ -28,5 +30,12 @@ router.get("/device-stats", authenticate, authorizePermission("DASHBOARD_READ"),
 router.get("/assets/summary", authenticate, authorizePermission("DASHBOARD_READ"), getAssetDashboardSummary);
 router.get("/assets/warranty-expiring", authenticate, authorizePermission("DASHBOARD_READ"), getAssetWarrantyExpiring);
 router.get("/assets/maintenance-overdue", authenticate, authorizePermission("DASHBOARD_READ"), getAssetMaintenanceOverdue);
+
+// 🔗 GIAI ĐOẠN 4 (module Quản lý Thiết bị Y tế) — dùng CHUNG permission
+// DASHBOARD_READ với mọi route dashboard khác (kể cả của module Asset ở
+// trên) — nhất quán: "xem dashboard" là 1 concern riêng, tách khỏi
+// MEDICAL_DEVICE_VIEW (vốn dùng cho xem CHI TIẾT 1 thiết bị qua :assetId).
+router.get("/medical-devices/summary", authenticate, authorizePermission("DASHBOARD_READ"), getMedicalDeviceDashboardSummary);
+router.get("/medical-devices/calibration-due", authenticate, authorizePermission("DASHBOARD_READ"), getMedicalDeviceCalibrationDue);
 
 export default router;

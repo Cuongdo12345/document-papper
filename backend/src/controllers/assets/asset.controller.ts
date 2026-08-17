@@ -7,19 +7,19 @@ import {
   deleteAssetService,
   hardDeleteAssetService,
   restoreAssetService,
-} from "../../services/assets/asset.service";
+} from "../../services/assets/assetDevice/asset.service";
 import {
   generateAssetQRCodeService,
   checkInAssetService,
   findAssetByCodeService,
-} from "../../services/assets/assetQRCode.service";
+} from "../../services/assets/assetDevice/assetQRCode.service";
 import {
   exportAssetsExcelPRO,
   getImportAssetsExcelTemplate,
   importAssetsExcel,
-} from "../../services/assets/assetExcel.service";
+} from "../../services/assets/assetDevice/assetExcel.service";
 import { catchAsync } from "../../shared/utils/catchAsync";
-import { runAssetAlertsService } from "../../services/assets/assetAlerts.service";
+import { runAssetAlertsService } from "../../services/assets/assetDevice/assetAlerts.service";
 import ApiError from "../../shared/errors/ApiError";
 
 /**

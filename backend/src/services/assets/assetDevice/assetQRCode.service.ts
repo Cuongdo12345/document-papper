@@ -12,8 +12,8 @@
 
 import QRCode from "qrcode";
 import mongoose from "mongoose";
-import { Asset } from "../../models/assets/asset.model";
-import ApiError from "../../shared/errors/ApiError";
+import { Asset } from "../../../models/assets/asset.model";
+import ApiError from "../../../shared/errors/ApiError";
 
 /**
  * 📌 Sinh ảnh QR code (PNG buffer) cho 1 asset — encode `assetCode`.

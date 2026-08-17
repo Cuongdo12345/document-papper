@@ -1,10 +1,10 @@
 import mongoose from "mongoose";
-import { Asset, AssetStatus } from "../../models/assets/asset.model";
-import { AssetCategory } from "../../models/assets/assetCategory.model";
-import Department from "../../models/departments/department.model";
-import ApiError from "../../shared/errors/ApiError";
-import { generateAssetCode } from "../../shared/helpers/generateAssetCode";
-import { ASSET_UPDATE_WHITELIST, pickWhitelisted } from "./assets.constants";
+import { Asset, AssetStatus } from "../../../models/assets/asset.model";
+import { AssetCategory } from "../../../models/assets/assetCategory.model";
+import Department from "../../../models/departments/department.model";
+import ApiError from "../../../shared/errors/ApiError";
+import { generateAssetCode } from "../../../shared/helpers/generateAssetCode";
+import { ASSET_UPDATE_WHITELIST, pickWhitelisted } from "../assets.constants";
 
 const ASSET_POPULATE = [
   { path: "category", select: "code name" },

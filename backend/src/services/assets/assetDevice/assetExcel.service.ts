@@ -15,19 +15,19 @@
 import ExcelJS from "exceljs";
 import { Buffer } from "buffer";
 import { Types } from "mongoose";
-import { Asset, AssetStatus } from "../../models/assets/asset.model";
-import { AssetCategory } from "../../models/assets/assetCategory.model";
-import Department from "../../models/departments/department.model";
-import ApiError from "../../shared/errors/ApiError";
-import { generateAssetCode } from "../../shared/helpers/generateAssetCode";
-import { validateImportHeaderRow } from "../../shared/helpers/importHeaderValidator.helper";
+import { Asset, AssetStatus } from "../../../models/assets/asset.model";
+import { AssetCategory } from "../../../models/assets/assetCategory.model";
+import Department from "../../../models/departments/department.model";
+import ApiError from "../../../shared/errors/ApiError";
+import { generateAssetCode } from "../../../shared/helpers/generateAssetCode";
+import { validateImportHeaderRow } from "../../../shared/helpers/importHeaderValidator.helper";
 import {
   ASSET_IMPORT_COLUMNS,
   MAX_IMPORT_ROWS,
   MAX_STORED_ERRORS,
-} from "../../shared/constants/excel.constants";
-import { ImportHistory } from "../../models/importAudit/importhistory.model";
-import { resolveImportStatus } from "../../shared/helpers/importStatus.helper";
+} from "../../../shared/constants/excel.constants";
+import { ImportHistory } from "../../../models/importAudit/importhistory.model";
+import { resolveImportStatus } from "../../../shared/helpers/importStatus.helper";
 
 export interface AssetImportOptions {
   dryRun?: boolean;

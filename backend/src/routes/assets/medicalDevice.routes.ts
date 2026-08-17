@@ -3,6 +3,7 @@ import {
   createMedicalDeviceProfile,
   getMedicalDeviceProfile,
   updateMedicalDeviceProfile,
+  runMedicalDeviceAlerts,
 } from "../../controllers/assets/medicalDevice.controller";
 import {
   createCalibrationRecord,
@@ -77,6 +78,20 @@ router.get(
   authorizePermission("MEDICAL_DEVICE_VIEW"),
   validateParams(assetIdParam),
   getCalibrationHistory,
+);
+
+/* =====================================================================
+   GIAI ĐOẠN 3 — Cảnh báo sắp/đã quá hạn kiểm định (chạy tay, ngoài lịch
+   cron). Mirror đúng pattern "/alerts/run" của module Asset
+   (asset.routes.ts, Giai đoạn 4). Không xung đột path với "/:assetId/..."
+   ở trên vì segment thứ 2 khác nhau ("run" vs "profile"/"calibration-records").
+===================================================================== */
+
+router.post(
+  "/alerts/run",
+  authenticate,
+  authorizePermission("MEDICAL_DEVICE_ALERTS_TRIGGER"),
+  runMedicalDeviceAlerts,
 );
 
 export default router;

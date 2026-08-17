@@ -10,15 +10,15 @@
 // báo có ngữ nghĩa gửi lặp lại KHÁC NHAU (xem giải thích ở từng hàm), gộp
 // chung dễ nhầm lẫn khi đọc lại sau này.
 
-import { Asset, AssetStatus } from "../../models/assets/asset.model";
+import { Asset, AssetStatus } from "../../../models/assets/asset.model";
 import {
   NotificationType,
   NotificationResourceType,
   NotificationPriority,
-} from "../../models/notifications/notification.model";
-import { Role } from "../../models/rbac/role.model";
-import { User } from "../../models/users/user.model";
-import { notifyUsersByRoleName } from "../notifications/notification.service";
+} from "../../../models/notifications/notification.model";
+import { Role } from "../../../models/rbac/role.model";
+import { User } from "../../../models/users/user.model";
+import { notifyUsersByRoleName } from "../../notifications/notification.service";
 
 /** Số ngày trước hạn bảo hành để bắt đầu cảnh báo — chỉnh ở đây nếu cần đổi. */
 const WARRANTY_ALERT_DAYS_BEFORE = 30;

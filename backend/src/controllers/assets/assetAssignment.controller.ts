@@ -4,7 +4,7 @@ import {
   transferAssetService,
   returnAssetService,
   getAssetAssignmentHistoryService,
-} from "../../services/assets/assetAssignment.service";
+} from "../../services/assets/assetDevice/assetAssignment.service";
 import { catchAsync } from "../../shared/utils/catchAsync";
 
 /**

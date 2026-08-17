@@ -1,13 +1,13 @@
 import mongoose from "mongoose";
-import { Asset, AssetStatus } from "../../models/assets/asset.model";
+import { Asset, AssetStatus } from "../../../models/assets/asset.model";
 import {
   AssetAssignmentHistory,
   AssetAssignmentActionType,
-} from "../../models/assets/assetAssignmentHistory.model";
-import Department from "../../models/departments/department.model";
-import { User } from "../../models/users/user.model";
-import ApiError from "../../shared/errors/ApiError";
-import { withTransaction } from "../../shared/utils/withTransaction";
+} from "../../../models/assets/assetAssignmentHistory.model";
+import Department from "../../../models/departments/department.model";
+import { User } from "../../../models/users/user.model";
+import ApiError from "../../../shared/errors/ApiError";
+import { withTransaction } from "../../../shared/utils/withTransaction";
 
 const ASSIGNMENT_HISTORY_POPULATE = [
   { path: "fromDepartment", select: "code name" },

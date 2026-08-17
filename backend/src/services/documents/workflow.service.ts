@@ -5,8 +5,8 @@ import ApiError from "../../shared/errors/ApiError";
 import {
   startAssetMaintenanceService,
   resolveAssetMaintenanceService,
-} from "../assets/assetMaintenance.service";
-import type { RepairOutcome } from "../assets/assetMaintenance.service";
+} from "../assets/assetDevice/assetMaintenance.service";
+import type { RepairOutcome } from "../assets/assetDevice/assetMaintenance.service";
 import {
   NotificationPriority,
   NotificationResourceType,

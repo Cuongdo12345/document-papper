@@ -13,8 +13,8 @@
 // cần audit trail riêng, còn bảo trì thì Document đã tự đóng vai trò đó).
 
 import mongoose from "mongoose";
-import { Asset, AssetStatus } from "../../models/assets/asset.model";
-import ApiError from "../../shared/errors/ApiError";
+import { Asset, AssetStatus } from "../../../models/assets/asset.model";
+import ApiError from "../../../shared/errors/ApiError";
 
 export type RepairOutcome = "REPAIRED" | "UNREPAIRABLE";
 

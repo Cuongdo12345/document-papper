@@ -68,7 +68,7 @@ import {
   assignAssetService,
   transferAssetService,
   returnAssetService,
-} from "../src/services/assets/assetAssignment.service";
+} from "../src/services/assets/assetDevice/assetAssignment.service";
 
 const MONGO_URI = process.env.MONGO_URI as string;
 

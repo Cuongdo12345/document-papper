@@ -2,14 +2,17 @@
 //
 // GIAI ĐOẠN 4 — đăng ký cron job chạy `runAssetAlertsService` mỗi ngày.
 //
-// Đây là cron job ĐẦU TIÊN của project (chưa có `node-cron` trước đó) —
-// nên file này CHỦ Ý đứng riêng, không gộp vào bất kỳ file khởi động nào
-// khác, để nếu sau này cần thêm cron job khác (VD dọn Notification cũ,
-// đóng kỳ báo cáo tháng...) thì chỉ cần thêm 1 file `*.cron.ts` mới cạnh
-// đây và import vào `registerCronJobs()`, không phải sửa lại file này.
+// File này CHỦ Ý CHỈ lo đúng 1 việc: định nghĩa + đăng ký cron cảnh báo
+// Asset. KHÔNG còn giữ hàm tổng `registerCronJobs()` như trước (đã tách
+// sang `shared/cron/index.ts`) — sửa đúng nợ kỹ thuật đã phát hiện khi
+// review Giai đoạn 3 (module Quản lý Thiết bị Y tế): trước đây hàm tổng
+// nằm ngay trong file cron ĐẦU TIÊN, khiến mọi cron thêm sau đó đều phải
+// quay lại sửa file này — ngược với đúng ý định ban đầu (mỗi file
+// `*.cron.ts` độc lập, không phải sửa lẫn nhau). Xem `shared/cron/index.ts`
+// để biết nơi đăng ký cron mới trong tương lai.
 
 import cron from "node-cron";
-import { runAssetAlertsService } from "../../services/assets/assetAlerts.service";
+import { runAssetAlertsService } from "../../services/assets/assetDevice/assetAlerts.service";
 
 /**
  * Giờ chạy: 08:00 sáng mỗi ngày (giờ server). Chọn 08:00 vì đây là giờ bắt
@@ -52,14 +55,4 @@ export const registerAssetAlertsCron = () => {
   console.log(
     `[cron] Đã đăng ký cron cảnh báo bảo hành/bảo trì Asset (lịch: "${ASSET_ALERTS_CRON_SCHEDULE}", timezone: Asia/Ho_Chi_Minh).`,
   );
-};
-
-/**
- * Đăng ký TOÀN BỘ cron job của hệ thống — gọi 1 LẦN DUY NHẤT trong
- * `server.ts` sau khi kết nối DB thành công. Thêm cron job mới trong
- * tương lai: thêm 1 dòng `register...Cron()` khác vào đây, không sửa
- * `server.ts`.
- */
-export const registerCronJobs = () => {
-  registerAssetAlertsCron();
 };

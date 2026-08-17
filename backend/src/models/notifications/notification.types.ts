@@ -20,6 +20,16 @@ export enum NotificationType {
   // Xem trigger tại `assetAlerts.service.ts` (cron job hằng ngày).
   ASSET_WARRANTY_EXPIRING = "ASSET_WARRANTY_EXPIRING",
   ASSET_MAINTENANCE_OVERDUE = "ASSET_MAINTENANCE_OVERDUE",
+  // 🔗 Giai đoạn 3 (module Quản lý Thiết bị Y tế) — bổ sung thêm, không đổi
+  // giá trị cũ. Xem trigger tại `medicalDeviceAlerts.service.ts` (cron job
+  // hằng ngày). Dùng CHUNG 1 type cho cả 2 trường hợp "sắp tới hạn" và "đã
+  // quá hạn" kiểm định — phân biệt qua `title`/`message` khi gửi, đúng
+  // pattern đã áp dụng ở `ASSET_WARRANTY_EXPIRING` (xem
+  // `checkWarrantyExpiringService`), KHÔNG tách 2 type riêng vì
+  // module-quan-ly-thiet-bi-y-te.md §3 chỉ định rõ đây là "gửi 1 lần,
+  // giống cảnh báo bảo hành" — không phải kiểu nhắc lặp lại như
+  // `ASSET_MAINTENANCE_OVERDUE`.
+  MEDICAL_DEVICE_CALIBRATION_DUE = "MEDICAL_DEVICE_CALIBRATION_DUE",
 }
 
 /**

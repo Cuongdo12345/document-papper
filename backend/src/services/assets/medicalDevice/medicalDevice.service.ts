@@ -6,13 +6,13 @@
 // "đính kèm" thêm 1 profile, đúng quan hệ 1-1 đã thiết kế).
 
 import mongoose from "mongoose";
-import { Asset } from "../../models/assets/asset.model";
-import { MedicalDeviceProfile } from "../../models/assets/medicalDeviceProfile.model";
-import ApiError from "../../shared/errors/ApiError";
+import { Asset } from "../../../models/assets/asset.model";
+import { MedicalDeviceProfile } from "../../../models/assets/medicalDeviceProfile.model";
+import ApiError from "../../../shared/errors/ApiError";
 import {
   MEDICAL_DEVICE_PROFILE_UPDATE_WHITELIST,
   pickWhitelisted,
-} from "./assets.constants";
+} from "../assets.constants";
 
 const PROFILE_POPULATE = {
   path: "asset",

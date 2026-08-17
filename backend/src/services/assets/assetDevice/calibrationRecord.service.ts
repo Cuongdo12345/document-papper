@@ -6,11 +6,11 @@
 // phát hiện vấn đề qua thực tế chạy, không lặp lại cách làm đó ở đây).
 
 import mongoose from "mongoose";
-import { Asset } from "../../models/assets/asset.model";
-import { MedicalDeviceProfile } from "../../models/assets/medicalDeviceProfile.model";
-import { CalibrationRecord } from "../../models/assets/calibrationRecord.model";
-import ApiError from "../../shared/errors/ApiError";
-import { withTransaction } from "../../shared/utils/withTransaction";
+import { Asset } from "../../../models/assets/asset.model";
+import { MedicalDeviceProfile } from "../../../models/assets/medicalDeviceProfile.model";
+import { CalibrationRecord } from "../../../models/assets/calibrationRecord.model";
+import ApiError from "../../../shared/errors/ApiError";
+import { withTransaction } from "../../../shared/utils/withTransaction";
 
 const CALIBRATION_RECORD_POPULATE = {
   path: "recordedBy",

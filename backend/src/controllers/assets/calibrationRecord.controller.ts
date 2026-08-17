@@ -3,7 +3,7 @@ import { Request, Response } from "express";
 import {
   createCalibrationRecordService,
   getCalibrationHistoryService,
-} from "../../services/assets/calibrationRecord.service";
+} from "../../services/assets/assetDevice/calibrationRecord.service";
 import { catchAsync } from "../../shared/utils/catchAsync";
 
 /**

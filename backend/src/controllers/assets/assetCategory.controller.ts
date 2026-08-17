@@ -7,7 +7,7 @@ import {
   deleteAssetCategoryService,
   hardDeleteAssetCategoryService,
   restoreAssetCategoryService,
-} from "../../services/assets/assetCategory.service";
+} from "../../services/assets/assetDevice/assetCategory.service";
 import { catchAsync } from "../../shared/utils/catchAsync";
 
 /**
