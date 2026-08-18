@@ -1916,6 +1916,14 @@ paths:
         `nextCalibrationDueDate` trên profile và reset
         `calibrationAlertSentAt` (cho phép cron gửi cảnh báo mới khi tới hạn
         kế tiếp).
+
+
+        ⚠️ GIAI ĐOẠN 5: request gửi dạng `multipart/form-data` để hỗ trợ
+        đính kèm file giấy chứng nhận kiểm định thật qua field
+        `certificateFile` (PDF/JPEG/PNG, tối đa 10MB) — TUỲ CHỌN, có thể bỏ
+        trống và dùng field `certificateFileUrl` (string, nhập tay link có
+        sẵn) như trước. KHÔNG được gửi CẢ HAI cùng lúc — trả `400` nếu vi
+        phạm.
       parameters:
         - name: assetId
           in: path
@@ -1924,9 +1932,35 @@ paths:
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
-              { $ref: "#/components/schemas/CreateCalibrationRecordRequest" }
+              type: object
+              required: [calibratedAt, calibratedBy, result, nextDueDate]
+              description: >
+                `nextDueDate` bắt buộc nhập tay và phải SAU `calibratedAt`.
+                `calibratedAt` phải mới hơn lần kiểm định gần nhất đã ghi
+                nhận cho thiết bị này (409 nếu không thoả). Chỉ cung cấp 1
+                trong 2: `certificateFile` HOẶC `certificateFileUrl`, không
+                cả hai.
+              properties:
+                calibratedAt: { type: string, format: date-time }
+                calibratedBy:
+                  type: string
+                  minLength: 1
+                  description: Tên đơn vị kiểm định bên ngoài hệ thống.
+                result: { $ref: "#/components/schemas/CalibrationResult" }
+                nextDueDate: { type: string, format: date-time }
+                certificateFile:
+                  type: string
+                  format: binary
+                  description: >-
+                    Tuỳ chọn — PDF/JPEG/PNG, tối đa 10MB. Không gửi kèm nếu
+                    đã dùng certificateFileUrl.
+                certificateFileUrl:
+                  type: string
+                  description: >-
+                    Tuỳ chọn thay thế cho certificateFile — link nhập tay
+                    tới file đã có sẵn.
       responses:
         "201":
           description: Ghi nhận thành công
@@ -1937,7 +1971,13 @@ paths:
                 properties:
                   message: { type: string }
                   data: { $ref: "#/components/schemas/CalibrationRecord" }
-        "400": { $ref: "#/components/responses/BadRequest" }
+        "400":
+          description: >-
+            Lỗi validate, hoặc gửi CẢ HAI certificateFile lẫn
+            certificateFileUrl cùng lúc
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404":
@@ -3876,6 +3916,11 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
+    # ⚠️ KHÔNG còn được $ref ở đâu nữa kể từ Giai đoạn 5 (endpoint POST
+    # .../calibration-records đã chuyển sang multipart/form-data với schema
+    # inline ngay tại path, để hỗ trợ field certificateFile dạng binary).
+    # Giữ lại schema này làm tài liệu tham khảo cấu trúc field gốc — có thể
+    # xoá nếu không còn nơi nào cần tham chiếu.
     CreateCalibrationRecordRequest:
       type: object
       required: [calibratedAt, calibratedBy, result, nextDueDate]
