@@ -22,14 +22,17 @@
  *   permission mới vào `permission.constant.ts` mà quên khai ở đây,
  *   `npm run seed:rbac` sẽ báo lỗi ngay, không để lọt tới production.
  *
- * ⚠️ LƯU Ý ĐẶC BIỆT — nhóm `MEDICAL_EQUIPMENT_*` (15 permission):
- *   Nhóm này KHÔNG được dùng ở bất kỳ route/controller nào trong codebase
- *   (đã grep xác nhận) — có thể là phần chuẩn bị cho 1 module tương lai
- *   chưa xây, hoặc nhầm lẫn/nháp cũ chưa dọn. VẪN mô tả đầy đủ ở đây (không
- *   được bỏ qua) để cơ chế tự kiểm tra phía dưới hoạt động đúng — seed script
- *   sẽ vẫn tạo các Permission này trong DB (không gây hại gì, chỉ là dữ liệu
- *   chưa dùng tới), nhưng KHÔNG có route nào thực sự chặn theo các quyền
- *   này. Xem ghi chú đầy đủ ở `permission.constant.ts`.
+ * ⚠️ LƯU Ý ĐẶC BIỆT — nhóm `MEDICAL_EQUIPMENT_*` (từng có, ĐÃ XOÁ):
+ *   Nhóm 13-15 permission này từng tồn tại song song với `MEDICAL_DEVICE_*`
+ *   (module Quản lý Thiết bị Y tế thật đang chạy) mà KHÔNG được dùng ở bất
+ *   kỳ route/controller nào — đã xác nhận là tàn dư từ 1 nỗ lực phát triển
+ *   khác, không liên quan tài liệu thiết kế `module-quan-ly-thiet-bi-y-te.md`
+ *   (xem lịch sử trao đổi). Team đã quyết định XOÁ hẳn khỏi
+ *   `permission.constant.ts` (không giữ lại "phòng khi cần sau") — file này
+ *   ĐÃ được dọn theo, không còn descriptor nào trỏ tới nhóm Equipment nữa.
+ *   Nếu cơ chế tự-kiểm-tra bên dưới từng báo lỗi "orphan descriptor" ở đây,
+ *   đó là do đợt xoá `permission.constant.ts` chưa đồng bộ sang file này —
+ *   đã xử lý xong ở lần sửa gần nhất.
  */
 
 import { PERMISSIONS, Permission as PermissionName } from "./permission.constant";
@@ -133,21 +136,6 @@ export const PERMISSION_DESCRIPTORS: PermissionDescriptor[] = [
   { name: PERMISSIONS.ASSET_CATEGORY_UPDATE, resource: "asset_category", action: "update", description: "Cập nhật loại tài sản" },
   { name: PERMISSIONS.ASSET_CATEGORY_DELETE, resource: "asset_category", action: "delete", description: "Xoá (soft-delete) loại tài sản" },
   { name: PERMISSIONS.ASSET_CATEGORY_DELETE_PERMANENT, resource: "asset_category", action: "delete_permanent", description: "Xoá vĩnh viễn loại tài sản (rủi ro cao)" },
-
-  // ───────── MEDICAL EQUIPMENT — ⚠️ ORPHANED, xem cảnh báo đầu file ─────────
-  { name: PERMISSIONS.MEDICAL_EQUIPMENT_VIEW, resource: "medical_equipment", action: "view", description: "[CHƯA CÓ ROUTE DÙNG] Xem danh sách thiết bị y tế (module Equipment orphaned)" },
-  { name: PERMISSIONS.MEDICAL_EQUIPMENT_VIEW_DETAIL, resource: "medical_equipment", action: "view_detail", description: "[CHƯA CÓ ROUTE DÙNG] Xem chi tiết thiết bị y tế" },
-  { name: PERMISSIONS.MEDICAL_EQUIPMENT_CREATE, resource: "medical_equipment", action: "create", description: "[CHƯA CÓ ROUTE DÙNG] Tạo thiết bị y tế" },
-  { name: PERMISSIONS.MEDICAL_EQUIPMENT_UPDATE, resource: "medical_equipment", action: "update", description: "[CHƯA CÓ ROUTE DÙNG] Cập nhật thiết bị y tế" },
-  { name: PERMISSIONS.MEDICAL_EQUIPMENT_DELETE, resource: "medical_equipment", action: "delete", description: "[CHƯA CÓ ROUTE DÙNG] Xoá thiết bị y tế" },
-  { name: PERMISSIONS.MEDICAL_EQUIPMENT_DELETE_PERMANENT, resource: "medical_equipment", action: "delete_permanent", description: "[CHƯA CÓ ROUTE DÙNG] Xoá vĩnh viễn thiết bị y tế" },
-  { name: PERMISSIONS.MEDICAL_EQUIPMENT_RELOCATE, resource: "medical_equipment", action: "relocate", description: "[CHƯA CÓ ROUTE DÙNG] Đổi department/vị trí thiết bị y tế" },
-  { name: PERMISSIONS.MEDICAL_EQUIPMENT_CALIBRATE, resource: "medical_equipment", action: "calibrate", description: "[CHƯA CÓ ROUTE DÙNG] Ghi nhận kiểm định thiết bị y tế" },
-  { name: PERMISSIONS.MEDICAL_EQUIPMENT_QUARANTINE_OVERRIDE, resource: "medical_equipment", action: "quarantine_override", description: "[CHƯA CÓ ROUTE DÙNG] Ghi đè trạng thái cách ly/niêm phong thiết bị" },
-  { name: PERMISSIONS.MEDICAL_EQUIPMENT_CATEGORY_VIEW, resource: "medical_equipment_category", action: "view", description: "[CHƯA CÓ ROUTE DÙNG] Xem danh mục loại thiết bị y tế" },
-  { name: PERMISSIONS.MEDICAL_EQUIPMENT_CATEGORY_CREATE, resource: "medical_equipment_category", action: "create", description: "[CHƯA CÓ ROUTE DÙNG] Tạo danh mục loại thiết bị y tế" },
-  { name: PERMISSIONS.MEDICAL_EQUIPMENT_CATEGORY_UPDATE, resource: "medical_equipment_category", action: "update", description: "[CHƯA CÓ ROUTE DÙNG] Cập nhật danh mục loại thiết bị y tế" },
-  { name: PERMISSIONS.MEDICAL_EQUIPMENT_CATEGORY_DELETE, resource: "medical_equipment_category", action: "delete", description: "[CHƯA CÓ ROUTE DÙNG] Xoá danh mục loại thiết bị y tế" },
 
   // ───────── MEDICAL DEVICE — module THẬT đang chạy ─────────
   { name: PERMISSIONS.MEDICAL_DEVICE_CREATE, resource: "medical_device", action: "create", description: "Gắn profile tuân thủ pháp lý (thiết bị y tế) cho 1 Asset" },

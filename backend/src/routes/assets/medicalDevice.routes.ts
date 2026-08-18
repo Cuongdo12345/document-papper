@@ -21,6 +21,7 @@ import {
   UpdateMedicalDeviceProfileDTO,
 } from "../../dto/assets/medicalDevice.dto";
 import { CreateCalibrationRecordDTO } from "../../dto/assets/calibrationRecord.dto";
+import { createUploader } from "../../services/upload/upload.middleware";
 
 const router = Router();
 
@@ -28,6 +29,18 @@ const router = Router();
 // — vì bản chất là "gắn thêm 1 lớp thông tin cho 1 Asset đã có", FE luôn
 // đã có sẵn assetId từ màn hình chi tiết Asset, không cần biết profileId.
 const assetIdParam = makeIdParamDTO("assetId", "Asset ID không hợp lệ");
+
+/**
+ * GIAI ĐOẠN 5 — Upload file giấy chứng nhận kiểm định thật (PDF scan hoặc
+ * ảnh chụp), đúng §9.2/§5 tài liệu thiết kế: tái dùng `createUploader`
+ * (disk storage, model `Upload` sẵn có) — KHÔNG chờ migrate S3. Chỉ cho
+ * phép PDF/JPEG/PNG, tối đa 10MB (đủ cho scan chất lượng thường, chặn file
+ * quá khổ làm nặng ổ đĩa server).
+ */
+const certificateUploader = createUploader({
+  maxSize: 10 * 1024 * 1024,
+  allowedTypes: ["application/pdf", "image/jpeg", "image/png"],
+});
 
 router.post(
   "/:assetId/profile",
@@ -68,6 +81,14 @@ router.post(
   authenticate,
   authorizePermission("MEDICAL_DEVICE_CALIBRATE"),
   validateParams(assetIdParam),
+  // GIAI ĐOẠN 5: Multer PHẢI chạy TRƯỚC validateBody — với
+  // multipart/form-data, multer là middleware duy nhất parse được
+  // `req.body` (Express body-parser mặc định KHÔNG đọc được multipart);
+  // validateBody đọc `req.body` sau khi multer đã điền vào. File
+  // certificate là TUỲ CHỌN (không bắt buộc gửi kèm — vẫn tạo được bản ghi
+  // kiểm định không đính kèm chứng nhận, hoặc dùng `certificateFileUrl`
+  // dạng string như Giai đoạn 2).
+  certificateUploader.single("certificateFile"),
   validateBody(CreateCalibrationRecordDTO),
   createCalibrationRecord,
 );

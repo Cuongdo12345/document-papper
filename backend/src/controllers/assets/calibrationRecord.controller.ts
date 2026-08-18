@@ -15,6 +15,7 @@ export const createCalibrationRecord = catchAsync(
       req.params.assetId,
       req.body,
       req.user?._id,
+      req.file, // GIAI ĐOẠN 5 — file certificate (tuỳ chọn), undefined nếu client không gửi kèm file
     );
 
     res.status(201).json({
