@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Document Manager API — Luồng dữ liệu hệ thống</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@500;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A121F;
+    --panel:#101B2D;
+    --panel-2:#141F34;
+    --border:#22334C;
+    --border-soft:#1A2740;
+    --text:#EAF1FB;
+    --text-muted:#8CA0BE;
+    --text-faint:#5C7093;
+
+    --c-gateway:#9B8CFB;
+    --c-core:#22D3B8;
+    --c-cross:#F2B84B;
+    --c-db:#5EC8FF;
+
+    --edge-default: rgba(140,160,190,0.16);
+    --edge-default-dim: rgba(140,160,190,0.05);
+
+    --scenario-color: #22D3B8;
+
+    --font-display:'Be Vietnam Pro', sans-serif;
+    --font-body:'Inter', sans-serif;
+    --font-mono:'IBM Plex Mono', monospace;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font-body);}
+  body{
+    background-image:
+      radial-gradient(circle at 12% 8%, rgba(155,140,251,0.10), transparent 45%),
+      radial-gradient(circle at 88% 18%, rgba(34,211,184,0.08), transparent 40%),
+      radial-gradient(circle at 50% 100%, rgba(94,200,255,0.06), transparent 50%);
+  }
+
+  .wrap{max-width:1240px;margin:0 auto;padding:64px 28px 40px;}
+
+  /* ---------- HERO ---------- */
+  .eyebrow{
+    font-family:var(--font-mono);
+    font-size:12.5px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--c-core);
+    display:flex;align-items:center;gap:10px;
+    margin-bottom:18px;
+  }
+  .eyebrow::before{content:"";width:22px;height:1px;background:var(--c-core);display:inline-block;}
+
+  h1{
+    font-family:var(--font-display);
+    font-weight:800;
+    font-size:clamp(28px,4.2vw,46px);
+    line-height:1.14;
+    margin:0 0 18px;
+    letter-spacing:-0.01em;
+  }
+  h1 span{color:var(--c-core);}
+
+  .lede{
+    font-size:16px;
+    line-height:1.7;
+    color:var(--text-muted);
+    max-width:700px;
+    margin:0 0 34px;
+  }
+
+  .stats{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px;}
+  .stat{
+    border:1px solid var(--border);
+    background:var(--panel);
+    border-radius:12px;
+    padding:14px 20px;
+    min-width:140px;
+  }
+  .stat b{
+    display:block;font-family:var(--font-display);font-weight:800;
+    font-size:24px;color:var(--text);
+  }
+  .stat span{font-size:12px;color:var(--text-faint);letter-spacing:0.02em;}
+
+  /* ---------- SECTION HEADS ---------- */
+  .section-head{margin:64px 0 22px;}
+  .section-head h2{
+    font-family:var(--font-display);font-weight:700;font-size:22px;margin:0 0 6px;
+  }
+  .section-head p{color:var(--text-muted);font-size:14.5px;margin:0;max-width:640px;line-height:1.65;}
+
+  /* ---------- LEGEND ---------- */
+  .legend{display:flex;gap:22px;flex-wrap:wrap;margin:18px 0 30px;}
+  .legend-item{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-muted);}
+  .legend-dot{width:9px;height:9px;border-radius:2px;}
+
+  /* ---------- SCENARIO TABS ---------- */
+  .tabs{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:30px;}
+  .tab{
+    font-family:var(--font-body);font-weight:600;font-size:13.5px;
+    color:var(--text-muted);
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:999px;
+    padding:10px 18px;
+    cursor:pointer;
+    transition:all .18s ease;
+  }
+  .tab:hover{color:var(--text);border-color:var(--border-soft);}
+  .tab.active{
+    color:#08131F;
+    background:var(--tab-color, var(--c-core));
+    border-color:var(--tab-color, var(--c-core));
+  }
+
+  /* ---------- DIAGRAM ---------- */
+  .diagram-wrap{position:relative;padding:6px 0 10px;}
+  .edges-svg{position:absolute;top:0;left:0;width:100%;height:100%;overflow:visible;pointer-events:none;}
+  .edges-svg path{
+    fill:none;
+    stroke:var(--edge-default);
+    stroke-width:1.6;
+    transition:stroke .25s ease, opacity .25s ease;
+  }
+  .diagram-wrap.scenario-active .edges-svg path{stroke:var(--edge-default-dim);}
+  .edges-svg path.edge--active{
+    stroke:var(--scenario-color);
+    stroke-width:2.2;
+    stroke-dasharray:7 6;
+    animation:dashflow 1.1s linear infinite;
+    filter:drop-shadow(0 0 4px var(--scenario-color));
+  }
+  @keyframes dashflow{to{stroke-dashoffset:-26;}}
+
+  .grid{
+    position:relative;
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    grid-auto-rows:auto;
+    gap:22px 18px;
+  }
+
+  .node{
+    position:relative;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:14px 16px;
+    transition:transform .2s ease, border-color .2s ease, box-shadow .2s ease, opacity .2s ease;
+  }
+  .node .cat{
+    font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--cat-color);margin-bottom:5px;display:block;
+  }
+  .node .label{font-family:var(--font-display);font-weight:700;font-size:14.5px;color:var(--text);line-height:1.3;}
+  .node .sub{font-size:12px;color:var(--text-faint);margin-top:4px;line-height:1.4;}
+  .node::before{
+    content:"";position:absolute;top:0;left:0;bottom:0;width:3px;
+    border-radius:12px 0 0 12px;background:var(--cat-color);
+  }
+
+  .node.n-gateway{--cat-color:var(--c-gateway);}
+  .node.n-core{--cat-color:var(--c-core);}
+  .node.n-cross{--cat-color:var(--c-cross);}
+  .node.n-db{--cat-color:var(--c-db);background:linear-gradient(180deg,var(--panel-2),var(--panel));}
+
+  .diagram-wrap.scenario-active .node{opacity:0.32;}
+  .diagram-wrap.scenario-active .node.node--active{
+    opacity:1;
+    border-color:var(--scenario-color);
+    box-shadow:0 0 0 1px var(--scenario-color), 0 0 22px -6px var(--scenario-color);
+    transform:translateY(-1px);
+  }
+
+  /* explicit placement (desktop) */
+  .n-client{grid-column:1/5;grid-row:1;}
+  .n-auth{grid-column:1/5;grid-row:2;}
+  .n-rbac{grid-column:1/5;grid-row:3;}
+  .n-users{grid-column:1/2;grid-row:4;}
+  .n-documents{grid-column:2/3;grid-row:4;}
+  .n-assets{grid-column:3/4;grid-row:4;}
+  .n-audit{grid-column:4/5;grid-row:4;}
+  .n-workflow{grid-column:2/3;grid-row:5;}
+  .n-assignment{grid-column:3/4;grid-row:5;}
+  .n-perf{grid-column:4/5;grid-row:5;}
+  .n-upload{grid-column:1/2;grid-row:6;}
+  .n-meddevice{grid-column:3/4;grid-row:6;}
+  .n-excel{grid-column:4/5;grid-row:6;}
+  .n-notify{grid-column:1/3;grid-row:7;}
+  .n-dashboard{grid-column:3/5;grid-row:7;}
+  .n-db{grid-column:1/5;grid-row:8;}
+
+  .n-client .label, .n-auth .label, .n-rbac .label, .n-db .label{font-size:15.5px;}
+
+  @media (max-width:860px){
+    .grid{grid-template-columns:1fr;gap:14px;}
+    .node{grid-column:1/-1 !important;grid-row:auto !important;}
+  }
+
+  /* ---------- SCENARIO DESCRIPTION ---------- */
+  .story{
+    margin-top:34px;
+    border:1px solid var(--border);
+    background:var(--panel);
+    border-radius:14px;
+    padding:26px 28px;
+  }
+  .story h3{
+    font-family:var(--font-display);font-size:17px;margin:0 0 4px;color:var(--scenario-color);
+    transition:color .2s ease;
+  }
+  .story p.intro{color:var(--text-muted);font-size:13.5px;margin:0 0 18px;}
+  .story ol{margin:0;padding-left:20px;display:grid;gap:12px;}
+  .story li{font-size:14px;line-height:1.65;color:var(--text);}
+  .story li b{color:var(--text);font-weight:600;}
+  .story code{
+    font-family:var(--font-mono);font-size:12.5px;background:var(--panel-2);
+    border:1px solid var(--border-soft);border-radius:5px;padding:1px 6px;color:var(--c-core);
+  }
+
+  /* ---------- FOOTER ---------- */
+  footer{
+    margin-top:60px;padding-top:22px;border-top:1px solid var(--border-soft);
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;
+    font-family:var(--font-mono);font-size:11.5px;color:var(--text-faint);
+  }
+
+  ::selection{background:rgba(34,211,184,0.28);}
+
+  /* ---------- CLICKABLE NODES ---------- */
+  .node.clickable{cursor:pointer;}
+  .node.clickable:hover{
+    border-color:var(--cat-color);
+    transform:translateY(-2px);
+    box-shadow:0 10px 24px -14px var(--cat-color);
+  }
+  .node.clickable .hint{
+    position:absolute;top:12px;right:14px;font-family:var(--font-mono);font-size:10px;color:var(--text-faint);
+    opacity:0;transition:opacity .15s ease;
+  }
+  .node.clickable:hover .hint{opacity:1;}
+  .hint-line{
+    font-family:var(--font-mono);font-size:12px;color:var(--text-faint);margin:14px 0 0;
+  }
+
+  /* ---------- MODAL ---------- */
+  .modal-backdrop{
+    position:fixed;inset:0;background:rgba(5,9,16,0.72);backdrop-filter:blur(3px);
+    display:none;align-items:flex-start;justify-content:center;
+    padding:5vh 20px;z-index:50;overflow-y:auto;
+  }
+  .modal-backdrop.open{display:flex;}
+  .modal{
+    width:100%;max-width:760px;background:var(--panel);border:1px solid var(--border);
+    border-radius:16px;padding:0;overflow:hidden;
+    box-shadow:0 30px 70px -20px rgba(0,0,0,0.6);
+    animation:modalIn .18s ease;
+  }
+  @keyframes modalIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+  .modal-head{
+    padding:22px 26px 18px;border-bottom:1px solid var(--border-soft);
+    display:flex;justify-content:space-between;align-items:flex-start;gap:14px;
+    background:linear-gradient(180deg, var(--panel-2), var(--panel));
+  }
+  .modal-head .cat{
+    font-family:var(--font-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--modal-color);margin-bottom:6px;display:block;
+  }
+  .modal-head h3{font-family:var(--font-display);font-size:19px;margin:0 0 4px;}
+  .modal-head p{margin:0;font-size:12.5px;color:var(--text-muted);}
+  .modal-close{
+    border:1px solid var(--border);background:var(--panel-2);color:var(--text-muted);
+    width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:15px;line-height:1;flex-shrink:0;
+  }
+  .modal-close:hover{color:var(--text);border-color:var(--modal-color);}
+
+  .modal-body{padding:20px 26px 26px;max-height:70vh;overflow-y:auto;}
+  .modal-section-title{
+    font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--text-faint);margin:22px 0 10px;
+  }
+  .modal-section-title:first-child{margin-top:0;}
+
+  .model-chips{display:flex;gap:8px;flex-wrap:wrap;}
+  .model-chip{
+    font-family:var(--font-mono);font-size:12px;color:var(--modal-color);
+    border:1px solid var(--border-soft);background:var(--panel-2);
+    padding:5px 10px;border-radius:7px;
+  }
+
+  .ep-table{width:100%;border-collapse:collapse;}
+  .ep-table tr{border-bottom:1px solid var(--border-soft);}
+  .ep-table tr:last-child{border-bottom:none;}
+  .ep-table td{padding:9px 6px;font-size:12.5px;vertical-align:top;}
+  .ep-method{
+    font-family:var(--font-mono);font-weight:600;font-size:10.5px;
+    padding:2px 7px;border-radius:5px;white-space:nowrap;
+  }
+  .m-GET{color:#5EC8FF;background:rgba(94,200,255,0.12);}
+  .m-POST{color:#22D3B8;background:rgba(34,211,184,0.12);}
+  .m-PUT{color:#F2B84B;background:rgba(242,184,75,0.12);}
+  .m-PATCH{color:#F2B84B;background:rgba(242,184,75,0.12);}
+  .m-DELETE{color:#FF6B7A;background:rgba(255,107,122,0.12);}
+  .ep-path{font-family:var(--font-mono);font-size:11.5px;color:var(--text);white-space:nowrap;}
+  .ep-summary{color:var(--text-muted);line-height:1.5;}
+  .ep-perm{font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);white-space:nowrap;text-align:right;}
+
+  .rel-list{display:grid;gap:10px;}
+  .rel-item{
+    display:flex;gap:12px;align-items:flex-start;
+    border:1px solid var(--border-soft);background:var(--panel-2);
+    border-radius:10px;padding:12px 14px;
+  }
+  .rel-target{
+    flex-shrink:0;font-family:var(--font-mono);font-size:11px;font-weight:600;
+    color:var(--modal-color);border:1px solid var(--modal-color);border-radius:6px;
+    padding:4px 9px;cursor:pointer;white-space:nowrap;
+    transition:background .15s ease;
+  }
+  .rel-target:hover{background:rgba(255,255,255,0.06);}
+  .rel-desc{font-size:12.5px;color:var(--text-muted);line-height:1.55;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">Document Manager API · v1.0.0</div>
+  <h1>Luồng dữ liệu &amp; kiến trúc <span>toàn hệ thống</span></h1>
+  <p class="lede">
+    Sơ đồ dưới đây dựng lại toàn bộ hệ thống DMS từ đặc tả OpenAPI: mọi request đi qua cổng xác thực,
+    lớp phân quyền RBAC/ABAC, tới các nghiệp vụ lõi (Hồ sơ, Workflow, Tài sản, Thiết bị y tế), rồi chạm
+    tới các dịch vụ liên module (Thông báo, Excel, Audit, Dashboard) trước khi lưu vào MongoDB.
+    Chọn một luồng bên dưới để xem đường đi được tô sáng trên sơ đồ.
+  </p>
+
+  <div class="stats">
+    <div class="stat"><b>86</b><span>Resource path</span></div>
+    <div class="stat"><b>115</b><span>API operations</span></div>
+    <div class="stat"><b>18</b><span>Module nghiệp vụ</span></div>
+    <div class="stat"><b>1</b><span>Cổng xác thực JWT</span></div>
+  </div>
+
+  <div class="section-head">
+    <h2>Sơ đồ kiến trúc &amp; đường đi dữ liệu</h2>
+    <p>4 lớp từ trên xuống: Client → Cổng xác thực → Cổng phân quyền → Nghiệp vụ lõi, với các dịch vụ liên module bám dọc bên phải và MongoDB là điểm hội tụ cuối cùng.</p>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><span class="legend-dot" style="background:var(--c-gateway)"></span>Gateway &amp; bảo mật</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--c-core)"></span>Nghiệp vụ lõi</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--c-cross)"></span>Dịch vụ liên module</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--c-db)"></span>Cơ sở dữ liệu</div>
+  </div>
+
+  <p class="hint-line">→ Bấm vào một khối trên sơ đồ để xem danh sách endpoint và quan hệ dữ liệu của module đó.</p>
+
+  <div class="tabs" id="tabs">
+    <div class="tab" data-scenario="overview" style="--tab-color:#5C7093;">Tổng quan (không tô sáng)</div>
+    <div class="tab" data-scenario="s1" style="--tab-color:#9B8CFB;">Đăng nhập &amp; phân quyền</div>
+    <div class="tab" data-scenario="s2" style="--tab-color:#22D3B8;">Tạo &amp; duyệt hồ sơ</div>
+    <div class="tab" data-scenario="s3" style="--tab-color:#5EC8FF;">Cấp phát tài sản &amp; thiết bị y tế</div>
+    <div class="tab" data-scenario="s4" style="--tab-color:#F2B84B;">Đồng bộ Excel &amp; kiểm toán</div>
+  </div>
+
+  <div class="diagram-wrap" id="diagramWrap">
+    <svg class="edges-svg" id="edgesSvg"></svg>
+    <div class="grid" id="grid">
+
+      <div class="node n-gateway n-client" id="node-client">
+        <span class="cat">Client</span>
+        <div class="label">Web / App</div>
+        <div class="sub">React + TypeScript · Ant Design 5</div>
+      </div>
+
+      <div class="node n-gateway n-auth" id="node-auth">
+        <span class="cat">Gateway</span>
+        <div class="label">Auth · JWT</div>
+        <div class="sub">6 endpoints — login, refresh-token, forgot/reset password</div>
+      </div>
+
+      <div class="node n-gateway n-rbac" id="node-rbac">
+        <span class="cat">Gateway</span>
+        <div class="label">RBAC Gate — Role · Permission · Policy (ABAC)</div>
+        <div class="sub">16 endpoints — kiểm tra trên mọi route, có extraPermissions/denyPermissions theo user</div>
+      </div>
+
+      <div class="node n-core n-users" id="node-users">
+        <span class="cat">Nghiệp vụ</span>
+        <div class="label">Users &amp; Departments</div>
+        <div class="sub">15 endpoints</div>
+      </div>
+
+      <div class="node n-core n-documents" id="node-documents">
+        <span class="cat">Nghiệp vụ</span>
+        <div class="label">Documents</div>
+        <div class="sub">Proposal / Report · 8 endpoints</div>
+      </div>
+
+      <div class="node n-core n-assets" id="node-assets">
+        <span class="cat">Nghiệp vụ</span>
+        <div class="label">Assets &amp; Danh mục</div>
+        <div class="sub">21 endpoints</div>
+      </div>
+
+      <div class="node n-cross n-audit" id="node-audit">
+        <span class="cat">Liên module</span>
+        <div class="label">User Audit Log</div>
+        <div class="sub">3 endpoints</div>
+      </div>
+
+      <div class="node n-core n-workflow" id="node-workflow">
+        <span class="cat">Nghiệp vụ</span>
+        <div class="label">Workflow Engine</div>
+        <div class="sub">Template · Instance · 9 endpoints</div>
+      </div>
+
+      <div class="node n-core n-assignment" id="node-assignment">
+        <span class="cat">Nghiệp vụ</span>
+        <div class="label">Asset Assignment</div>
+        <div class="sub">Assign · Transfer · Return · 4 endpoints</div>
+      </div>
+
+      <div class="node n-cross n-perf" id="node-perf">
+        <span class="cat">Liên module</span>
+        <div class="label">Performance Monitor</div>
+        <div class="sub">1 endpoint · chỉ ADMIN</div>
+      </div>
+
+      <div class="node n-cross n-upload" id="node-upload">
+        <span class="cat">Liên module</span>
+        <div class="label">Upload File</div>
+        <div class="sub">4 endpoints</div>
+      </div>
+
+      <div class="node n-core n-meddevice" id="node-meddevice">
+        <span class="cat">Nghiệp vụ</span>
+        <div class="label">Hồ sơ Thiết bị Y tế</div>
+        <div class="sub">1–1 với Asset · Calibration · 6 endpoints</div>
+      </div>
+
+      <div class="node n-cross n-excel" id="node-excel">
+        <span class="cat">Liên module</span>
+        <div class="label">Excel Import / Export</div>
+        <div class="sub">5 endpoints</div>
+      </div>
+
+      <div class="node n-cross n-notify" id="node-notify">
+        <span class="cat">Liên module</span>
+        <div class="label">Notifications</div>
+        <div class="sub">5 endpoints</div>
+      </div>
+
+      <div class="node n-cross n-dashboard" id="node-dashboard">
+        <span class="cat">Liên module</span>
+        <div class="label">Dashboard &amp; KPI</div>
+        <div class="sub">12 endpoints</div>
+      </div>
+
+      <div class="node n-db n-db" id="node-db">
+        <span class="cat">Lưu trữ</span>
+        <div class="label">MongoDB (Mongoose)</div>
+        <div class="sub">Điểm hội tụ dữ liệu của toàn bộ 18 module</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="story" id="story">
+    <h3 id="storyTitle">Tổng quan hệ thống</h3>
+    <p class="intro" id="storyIntro">Chọn một trong 4 luồng phía trên để xem đường đi dữ liệu chi tiết, kèm sơ đồ tô sáng tương ứng.</p>
+    <ol id="storySteps"></ol>
+  </div>
+
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal" id="modal">
+      <div class="modal-head">
+        <div>
+          <span class="cat" id="modalCat">Module</span>
+          <h3 id="modalTitle">—</h3>
+          <p id="modalSub">—</p>
+        </div>
+        <button class="modal-close" id="modalClose" aria-label="Đóng">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-section-title" id="modelsTitle">Model liên quan</div>
+        <div class="model-chips" id="modalModels"></div>
+
+        <div class="modal-section-title">Endpoints</div>
+        <table class="ep-table" id="modalEndpoints"></table>
+
+        <div class="modal-section-title">Liên kết &amp; quan hệ dữ liệu</div>
+        <div class="rel-list" id="modalRelations"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span>Dựng từ đặc tả OpenAPI 3.0.3 — Document Manager API v1.0.0</span>
+    <span>86 paths · 115 operations · 18 tags</span>
+  </footer>
+
+</div>
+
+<script>
+const EDGES = [
+  {id:1,  from:'client',     to:'auth'},
+  {id:2,  from:'auth',       to:'rbac'},
+  {id:3,  from:'rbac',       to:'users'},
+  {id:4,  from:'rbac',       to:'documents'},
+  {id:5,  from:'rbac',       to:'assets'},
+  {id:6,  from:'rbac',       to:'audit'},
+  {id:7,  from:'auth',       to:'perf'},
+  {id:8,  from:'documents',  to:'workflow'},
+  {id:9,  from:'upload',     to:'documents'},
+  {id:10, from:'workflow',   to:'notify'},
+  {id:11, from:'assets',     to:'assignment'},
+  {id:12, from:'assets',     to:'meddevice'},
+  {id:13, from:'assets',     to:'notify'},
+  {id:14, from:'meddevice',  to:'notify'},
+  {id:15, from:'excel',      to:'documents'},
+  {id:16, from:'excel',      to:'assets'},
+  {id:17, from:'excel',      to:'users'},
+  {id:18, from:'documents',  to:'dashboard'},
+  {id:19, from:'assets',     to:'dashboard'},
+  {id:20, from:'meddevice',  to:'dashboard'},
+  {id:21, from:'workflow',   to:'dashboard'},
+  {id:22, from:'users',      to:'db'},
+  {id:23, from:'documents',  to:'db'},
+  {id:24, from:'workflow',   to:'db'},
+  {id:25, from:'assets',     to:'db'},
+  {id:26, from:'assignment', to:'db'},
+  {id:27, from:'meddevice',  to:'db'},
+  {id:28, from:'notify',     to:'db'},
+  {id:29, from:'audit',      to:'db'},
+  {id:30, from:'excel',      to:'db'},
+  {id:31, from:'dashboard',  to:'db'},
+];
+
+const SCENARIOS = {
+  overview: {color:'#5C7093', nodes:[], edges:[], title:'Tổng quan hệ thống',
+    intro:'Chọn một trong 4 luồng phía trên để xem đường đi dữ liệu chi tiết, kèm sơ đồ tô sáng tương ứng.',
+    steps:[]},
+  s1: {
+    color:'#9B8CFB',
+    nodes:['client','auth','rbac','users','db'],
+    edges:[1,2,3,22],
+    title:'Đăng nhập &amp; phân quyền',
+    intro:'Mọi phiên làm việc bắt đầu từ đây — token và quyền hạn được xác lập trước khi chạm tới bất kỳ nghiệp vụ nào.',
+    steps:[
+      'Client gửi <code>POST /api/auths/login</code>. Auth Gateway xác thực và cấp <b>access token</b> (JWT ngắn hạn) cùng <b>refresh token</b>.',
+      'Khi access token hết hạn, client gọi <code>POST /api/auths/refresh-token</code> để làm mới mà không cần đăng nhập lại.',
+      'Từ request thứ hai trở đi, <b>RBAC Gate</b> đọc permission gắn trên route, đối chiếu với Role của user — có thể bị ghi đè bởi <code>extraPermissions</code> / <code>denyPermissions</code> riêng của từng user, cộng thêm điều kiện động từ Policy (ABAC) nếu có.',
+      'Thông tin User, Role, Department được đọc/ghi tại module Users &amp; Departments, lưu trong MongoDB.'
+    ]
+  },
+  s2: {
+    color:'#22D3B8',
+    nodes:['rbac','documents','upload','workflow','notify','db'],
+    edges:[4,9,8,10,23,24,28],
+    title:'Tạo &amp; duyệt hồ sơ (Document → Workflow)',
+    intro:'Vòng đời một Proposal/Report từ lúc tạo tới lúc được duyệt xong.',
+    steps:[
+      'Người dùng tạo Document (Proposal/Report) qua <code>POST /api/documents/proposal</code>, file đính kèm được xử lý qua module <b>Upload</b> trước.',
+      'Document được gắn vào một <b>Workflow Template</b> qua <code>POST /api/workflows/submit</code>, khởi tạo Workflow Instance nhiều bước duyệt.',
+      'Ở mỗi bước, người có role khớp <code>step.role</code> gọi approve/reject; <code>workflowStatus</code> trên Document được đồng bộ theo <code>currentStep</code>.',
+      'Duyệt/từ chối hoặc hoàn tất workflow sẽ sinh <b>Notification</b> gửi tới người liên quan. Toàn bộ trạng thái được ghi vào MongoDB.'
+    ]
+  },
+  s3: {
+    color:'#5EC8FF',
+    nodes:['rbac','assets','assignment','meddevice','notify','db'],
+    edges:[5,11,12,13,14,25,26,27,28],
+    title:'Cấp phát tài sản &amp; thiết bị y tế',
+    intro:'Từ tài sản CNTT thông thường đến thiết bị y tế cần tuân thủ kiểm định định kỳ.',
+    steps:[
+      'Tài sản được tạo và phân loại trong module <b>Assets &amp; Danh mục</b>.',
+      '<b>Asset Assignment</b> thực hiện assign / transfer / return giữa kho và các khoa/phòng ban, lưu lại lịch sử tại <code>assignment-history</code>.',
+      'Với thiết bị y tế, một <b>Medical Device Profile</b> quan hệ 1–1 được gắn thêm vào Asset (số đăng ký, chu kỳ kiểm định...); mỗi lần kiểm định ghi qua <code>calibration-records</code>.',
+      'Job cảnh báo (<code>assets/alerts/run</code>, <code>medical-devices/alerts/run</code>) quét bảo hành/bảo trì/kiểm định sắp hết hạn → sinh Notification cảnh báo tự động.'
+    ]
+  },
+  s4: {
+    color:'#F2B84B',
+    nodes:['rbac','excel','documents','assets','users','audit','dashboard','db'],
+    edges:[6,15,16,17,18,19,20,21,29,30,31],
+    title:'Đồng bộ Excel &amp; kiểm toán',
+    intro:'Dữ liệu hàng loạt đi vào hệ thống, mọi thao tác được ghi vết, và số liệu được tổng hợp lại thành KPI.',
+    steps:[
+      'Module <b>Excel</b> import/export hàng loạt: Document (proposal), Asset, và đồng bộ Department từ file Excel — kèm file mẫu và lịch sử import.',
+      'Mỗi thao tác tạo/sửa/xoá dữ liệu — dù qua UI hay Excel — đều được RBAC Gate định danh người thực hiện và ghi vào <b>User Audit Log</b>.',
+      '<b>Dashboard &amp; KPI</b> tổng hợp thời gian thực từ Document, Asset, Medical Device, Workflow: tỉ lệ chuyển đổi Proposal→Report, xu hướng hư hỏng thiết bị, tài sản sắp hết bảo hành...',
+      'Toàn bộ số liệu tổng hợp và log đều bắt nguồn từ cùng một MongoDB — không có kho dữ liệu tách biệt.'
+    ]
+  }
+};
+
+const wrap = document.getElementById('diagramWrap');
+const svg = document.getElementById('edgesSvg');
+
+function anchorPoints(rA, rB, wrapRect){
+  const a = {left:rA.left-wrapRect.left, top:rA.top-wrapRect.top, right:rA.right-wrapRect.left, bottom:rA.bottom-wrapRect.top};
+  const b = {left:rB.left-wrapRect.left, top:rB.top-wrapRect.top, right:rB.right-wrapRect.left, bottom:rB.bottom-wrapRect.top};
+  a.cx=(a.left+a.right)/2; a.cy=(a.top+a.bottom)/2;
+  b.cx=(b.left+b.right)/2; b.cy=(b.top+b.bottom)/2;
+  const dx=b.cx-a.cx, dy=b.cy-a.cy;
+  if (Math.abs(dy) >= Math.abs(dx)){
+    return dy>0 ? [{x:a.cx,y:a.bottom},{x:b.cx,y:b.top}] : [{x:a.cx,y:a.top},{x:b.cx,y:b.bottom}];
+  } else {
+    return dx>0 ? [{x:a.right,y:a.cy},{x:b.left,y:b.cy}] : [{x:a.left,y:a.cy},{x:b.right,y:b.cy}];
+  }
+}
+
+function pathD(p1,p2){
+  const dx=p2.x-p1.x, dy=p2.y-p1.y;
+  if (Math.abs(dy) >= Math.abs(dx)){
+    const midY=(p1.y+p2.y)/2;
+    return `M ${p1.x} ${p1.y} C ${p1.x} ${midY}, ${p2.x} ${midY}, ${p2.x} ${p2.y}`;
+  } else {
+    const midX=(p1.x+p2.x)/2;
+    return `M ${p1.x} ${p1.y} C ${midX} ${p1.y}, ${midX} ${p2.y}, ${p2.x} ${p2.y}`;
+  }
+}
+
+function draw(){
+  const wrapRect = wrap.getBoundingClientRect();
+  svg.setAttribute('width', wrapRect.width);
+  svg.setAttribute('height', wrapRect.height);
+  svg.innerHTML = '';
+  EDGES.forEach(e=>{
+    const na = document.getElementById('node-'+e.from);
+    const nb = document.getElementById('node-'+e.to);
+    if(!na||!nb) return;
+    const [p1,p2] = anchorPoints(na.getBoundingClientRect(), nb.getBoundingClientRect(), wrapRect);
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', pathD(p1,p2));
+    path.setAttribute('id','path-'+e.id);
+    svg.appendChild(path);
+  });
+  applyScenario(currentScenario);
+}
+
+let currentScenario = 'overview';
+
+function applyScenario(key){
+  currentScenario = key;
+  const sc = SCENARIOS[key];
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.scenario===key));
+
+  if(key==='overview'){
+    wrap.classList.remove('scenario-active');
+    document.querySelectorAll('.node').forEach(n=>n.classList.remove('node--active'));
+    document.querySelectorAll('.edges-svg path').forEach(p=>p.classList.remove('edge--active'));
+  } else {
+    wrap.classList.add('scenario-active');
+    wrap.style.setProperty('--scenario-color', sc.color);
+    document.querySelectorAll('.node').forEach(n=>{
+      const id = n.id.replace('node-','');
+      n.classList.toggle('node--active', sc.nodes.includes(id));
+    });
+    document.querySelectorAll('.edges-svg path').forEach(p=>{
+      const id = parseInt(p.id.replace('path-',''));
+      p.classList.toggle('edge--active', sc.edges.includes(id));
+    });
+  }
+
+  document.getElementById('storyTitle').innerHTML = sc.title;
+  document.getElementById('storyIntro').textContent = sc.intro;
+  document.getElementById('story').style.setProperty('--scenario-color', key==='overview' ? '#22D3B8' : sc.color);
+  const list = document.getElementById('storySteps');
+  list.innerHTML = sc.steps.map(s=>`<li>${s}</li>`).join('');
+}
+
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=> applyScenario(tab.dataset.scenario));
+});
+
+/* ================= MODULE DETAIL DATA ================= */
+/* Endpoint chính xác trích từ openAPI.yaml (86 path / 115 operations) */
+const EP = {"users":[{"method":"POST","path":"/api/users","summary":"Tạo user mới","perm":"USER_CREATE"},{"method":"GET","path":"/api/users","summary":"Danh sách user","perm":"USER_READ"},{"method":"GET","path":"/api/users/me","summary":"Thông tin cá nhân (user đang đăng nhập)","perm":null},{"method":"PATCH","path":"/api/users/me","summary":"Cập nhật thông tin cá nhân","perm":null},{"method":"GET","path":"/api/users/{id}","summary":"Chi tiết user","perm":"USER_DETAIL"},{"method":"PUT","path":"/api/users/{id}","summary":"Cập nhật user","perm":"USER_UPDATE"},{"method":"DELETE","path":"/api/users/{id}","summary":"Vô hiệu hoá user - soft delete","perm":"USER_DELETE"},{"method":"PATCH","path":"/api/users/restore/{id}","summary":"Khôi phục user đã bị vô hiệu hoá","perm":"USER_RESTORE"},{"method":"PATCH","path":"/api/users/change-password","summary":"Tự đổi mật khẩu","perm":"USER_CHANGE_PASSWORD"},{"method":"PATCH","path":"/api/users/reset-password/{id}","summary":"Admin reset mật khẩu cho 1 user","perm":"USER_RESET_PASSWORD"},{"method":"POST","path":"/api/departments","summary":"Tạo khoa/phòng ban","perm":"DEPARTMENT_CREATE"},{"method":"GET","path":"/api/departments","summary":"Danh sách khoa/phòng ban","perm":"DEPARTMENT_VIEW"},{"method":"GET","path":"/api/departments/{id}","summary":"Chi tiết khoa","perm":"DEPARTMENT_VIEW_DETAIL"},{"method":"PUT","path":"/api/departments/{id}","summary":"Cập nhật khoa","perm":"DEPARTMENT_UPDATE"},{"method":"DELETE","path":"/api/departments/{id}","summary":"Xoá khoa","perm":"DEPARTMENT_DELETE"}],"rbac":[{"method":"POST","path":"/api/rbac/permissions","summary":"Tạo permission mới","perm":"PERMISSION_CREATE"},{"method":"GET","path":"/api/rbac/permissions","summary":"Danh sách permission","perm":"PERMISSION_VIEW"},{"method":"GET","path":"/api/rbac/permissions/{id}","summary":"Chi tiết permission","perm":"PERMISSION_VIEW"},{"method":"PUT","path":"/api/rbac/permissions/{id}","summary":"Cập nhật permission","perm":"PERMISSION_UPDATE"},{"method":"DELETE","path":"/api/rbac/permissions/{id}","summary":"Xoá permission","perm":"PERMISSION_DELETE"},{"method":"POST","path":"/api/rbac/roles","summary":"Tạo role mới","perm":"ROLE_CREATE"},{"method":"GET","path":"/api/rbac/roles","summary":"Danh sách role","perm":"ROLE_VIEW"},{"method":"GET","path":"/api/rbac/roles/{id}","summary":"Chi tiết role, kèm populate permissions","perm":"ROLE_VIEW"},{"method":"PUT","path":"/api/rbac/roles/{id}","summary":"Đổi tên role. Không đổi permissions ở đây.","perm":"ROLE_UPDATE"},{"method":"DELETE","path":"/api/rbac/roles/{id}","summary":"Xoá role","perm":"ROLE_DELETE"},{"method":"POST","path":"/api/rbac/roles/{id}/assign-permissions","summary":"Gán danh sách permission cho role","perm":"ROLE_ASSIGN_PERMISSIONS"},{"method":"POST","path":"/api/rbac/policies","summary":"Tạo policy mới","perm":"POLICY_CREATE"},{"method":"GET","path":"/api/rbac/policies","summary":"Danh sách policy","perm":"POLICY_VIEW"},{"method":"GET","path":"/api/rbac/policies/{id}","summary":"Chi tiết policy","perm":"POLICY_VIEW"},{"method":"PUT","path":"/api/rbac/policies/{id}","summary":"Cập nhật policy","perm":"POLICY_UPDATE"},{"method":"DELETE","path":"/api/rbac/policies/{id}","summary":"Xoá policy","perm":"POLICY_DELETE"}],"documents":[{"method":"POST","path":"/api/documents/proposal","summary":"Tạo Document (Proposal/Report)","perm":null},{"method":"GET","path":"/api/documents","summary":"Danh sách Document","perm":"DOCUMENT_READ"},{"method":"GET","path":"/api/documents/{id}","summary":"Chi tiết Document","perm":"DOCUMENT_DETAIL"},{"method":"PUT","path":"/api/documents/{id}","summary":"Cập nhật Document","perm":"DOCUMENT_UPDATE"},{"method":"DELETE","path":"/api/documents/{id}","summary":"Xoá mềm Document","perm":"DOCUMENT_DELETE"},{"method":"DELETE","path":"/api/documents/delete-by-month","summary":"Xoá hàng loạt Document theo tháng/năm","perm":"DOCUMENT_DELETE"},{"method":"PATCH","path":"/api/documents/restore/{id}","summary":"Khôi phục Document đã xoá mềm","perm":"DOCUMENT_UPDATE"},{"method":"GET","path":"/api/documents/{proposalId}/reports","summary":"Danh sách Report (biên bản) tham chiếu tới 1 Proposal","perm":"DOCUMENT_READ"}],"workflow":[{"method":"POST","path":"/api/workflows/templates","summary":"Tạo workflow template","perm":"WORKFLOW_TEMPLATE_CREATE"},{"method":"POST","path":"/api/workflows/submit","summary":"Gắn 1 Document vào workflow template để bắt đầu luồng duyệt","perm":"WORKFLOW_SUBMIT"},{"method":"GET","path":"/api/workflows/pending","summary":"Danh sách workflow đang chờ duyệt cho role của user hiện tại","perm":"WORKFLOW_VIEW"},{"method":"GET","path":"/api/workflows/document/{documentId}","summary":"Lấy workflow instance theo Document","perm":"WORKFLOW_VIEW"},{"method":"GET","path":"/api/workflows/{id}","summary":"Chi tiết workflow instance","perm":"WORKFLOW_VIEW"},{"method":"POST","path":"/api/workflows/{id}/approve","summary":"Duyệt bước hiện tại","perm":"WORKFLOW_APPROVE"},{"method":"POST","path":"/api/workflows/{id}/reject","summary":"Từ chối bước hiện tại","perm":"WORKFLOW_REJECT"},{"method":"POST","path":"/api/workflows/{id}/cancel","summary":"Huỷ workflow","perm":"WORKFLOW_CANCEL"},{"method":"POST","path":"/api/workflows/{id}/complete","summary":"Đánh dấu workflow đã hoàn tất công việc thực tế","perm":"WORKFLOW_COMPLETE"}],"assets":[{"method":"POST","path":"/api/assets","summary":"Tạo tài sản mới","perm":"ASSET_CREATE"},{"method":"GET","path":"/api/assets","summary":"Danh sách tài sản","perm":"ASSET_VIEW"},{"method":"GET","path":"/api/assets/export","summary":"Export danh sách tài sản ra file Excel (streaming)","perm":"ASSET_EXCEL_EXPORT"},{"method":"GET","path":"/api/assets/{id}","summary":"Chi tiết tài sản","perm":"ASSET_VIEW_DETAIL"},{"method":"PUT","path":"/api/assets/{id}","summary":"Cập nhật tài sản","perm":"ASSET_UPDATE"},{"method":"DELETE","path":"/api/assets/{id}","summary":"Xoá mềm tài sản","perm":"ASSET_DELETE"},{"method":"DELETE","path":"/api/assets/{id}/permanent","summary":"Xoá vĩnh viễn tài sản — chỉ áp dụng cho asset đã soft-delete","perm":"ASSET_DELETE_PERMANENT"},{"method":"PATCH","path":"/api/assets/{id}/restore","summary":"Khôi phục tài sản đã soft-delete","perm":"ASSET_UPDATE"},{"method":"POST","path":"/api/assets/alerts/run","summary":"Chạy tay kiểm tra cảnh báo bảo hành/bảo trì sắp hết hạn","perm":"ASSET_ALERTS_TRIGGER"},{"method":"GET","path":"/api/assets/import/template","summary":"Tải file Excel mẫu để import tài sản hàng loạt","perm":"ASSET_EXCEL_IMPORT"},{"method":"POST","path":"/api/assets/import","summary":"Import tài sản hàng loạt từ Excel","perm":"ASSET_EXCEL_IMPORT"},{"method":"GET","path":"/api/assets/lookup/{assetCode}","summary":"Tra cứu tài sản theo assetCode","perm":"ASSET_INVENTORY_CHECK"},{"method":"GET","path":"/api/assets/{id}/qrcode","summary":"Sinh ảnh QR code (PNG) cho 1 tài sản","perm":"ASSET_VIEW_DETAIL"},{"method":"POST","path":"/api/assets/{id}/check-in","summary":"Ghi nhận kiểm kê — xác nhận vẫn thấy tài sản","perm":"ASSET_INVENTORY_CHECK"},{"method":"POST","path":"/api/assets/asset-categories","summary":"Tạo danh mục tài sản","perm":"ASSET_CATEGORY_CREATE"},{"method":"GET","path":"/api/assets/asset-categories","summary":"Danh sách danh mục tài sản","perm":"ASSET_CATEGORY_VIEW"},{"method":"GET","path":"/api/assets/asset-categories/{id}","summary":"Chi tiết danh mục tài sản","perm":"ASSET_CATEGORY_VIEW"},{"method":"PUT","path":"/api/assets/asset-categories/{id}","summary":"Cập nhật danh mục tài sản","perm":"ASSET_CATEGORY_UPDATE"},{"method":"DELETE","path":"/api/assets/asset-categories/{id}","summary":"Xoá mềm danh mục tài sản","perm":"ASSET_CATEGORY_DELETE"},{"method":"DELETE","path":"/api/assets/asset-categories/{id}/permanent","summary":"Xoá vĩnh viễn danh mục tài sản","perm":"ASSET_CATEGORY_DELETE_PERMANENT"},{"method":"PATCH","path":"/api/assets/asset-categories/{id}/restore","summary":"Khôi phục danh mục đã soft-delete","perm":"ASSET_CATEGORY_UPDATE"}],"assignment":[{"method":"POST","path":"/api/assets/{id}/assign","summary":"Cấp phát tài sản từ kho cho khoa/phòng","perm":"ASSET_ASSIGN"},{"method":"POST","path":"/api/assets/{id}/transfer","summary":"Luân chuyển tài sản đang sử dụng","perm":"ASSET_ASSIGN"},{"method":"POST","path":"/api/assets/{id}/return","summary":"Thu hồi tài sản về kho","perm":"ASSET_ASSIGN"},{"method":"GET","path":"/api/assets/{id}/assignment-history","summary":"Lịch sử cấp phát/luân chuyển/thu hồi của 1 tài sản","perm":"ASSET_VIEW_DETAIL"}],"meddevice":[{"method":"POST","path":"/api/assets/medical-devices/{assetId}/profile","summary":"Gắn profile thiết bị y tế cho 1 Asset đã tồn tại","perm":"MEDICAL_DEVICE_CREATE"},{"method":"GET","path":"/api/assets/medical-devices/{assetId}/profile","summary":"Xem profile thiết bị y tế theo Asset","perm":"MEDICAL_DEVICE_VIEW"},{"method":"PUT","path":"/api/assets/medical-devices/{assetId}/profile","summary":"Cập nhật profile thiết bị y tế","perm":"MEDICAL_DEVICE_UPDATE"},{"method":"POST","path":"/api/assets/medical-devices/{assetId}/calibration-records","summary":"Ghi nhận 1 lần kiểm định mới","perm":"MEDICAL_DEVICE_CALIBRATE"},{"method":"GET","path":"/api/assets/medical-devices/{assetId}/calibration-records","summary":"Lịch sử kiểm định theo thiết bị","perm":"MEDICAL_DEVICE_VIEW"},{"method":"POST","path":"/api/assets/medical-devices/alerts/run","summary":"Chạy tay kiểm tra cảnh báo kiểm định sắp/đã quá hạn","perm":"MEDICAL_DEVICE_ALERTS_TRIGGER"}],"upload":[{"method":"POST","path":"/api/upload","summary":"Upload file đính kèm chung","perm":"UPLOAD_FILES"},{"method":"GET","path":"/api/upload","summary":"Danh sách file đã upload, chưa xoá","perm":"VIEW_FILES"},{"method":"GET","path":"/api/upload/{id}","summary":"Chi tiết 1 file đã upload","perm":"VIEW_FILE_DETAIL"},{"method":"DELETE","path":"/api/upload/{id}","summary":"Xoá mềm 1 file đã upload","perm":"DELETE_FILE"}],"notify":[{"method":"GET","path":"/api/notifications","summary":"Danh sách thông báo của user đang đăng nhập","perm":null},{"method":"GET","path":"/api/notifications/unread-count","summary":"Số lượng thông báo chưa đọc","perm":null},{"method":"PATCH","path":"/api/notifications/{id}/read","summary":"Đánh dấu 1 thông báo đã đọc","perm":null},{"method":"PATCH","path":"/api/notifications/read-all","summary":"Đánh dấu tất cả thông báo đã đọc","perm":null},{"method":"DELETE","path":"/api/notifications/{id}","summary":"Xoá 1 thông báo (của chính user)","perm":null}],"excel":[{"method":"GET","path":"/api/export/export-documents-excel","summary":"Export danh sách Document ra file Excel (streaming)","perm":"DOCUMENT_EXCEL_EXPORT"},{"method":"GET","path":"/api/export/template","summary":"Tải file Excel mẫu để import Document","perm":"DOCUMENT_EXCEL_TEMPLATE"},{"method":"POST","path":"/api/export/import-proposal","summary":"Import Document (Proposal) hàng loạt từ file Excel","perm":"DOCUMENT_EXCEL_IMPORT"},{"method":"POST","path":"/api/export/departments/sync-from-excel","summary":"Đồng bộ/tạo mới Department hàng loạt từ file Excel","perm":"EXCEL_DEPARTMENT_SYNC"},{"method":"GET","path":"/api/export/import-history","summary":"Lịch sử import Excel","perm":"DOCUMENT_EXCEL_HISTORY"}],"audit":[{"method":"GET","path":"/api/user-audits","summary":"Danh sách audit log","perm":"AUDIT_VIEW"},{"method":"GET","path":"/api/user-audits/export","summary":"Export audit log ra Excel/CSV","perm":"AUDIT_VIEW"},{"method":"GET","path":"/api/user-audits/dashboard","summary":"Thống kê audit log theo action/theo ngày","perm":"AUDIT_VIEW_DASHBOARD"}],"dashboard":[{"method":"GET","path":"/api/dashboard/admin-summary","summary":"Tổng quan toàn hệ thống","perm":"DASHBOARD_READ"},{"method":"GET","path":"/api/dashboard/department/{departmentId}","summary":"Thống kê theo 1 khoa/phòng ban","perm":"DASHBOARD_READ"},{"method":"GET","path":"/api/dashboard/kpi/proposal-conversion","summary":"KPI tỉ lệ chuyển đổi Proposal → Report theo khoa","perm":"DASHBOARD_READ"},{"method":"GET","path":"/api/dashboard/kpi/device-damage-trend","summary":"Xu hướng hư hỏng thiết bị theo tháng","perm":"DASHBOARD_READ"},{"method":"GET","path":"/api/dashboard/kpi/top-damaged-devices","summary":"Top thiết bị hư hỏng nhiều nhất","perm":"DASHBOARD_READ"},{"method":"GET","path":"/api/dashboard/kpi/top-damaged-inks","summary":"Top mực in hư hỏng/thay thế nhiều nhất","perm":"DASHBOARD_READ"},{"method":"GET","path":"/api/dashboard/device-stats","summary":"Thống kê số lượng mực/sửa chữa/dự trù theo tháng-năm","perm":"DASHBOARD_READ"},{"method":"GET","path":"/api/dashboard/assets/summary","summary":"Tổng quan tài sản","perm":"DASHBOARD_READ"},{"method":"GET","path":"/api/dashboard/assets/warranty-expiring","summary":"Danh sách tài sản sắp hết hạn bảo hành","perm":"DASHBOARD_READ"},{"method":"GET","path":"/api/dashboard/assets/maintenance-overdue","summary":"Danh sách tài sản quá hạn bảo trì","perm":"DASHBOARD_READ"},{"method":"GET","path":"/api/dashboard/medical-devices/summary","summary":"Tổng quan Thiết bị Y tế — theo class + tỷ lệ tuân thủ kiểm định","perm":"DASHBOARD_READ"},{"method":"GET","path":"/api/dashboard/medical-devices/calibration-due","summary":"Danh sách thiết bị sắp/đã quá hạn kiểm định","perm":"DASHBOARD_READ"}],"perf":[{"method":"GET","path":"/api/performances/dashboard","summary":"Thống kê hiệu năng API theo endpoint (chỉ ADMIN)","perm":null}],"auth":[{"method":"POST","path":"/api/auths/register","summary":"Đăng ký tài khoản mới","perm":null},{"method":"POST","path":"/api/auths/login","summary":"Đăng nhập","perm":null},{"method":"POST","path":"/api/auths/refresh-token","summary":"Làm mới access token bằng refresh token","perm":null},{"method":"POST","path":"/api/auths/logout","summary":"Đăng xuất (thu hồi refresh token hiện tại)","perm":null},{"method":"POST","path":"/api/auths/forgot-password","summary":"Gửi email hướng dẫn đặt lại mật khẩu","perm":null},{"method":"POST","path":"/api/auths/reset-password","summary":"Đặt lại mật khẩu bằng token nhận qua email","perm":null}]};
+
+/* Model (Mongoose schema) mỗi module sở hữu */
+const MODELS = {
+  auth: ['User (đọc/ghi khi login)', 'RefreshToken (ẩn)'],
+  rbac: ['Role', 'Permission', 'Policy'],
+  users: ['User', 'Department'],
+  documents: ['Document'],
+  workflow: ['WorkflowTemplate', 'WorkflowInstance'],
+  assets: ['Asset', 'AssetCategory'],
+  assignment: ['AssetAssignmentRecord (lịch sử)'],
+  meddevice: ['MedicalDeviceProfile', 'CalibrationRecord'],
+  upload: ['UploadedFile'],
+  notify: ['Notification'],
+  excel: ['ImportHistory'],
+  audit: ['UserAudit'],
+  dashboard: ['— chỉ đọc, không có schema riêng —'],
+  perf: ['PerformanceLog (ghi tự động)'],
+  client: [],
+  db: ['User','Role','Permission','Policy','Department','Document','WorkflowTemplate','WorkflowInstance','Asset','AssetCategory','AssetAssignmentRecord','MedicalDeviceProfile','CalibrationRecord','Notification','UploadedFile','ImportHistory','UserAudit'],
+};
+
+/* Quan hệ dữ liệu / liên kết module — dùng để trả lời "model này liên kết gì với model khác" */
+const RELATIONS = {
+  auth: [
+    {to:'users', label:'Xác thực dựa trên bản ghi User (username/password), trả kèm Role đã populate để FE biết quyền ngay sau khi đăng nhập.'},
+    {to:'rbac', label:'Token JWT mang theo thông tin đủ để RBAC Gate kiểm tra permission ở các request kế tiếp.'},
+  ],
+  rbac: [
+    {to:'users', label:'Mỗi User giữ đúng 1 Role (quan hệ n–1); Role gồm nhiều Permission (n–n) qua assign-permissions.'},
+    {to:'users', label:'User có thể override Role bằng extraPermissions[] (cấp thêm) và denyPermissions[] (thu hồi riêng).'},
+  ],
+  users: [
+    {to:'rbac', label:'User.role tham chiếu Role (n–1) — quyết định tập permission mặc định.'},
+    {to:'documents', label:'User là createdBy của Document; Department của User dùng để giới hạn phạm vi xem/sửa.'},
+    {to:'assets', label:'Department liên kết Asset.department; User có thể là assignedTo của Asset.'},
+    {to:'audit', label:'Mọi hành động của User (tạo/sửa/xoá ở module khác) đều được ghi lại tại User Audit Log.'},
+  ],
+  documents: [
+    {to:'users', label:'createdBy, signedBy[] tham chiếu User; department tham chiếu Department.'},
+    {to:'workflow', label:'1 Document có tối đa 1 Workflow Instance đang hoạt động (documentId); workflowStatus trên Document phản ánh currentStep.'},
+    {to:'assets', label:'relatedAsset (tuỳ chọn) liên kết Document tới 1 Asset cụ thể — ví dụ biên bản sự cố thiết bị.'},
+    {to:'documents', label:'referenceTo[] cho phép 1 Report tham chiếu ngược Proposal gốc — quan hệ tự tham chiếu trong cùng model.'},
+    {to:'excel', label:'Import/export hàng loạt qua module Excel, có file mẫu và lịch sử import riêng.'},
+    {to:'upload', label:'File đính kèm được lưu qua module Upload, gắn resourceId = Document._id.'},
+  ],
+  workflow: [
+    {to:'documents', label:'WorkflowInstance.documentId trỏ về đúng 1 Document — quan hệ 1–1 tại một thời điểm.'},
+    {to:'rbac', label:'Mỗi step trong WorkflowTemplate gắn 1 Role bắt buộc; người duyệt phải khớp đúng role đó mới approve/reject được.'},
+    {to:'notify', label:'approve / reject / complete đều sinh Notification gửi tới người tạo Document hoặc người duyệt bước kế tiếp.'},
+  ],
+  assets: [
+    {to:'users', label:'department, assignedTo, createdBy/updatedBy tham chiếu Department và User.'},
+    {to:'assignment', label:'Lịch sử assign/transfer/return lưu tách riêng, luôn tham chiếu ngược asset._id.'},
+    {to:'meddevice', label:'1 Asset có thể mở rộng thêm 1 MedicalDeviceProfile — quan hệ 1–1, KHÔNG phải subclass hay collection tách biệt.'},
+    {to:'documents', label:'Có thể được Document.relatedAsset tham chiếu tới, ví dụ trong biên bản sự cố.'},
+    {to:'notify', label:'Cảnh báo bảo hành/bảo trì sắp hết hạn (alerts/run) tự động sinh Notification.'},
+    {to:'excel', label:'Import/export hàng loạt kèm file mẫu qua module Excel/Assets.'},
+    {to:'dashboard', label:'Là nguồn số liệu chính cho các KPI: summary, warranty-expiring, maintenance-overdue.'},
+  ],
+  assignment: [
+    {to:'assets', label:'Mỗi bản ghi lịch sử gắn với đúng 1 Asset; sau khi assign/transfer/return, Asset.department và Asset.assignedTo được cập nhật.'},
+    {to:'users', label:'Ghi nhận Department nguồn–đích và User thực hiện thao tác cấp phát.'},
+  ],
+  meddevice: [
+    {to:'assets', label:'Quan hệ 1–1 bắt buộc với 1 Asset đã tồn tại (field asset) — mọi thao tác vòng đời khác (CRUD, cấp phát, QR...) vẫn dùng API Assets.'},
+    {to:'notify', label:'nextCalibrationDueDate sắp/đã quá hạn → sinh Notification qua alerts/run.'},
+    {to:'dashboard', label:'Nguồn số liệu cho tỷ lệ tuân thủ kiểm định theo deviceClass và danh sách calibration-due.'},
+  ],
+  upload: [
+    {to:'documents', label:'File đính kèm của Document liên kết qua resourceType/resourceId — thiết kế polymorphic, không khoá cứng vào 1 module.'},
+  ],
+  notify: [
+    {to:'users', label:'recipient và createdBy đều tham chiếu User.'},
+    {to:'workflow', label:'resourceType=Workflow khi thông báo liên quan tới duyệt/từ chối một bước.'},
+    {to:'assets', label:'resourceType=Asset/MedicalDevice khi thông báo là cảnh báo bảo hành/kiểm định.'},
+  ],
+  excel: [
+    {to:'documents', label:'Import/export hàng loạt Document (Proposal) kèm file mẫu.'},
+    {to:'assets', label:'Import/export hàng loạt Asset (thao tác riêng, nằm ở module Assets).'},
+    {to:'users', label:'Đồng bộ/tạo mới Department hàng loạt từ file Excel.'},
+  ],
+  audit: [
+    {to:'users', label:'performedBy (người thao tác) và user (đối tượng bị tác động) đều tham chiếu User.'},
+    {to:'rbac', label:'Ghi lại mọi hành động đã đi qua RBAC Gate — dùng để truy vết trách nhiệm khi có tranh chấp.'},
+  ],
+  dashboard: [
+    {to:'documents', label:'Tổng hợp workflowStatus để tính KPI tỉ lệ chuyển đổi Proposal → Report theo khoa.'},
+    {to:'assets', label:'Tổng hợp status, warrantyExpiredAt để ra assets/summary, warranty-expiring, maintenance-overdue.'},
+    {to:'meddevice', label:'Tổng hợp theo deviceClass và nextCalibrationDueDate cho khối Thiết bị Y tế.'},
+    {to:'workflow', label:'Số liệu xu hướng hư hỏng/thay thế dựa một phần trên các Report đã hoàn tất workflow.'},
+  ],
+  perf: [
+    {to:'rbac', label:'Đo thời gian xử lý của mọi request đã đi qua Gateway, không phân biệt module đích.'},
+  ],
+  client: [
+    {to:'auth', label:'Mọi phiên làm việc của Client đều bắt đầu bằng việc lấy access/refresh token tại đây.'},
+  ],
+  db: [
+    {to:'rbac', label:'Là nơi lưu Role/Permission/Policy — nguồn sự thật duy nhất cho việc kiểm tra quyền.'},
+    {to:'audit', label:'Lưu vết mọi thay đổi dữ liệu từ toàn bộ 18 module để phục vụ truy vết.'},
+  ],
+};
+
+/* ================= MODAL LOGIC ================= */
+const backdrop = document.getElementById('modalBackdrop');
+const modal = document.getElementById('modal');
+
+function nodeMeta(id){
+  const el = document.getElementById('node-'+id);
+  if(!el) return null;
+  return {
+    label: el.querySelector('.label').innerHTML,
+    sub: el.querySelector('.sub').textContent,
+    cat: el.querySelector('.cat').textContent,
+    color: getComputedStyle(el).getPropertyValue('--cat-color').trim() || '#22D3B8',
+  };
+}
+
+function openModal(id){
+  const meta = nodeMeta(id);
+  if(!meta) return;
+  modal.style.setProperty('--modal-color', meta.color);
+  document.getElementById('modalCat').textContent = meta.cat;
+  document.getElementById('modalTitle').innerHTML = meta.label;
+  document.getElementById('modalSub').textContent = meta.sub;
+
+  const models = MODELS[id] || [];
+  const modelsBox = document.getElementById('modalModels');
+  document.getElementById('modelsTitle').style.display = models.length ? '' : 'none';
+  modelsBox.style.display = models.length ? '' : 'none';
+  modelsBox.innerHTML = models.map(m=>`<span class="model-chip">${m}</span>`).join('');
+
+  const eps = EP[id] || [];
+  const epTable = document.getElementById('modalEndpoints');
+  if(eps.length){
+    epTable.style.display='';
+    epTable.innerHTML = eps.map(e=>`
+      <tr>
+        <td><span class="ep-method m-${e.method}">${e.method}</span></td>
+        <td class="ep-path">${e.path}</td>
+        <td class="ep-summary">${e.summary}</td>
+        <td class="ep-perm">${e.perm ? e.perm : '—'}</td>
+      </tr>`).join('');
+  } else {
+    epTable.style.display='none';
+  }
+
+  const rels = RELATIONS[id] || [];
+  const relBox = document.getElementById('modalRelations');
+  if(rels.length){
+    relBox.innerHTML = rels.map(r=>{
+      const t = nodeMeta(r.to);
+      const targetLabel = t ? t.label.replace(/<[^>]+>/g,'') : r.to;
+      return `<div class="rel-item">
+        <span class="rel-target" data-jump="${r.to}">${targetLabel}</span>
+        <span class="rel-desc">${r.label}</span>
+      </div>`;
+    }).join('');
+    relBox.querySelectorAll('.rel-target').forEach(btn=>{
+      btn.addEventListener('click', ()=> openModal(btn.dataset.jump));
+    });
+  } else {
+    relBox.innerHTML = '<div class="rel-desc">Không có quan hệ liên module ghi nhận riêng cho khối này.</div>';
+  }
+
+  backdrop.classList.add('open');
+  document.body.style.overflow='hidden';
+}
+
+function closeModal(){
+  backdrop.classList.remove('open');
+  document.body.style.overflow='';
+}
+
+document.getElementById('modalClose').addEventListener('click', closeModal);
+backdrop.addEventListener('click', (e)=>{ if(e.target===backdrop) closeModal(); });
+document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeModal(); });
+
+document.querySelectorAll('.node').forEach(n=>{
+  const id = n.id.replace('node-','');
+  n.classList.add('clickable');
+  n.innerHTML += '<span class="hint">Xem chi tiết →</span>';
+  n.addEventListener('click', ()=> openModal(id));
+});
+
+window.addEventListener('resize', draw);
+window.addEventListener('load', ()=>{ draw(); setTimeout(draw,120); });
+document.fonts && document.fonts.ready.then(draw);
+applyScenario('overview');
+draw();
+</script>
+</body>
+</html>

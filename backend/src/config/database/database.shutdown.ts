@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { flushPerformanceLogBuffer } from "../../shared/performance/performanceLogBuffer";
 
 /**
  * Đăng ký các event listener cho kết nối MongoDB để log rõ ràng trạng thái kết nối, lỗi, ngắt kết nối và tái kết nối. Điều này giúp dev dễ dàng theo dõi và debug trong cả môi trường development và production.
@@ -12,6 +13,11 @@ import mongoose from "mongoose";
 export const registerMongoShutdown = () => {
   const shutdown = async () => {
     try {
+      // Flush nốt buffer performance log còn kẹt trong RAM (xem
+      // `performanceLogBuffer.ts` — log được gom batch, chỉ ghi DB mỗi 10s
+      // hoặc khi đủ 50 bản ghi) trước khi đóng kết nối, tránh mất log của
+      // vài request cuối cùng trước lúc server tắt.
+      await flushPerformanceLogBuffer();
       await mongoose.connection.close();
       console.log("🛑 MongoDB connection closed");
       process.exit(0);
