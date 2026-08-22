@@ -12,7 +12,7 @@ import mongoose, { ClientSession } from "mongoose";
  *   set member or mongos
  *
  * Cách dùng — MỌI write bên trong callback đều PHẢI truyền `{ session }`,
- * nếu không write đó sẽ chạy NGOÀI transaction (không rollback được):
+ * nếu không write đó sẽ chạy N GOÀI transaction (không rollback được):
  *
  *   const result = await withTransaction(async (session) => {
  *     const doc = await Model.create({ ... }, { session });

@@ -145,7 +145,17 @@ export const createDocumentService = async (payload: CreateDocumentPayload) => {
         referenceTo: referenceArray,
         meta,
         relatedAsset:
-          subType === DocumentSubType.PROPOSE_REPAIR ? relatedAsset : undefined,
+                  // ⚠️ GIAI ĐOẠN 3 (đính kèm manual) — MANUAL cũng được phép lưu
+                  // relatedAsset (không bắt buộc, khác PROPOSE_REPAIR ở trên).
+                  // Trước đây field này bị ép `undefined` cho MỌI subType khác
+                  // PROPOSE_REPAIR — nếu không sửa dòng này, client gửi
+                  // `relatedAsset` kèm document MANUAL sẽ bị ÂM THẦM BỎ QUA (không
+                  // lỗi, nhưng liên kết asset↔manual không bao giờ được lưu).
+                  [DocumentSubType.PROPOSE_REPAIR, DocumentSubType.MANUAL].includes(subType)
+                    ? relatedAsset
+                    : undefined,
+        // relatedAsset:
+        //   subType === DocumentSubType.PROPOSE_REPAIR ? relatedAsset : undefined,
       },
       session, // ⚠️ xem giả định ở đầu file — cần `createDocument` forward session này
     );

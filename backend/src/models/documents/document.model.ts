@@ -7,6 +7,10 @@ import type { IDocument } from "../../interfaces/documents/document.interface";
 export enum DocumentCategory {
   PROPOSAL = "PROPOSAL",
   REPORT = "REPORT",
+  // GIAI ĐOẠN 3 (đính kèm manual thiết bị) — category MỚI, tách riêng
+  // khỏi PROPOSAL/REPORT vì bản chất khác hẳn: đây là tài liệu THAM KHẢO
+  // (không cần ai duyệt, không tham chiếu ngược PROPOSAL nào)
+  REFERENCE = "REFERENCE",
 }
 
 export enum DocumentSubType {
@@ -18,15 +22,17 @@ export enum DocumentSubType {
   // REPORT 2 loại biên bản kiểm tra hư hỏng, biên bản xác nhận tình trạng...
   CHECK_DAMAGE = "CHECK_DAMAGE",
   CONFIRM_STATUS = "CONFIRM_STATUS",
+  // REFERENCE — tài liệu kỹ thuật/hướng dẫn sử dụng, thường gắn với 1 Asset
+  // cụ thể qua `relatedAsset` (không bắt buộc)
+  MANUAL = "MANUAL",
 }
-
 
 /* ===== SCHEMA ===== */
 
 const DocumentSchema = new Schema<IDocument>(
   {
     documentCode: {
-      type: String
+      type: String,
     },
 
     category: {
@@ -55,7 +61,6 @@ const DocumentSchema = new Schema<IDocument>(
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
-
     },
 
     updatedBy: {
@@ -84,13 +89,13 @@ const DocumentSchema = new Schema<IDocument>(
       ref: "WorkflowInstance",
     },
 
-     workflowStatus: {
+    workflowStatus: {
       type: String,
       enum: ["pending", "approved", "rejected", "cancelled", "completed"],
       default: "pending",
     },
 
-     // 🔗 GIAI ĐOẠN 3 (module Asset) — xem giải thích đầy đủ ở interface
+    // 🔗 GIAI ĐOẠN 3 (module Asset) — xem giải thích đầy đủ ở interface
     // `IDocument.relatedAsset` phía trên.
     relatedAsset: {
       type: Schema.Types.ObjectId,
@@ -184,4 +189,3 @@ DocumentSchema.index({
 });
 
 export const Document = model<IDocument>("Document", DocumentSchema);
-

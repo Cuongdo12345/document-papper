@@ -1,5 +1,8 @@
 // constants/document.rules.ts
-import { DocumentCategory, DocumentSubType } from "../../models/documents/document.model";
+import {
+  DocumentCategory,
+  DocumentSubType,
+} from "../../models/documents/document.model";
 
 export const DOCUMENT_RULES: Record<
   DocumentSubType,
@@ -36,6 +39,12 @@ export const DOCUMENT_RULES: Record<
 
   PROPOSE_PROCUREMENT: {
     category: DocumentCategory.PROPOSAL,
+    requireReference: false,
+  },
+
+  // ===== TÀI LIỆU THAM KHẢO =====
+  MANUAL: {
+    category: DocumentCategory.REFERENCE,
     requireReference: false,
   },
 };

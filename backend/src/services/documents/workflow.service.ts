@@ -1,6 +1,7 @@
 import WorkflowTemplate from "../../models/documents/workflowTemplate.model";
 import WorkflowInstance from "../../models/documents/workflowInstance.model";
 import { Document, DocumentSubType } from "../../models/documents/document.model";
+import { Role } from "../../models/rbac/role.model";
 import ApiError from "../../shared/errors/ApiError";
 import {
   startAssetMaintenanceService,
@@ -36,9 +37,53 @@ import { withTransaction } from "../../shared/utils/withTransaction";
  * Asset) vẫn nằm NGOÀI transaction như thiết kế gốc.
  */
 
+/**
+ * ⚠️ GIAI ĐOẠN 3 (RBAC theo chức danh thật) — validate `steps[].role` khớp
+ * với 1 Role THẬT SỰ TỒN TẠI trong collection `roles`, trước khi cho tạo
+ * template. Trước đây (ghi chú ở `workflow.dto.ts`) field này chỉ được
+ * validate SHAPE (là string không rỗng) ở tầng DTO — một template với
+ * `role: "TRUONG_KHAO"` (gõ nhầm) vẫn được tạo thành công, và lỗi chỉ lộ ra
+ * SAU KHI submit workflow: không user nào có role khớp để duyệt được bước
+ * đó, document bị "kẹt" vĩnh viễn ở bước đó mà không ai nhận ra ngay.
+ *
+ * Kiểm tra ở đây (Business Logic layer), KHÔNG phải ở DTO — vì DTO
+ * (Zod, chạy trước khi vào service) không có quyền truy cập DB, trong khi
+ * việc "role này có tồn tại trong Role collection không" là 1 câu hỏi cần
+ * query DB, đúng trách nhiệm của service layer.
+ */
 export const createWorkflowTemplate = async (data: any) => {
+  const roleNamesInSteps: string[] = Array.isArray(data?.steps)
+    ? Array.from(
+        new Set(
+          data.steps
+            .map((s: any) => s?.role)
+            .filter((r: unknown): r is string => typeof r === "string" && r.length > 0),
+        ),
+      )
+    : [];
+
+  if (roleNamesInSteps.length > 0) {
+    const existingRoles = await Role.find({
+      name: { $in: roleNamesInSteps },
+    }).select("name");
+    const existingRoleNames = new Set(existingRoles.map((r) => r.name));
+
+    const invalidRoleNames = roleNamesInSteps.filter(
+      (name) => !existingRoleNames.has(name),
+    );
+
+    if (invalidRoleNames.length > 0) {
+      throw ApiError.badRequest(
+        `Role không tồn tại trong hệ thống: ${invalidRoleNames.join(", ")}. ` +
+          `Mỗi bước duyệt (steps[].role) phải khớp với 1 Role thật đã được tạo qua RBAC ` +
+          `(kiểm tra lại chính tả, hoặc tạo Role đó trước qua /api/rbac/roles).`,
+      );
+    }
+  }
+
   return await WorkflowTemplate.create(data);
 };
+
 
 /**
  * 🔗 GIAI ĐOẠN 3 (module Asset) — gọi khi 1 Document duyệt xong TOÀN BỘ

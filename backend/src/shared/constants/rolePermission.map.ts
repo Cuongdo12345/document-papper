@@ -123,6 +123,101 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.WORKFLOW_VIEW,
     PERMISSIONS.WORKFLOW_CANCEL,
     PERMISSIONS.WORKFLOW_COMPLETE,
-  ]
+  ],
    
+// ⚠️ GIAI ĐOẠN 3 (RBAC theo chức danh thật) — 3 role mới, PHỤC VỤ ĐÚNG 1
+  // mục đích: được gán vào `WorkflowTemplate.steps[].role` để tham gia
+  // duyệt tài liệu theo đúng cơ cấu tổ chức thật (trước đây mọi bước duyệt
+  // chỉ có thể gán cho "IT" vì đó là role DUY NHẤT có WORKFLOW_APPROVE
+  // ngoài ADMIN — không phản ánh đúng ai thực sự ký duyệt trong bệnh viện).
+  //
+  // Mỗi role dưới đây được cấp permission Ở MỨC TÍNH NĂNG (coarse-grained,
+  // giống pattern IT/USER phía trên) — quyền duyệt ĐÚNG BƯỚC nào của
+  // 1 workflow cụ thể vẫn do `workflow.service.ts` tự so khớp
+  // `step.role === req.user.role.name`, KHÔNG đổi ở đây.
+
+  // Trưởng khoa — duyệt đề xuất/báo cáo ở cấp khoa (bước đầu quy trình).
+  TRUONG_KHOA: [
+    PERMISSIONS.DOCUMENT_VIEW,
+    PERMISSIONS.DOCUMENT_VIEW_DETAIL,
+    PERMISSIONS.ASSET_VIEW,
+    PERMISSIONS.ASSET_VIEW_DETAIL,
+    PERMISSIONS.MEDICAL_DEVICE_VIEW,
+    PERMISSIONS.WORKFLOW_VIEW,
+    PERMISSIONS.WORKFLOW_APPROVE,
+    PERMISSIONS.WORKFLOW_REJECT,
+    PERMISSIONS.DASHBOARD_READ,
+  ],
+
+  // Điều dưỡng trưởng — cùng cấp thẩm quyền với Trưởng khoa trong quy
+  // trình duyệt (2 chức danh khác nhau nhưng cùng vai trò "trưởng đơn vị"
+  // trong sơ đồ duyệt), tách role riêng để dashboard/audit phân biệt được
+  // ai thực sự duyệt (không gộp chung 1 role cho 2 chức danh khác nhau).
+  DIEU_DUONG_TRUONG: [
+    PERMISSIONS.DOCUMENT_VIEW,
+    PERMISSIONS.DOCUMENT_VIEW_DETAIL,
+    PERMISSIONS.ASSET_VIEW,
+    PERMISSIONS.ASSET_VIEW_DETAIL,
+    PERMISSIONS.MEDICAL_DEVICE_VIEW,
+    PERMISSIONS.WORKFLOW_VIEW,
+    PERMISSIONS.WORKFLOW_APPROVE,
+    PERMISSIONS.WORKFLOW_REJECT,
+    PERMISSIONS.DASHBOARD_READ,
+  ],
+
+  // Ban Giám đốc — bước duyệt CUỐI CÙNG, thẩm quyền cao nhất trừ ADMIN hệ
+  // thống. Cố tình KHÔNG cấp các quyền vận hành/CUD tài sản/tài liệu — vai
+  // trò của bước này trong quy trình là PHÊ DUYỆT, không phải người trực
+  // tiếp tạo/sửa dữ liệu.
+  BAN_GIAM_DOC: [
+    PERMISSIONS.DOCUMENT_VIEW,
+    PERMISSIONS.DOCUMENT_VIEW_DETAIL,
+    PERMISSIONS.ASSET_VIEW,
+    PERMISSIONS.ASSET_VIEW_DETAIL,
+    PERMISSIONS.MEDICAL_DEVICE_VIEW,
+    PERMISSIONS.WORKFLOW_VIEW,
+    PERMISSIONS.WORKFLOW_APPROVE,
+    PERMISSIONS.WORKFLOW_REJECT,
+    PERMISSIONS.DASHBOARD_READ,
+    PERMISSIONS.AUDIT_VIEW,
+    PERMISSIONS.AUDIT_VIEW_DASHBOARD,
+  ],
+  // Phòng Vật tư - Trang thiết bị y tế — ở nhiều bệnh viện đây là bộ phận
+  // TÁCH RIÊNG khỏi IT/CNTT (IT lo máy tính/phần mềm, Vật tư-TTB lo mua
+  // sắm/bảo trì thiết bị y tế vật lý). Cấp quyền quản lý Asset/Medical
+  // Device tương đương IT — CỘNG THÊM, không rút bớt quyền hiện có của IT,
+  // để không phá hành vi hiện tại ở những nơi đang gộp chung 1 người vừa
+  // là IT vừa quản vật tư.
+  PHONG_VAT_TU_TTB: [
+    PERMISSIONS.ASSET_VIEW,
+    PERMISSIONS.ASSET_VIEW_DETAIL,
+    PERMISSIONS.ASSET_CREATE,
+    PERMISSIONS.ASSET_UPDATE,
+    PERMISSIONS.ASSET_DELETE,
+    PERMISSIONS.ASSET_ASSIGN,
+    PERMISSIONS.ASSET_ALERTS_TRIGGER,
+    PERMISSIONS.ASSET_EXCEL_EXPORT,
+    PERMISSIONS.ASSET_EXCEL_IMPORT,
+    PERMISSIONS.ASSET_INVENTORY_CHECK,
+    PERMISSIONS.ASSET_DISPOSE,
+    PERMISSIONS.ASSET_CATEGORY_VIEW,
+    PERMISSIONS.ASSET_CATEGORY_CREATE,
+    PERMISSIONS.ASSET_CATEGORY_UPDATE,
+    PERMISSIONS.ASSET_CATEGORY_DELETE,
+
+    PERMISSIONS.MEDICAL_DEVICE_CREATE,
+    PERMISSIONS.MEDICAL_DEVICE_VIEW,
+    PERMISSIONS.MEDICAL_DEVICE_UPDATE,
+    PERMISSIONS.MEDICAL_DEVICE_CALIBRATE,
+    PERMISSIONS.MEDICAL_DEVICE_ALERTS_TRIGGER,
+
+    PERMISSIONS.DASHBOARD_READ,
+
+    // Tham gia luồng duyệt đề xuất sửa chữa/mua sắm với vai trò thẩm định
+    // kỹ thuật (thường đứng SAU Trưởng khoa, TRƯỚC Ban Giám đốc trong quy
+    // trình PROPOSE_REPAIR/PROPOSE_PROCUREMENT).
+    PERMISSIONS.WORKFLOW_VIEW,
+    PERMISSIONS.WORKFLOW_APPROVE,
+    PERMISSIONS.WORKFLOW_REJECT,
+  ],
 };

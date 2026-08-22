@@ -20,6 +20,7 @@ import {
 } from "../../services/assets/assetDevice/assetExcel.service";
 import { catchAsync } from "../../shared/utils/catchAsync";
 import { runAssetAlertsService } from "../../services/assets/assetDevice/assetAlerts.service";
+import { getAllDocumentsService } from "../../services/documents/document.service";
 import ApiError from "../../shared/errors/ApiError";
 
 /**
@@ -217,3 +218,34 @@ export const checkInAsset = catchAsync(async (req: Request, res: Response) => {
     data: asset,
   });
 });
+
+/**
+ * GIAI ĐOẠN 3 (đính kèm manual) — danh sách tài liệu liên quan tới 1 asset
+ * (dùng cho: xem manual/hướng dẫn sử dụng, đề xuất sửa chữa, biên bản...
+ * của thiết bị này). KHÔNG viết lại query logic — gọi thẳng
+ * `getAllDocumentsService` đã có sẵn đầy đủ pagination/filter/sort, chỉ ép
+ * cứng `relatedAsset = :id` từ URL param.
+ *
+ * FE cho phép lọc thêm qua query string như bình thường, vd:
+ *   GET /api/assets/:id/documents?subType=MANUAL   (chỉ xem manual)
+ *   GET /api/assets/:id/documents                  (toàn bộ tài liệu liên quan)
+ *
+ * Đây chính là bước "nối QR tới thông tin thiết bị" đã đề cập ở roadmap:
+ * QR code (xem `assetQRCode.service.ts`) CHỦ Ý chỉ encode `assetCode`
+ * (không encode URL — lý do đã giải thích tại đó). Luồng đúng: FE quét QR
+ * → gọi `GET /api/assets/lookup/:assetCode` (đã có) lấy `assetId` → gọi
+ * endpoint này để lấy danh sách manual/tài liệu của đúng thiết bị đó.
+ */
+export const getAssetDocuments = catchAsync(
+  async (req: Request, res: Response) => {
+    const result = await getAllDocumentsService({
+      ...req.query,
+      relatedAsset: req.params.id,
+    });
+
+    res.json({
+      message: "Danh sách tài liệu của tài sản",
+      ...result,
+    });
+  },
+);

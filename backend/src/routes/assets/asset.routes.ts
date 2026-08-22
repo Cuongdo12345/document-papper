@@ -13,7 +13,8 @@ import {
   getAssetQRCode,
   lookupAssetByCode,
   checkInAsset,
-  exportAssets
+  exportAssets,
+  getAssetDocuments,
 } from "../../controllers/assets/asset.controller";
 import { authenticate } from "../../middlewares/auth.middleware";
 import { uploadExcel } from "../../middlewares/upload.middleware";
@@ -165,12 +166,12 @@ router.get(
 
 // * =====================================================================
 //    GIAI ĐOẠN 4 — Cảnh báo bảo hành/bảo trì (chạy tay, ngoài lịch cron)
- 
+
 //    Đặt route "/alerts/run" TRƯỚC hay sau các route "/:id..." đều không
 //    xung đột (khác số lượng segment path), nhưng đặt ở cuối cùng nhóm với
 //    nhau cho dễ đọc — theo đúng thứ tự các Giai đoạn đã build.
 // ===================================================================== */
- 
+
 router.post(
   "/alerts/run",
   authenticate,
@@ -230,5 +231,16 @@ router.post(
   checkInAsset,
 );
 
+/**
+ * Dùng chung DOCUMENT_READ (không phải ASSET_*) vì dữ liệu trả về là
+ * Document — đúng permission bảo vệ resource thật sự được đọc.
+ */
+router.get(
+  "/:id/documents",
+  authenticate,
+  authorizePermission("DOCUMENT_READ"),
+  validateParams(IdParamDTO),
+  getAssetDocuments,
+);
 
 export default router;
