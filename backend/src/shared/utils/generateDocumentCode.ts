@@ -1,7 +1,10 @@
 import { Types } from "mongoose";
 import Department from "../../models/departments/department.model";
 import { getNextSequence } from "../utils/getNext";
-import { Document, DocumentCategory } from "../../models/documents/document.model";
+import {
+  Document,
+  DocumentCategory,
+} from "../../models/documents/document.model";
 import ApiError from "../errors/ApiError";
 
 /**
@@ -20,7 +23,7 @@ import ApiError from "../errors/ApiError";
 export const generateDocumentCode = async (
   category: DocumentCategory,
   departmentId: Types.ObjectId,
-  createdAt?: Date
+  createdAt?: Date,
 ): Promise<string> => {
   const department = await Department.findById(departmentId);
 
@@ -30,7 +33,19 @@ export const generateDocumentCode = async (
 
   const deptCode = department.code.toUpperCase();
 
-  const prefix = category === DocumentCategory.PROPOSAL ? "PR" : "RP";
+  // ⚠️ GIAI ĐOẠN 3 (đính kèm manual) — trước đây chỉ phân biệt 2 nhánh
+  // (`PROPOSAL` → "PR", MỌI category khác → "RP"). Khi thêm
+  // `DocumentCategory.REFERENCE`, ternary cũ sẽ ÂM THẦM gán prefix "RP"
+  // (nghĩa là "Report"/biên bản) cho tài liệu MANUAL — sai về mặt hiển thị,
+  // gây nhầm lẫn khi nhân viên đọc mã tài liệu (vd thấy "RP-..." tưởng là
+  // biên bản trong khi thực chất là hướng dẫn sử dụng). Liệt kê tường minh
+  // từng category thay vì suy luận qua phủ định.
+  const prefix =
+    category === DocumentCategory.PROPOSAL
+      ? "PR"
+      : category === DocumentCategory.REPORT
+        ? "RP"
+        : "RF"; // REFERENCE (manual/tài liệu tham khảo)
 
   const baseDate = createdAt || new Date();
   const year = baseDate.getFullYear();
@@ -74,4 +89,3 @@ Không duplicate documentCode	✅
 Scale cho nhiều server	✅
 Production ready	✅
  */
-

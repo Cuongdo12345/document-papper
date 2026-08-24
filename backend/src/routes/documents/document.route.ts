@@ -39,7 +39,7 @@ router.post(
 router.get(
   "/",
   authenticate,
-  authorizePermission("DOCUMENT_READ"),
+  authorizePermission("DOCUMENT_VIEW"),
   // validateQuery(QueryDocumentDTO),
   getAllDocuments,
 );
@@ -96,7 +96,7 @@ router.patch(
 router.get(
   "/:proposalId/reports",
   authenticate,
-  authorizePermission("DOCUMENT_READ"),
+  authorizePermission("DOCUMENT_VIEW"),
   validateParams(makeIdParamDTO("proposalId", "Proposal id không hợp lệ")),
   getReportsByProposals,
 );

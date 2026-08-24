@@ -232,13 +232,13 @@ router.post(
 );
 
 /**
- * Dùng chung DOCUMENT_READ (không phải ASSET_*) vì dữ liệu trả về là
+ * Dùng chung DOCUMENT_VIEW (không phải ASSET_*) vì dữ liệu trả về là
  * Document — đúng permission bảo vệ resource thật sự được đọc.
  */
 router.get(
   "/:id/documents",
   authenticate,
-  authorizePermission("DOCUMENT_READ"),
+  authorizePermission("DOCUMENT_VIEW"),
   validateParams(IdParamDTO),
   getAssetDocuments,
 );

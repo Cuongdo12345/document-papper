@@ -1802,6 +1802,110 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/assets/{id}/documents:
+    get:
+      tags: [Assets]
+      summary: Danh sách tài liệu liên quan tới 1 tài sản (permission DOCUMENT_READ)
+      description: >
+        Dùng chung permission DOCUMENT_READ (không phải ASSET_*) vì dữ liệu
+        trả về là Document — đúng permission bảo vệ resource thật sự được
+        đọc. Gọi lại y hệt GET /api/documents (cùng service, cùng bộ
+        filter/sort/pagination) nhưng ép cứng `relatedAsset = :id` từ URL.
+        Có thể lọc thêm qua query string như bình thường, ví dụ chỉ lấy
+        manual: `?subType=MANUAL`.
+
+
+        ⚠️ Khác với GET /api/documents (dùng QueryDocumentDTO validate/coerce
+        query), route này KHÔNG có validateQuery — `page`/`limit` không được
+        ép kiểu number, filter không được whitelist qua DTO. Coi giá trị trả
+        về là "best effort", không đảm bảo validate chặt như endpoint
+        documents gốc.
+
+
+        Đây là bước "nối QR tới thông tin thiết bị": FE quét QR (chỉ encode
+        assetCode) → gọi GET /api/assets/lookup/{assetCode} lấy assetId →
+        gọi endpoint này lấy danh sách manual/tài liệu.
+      parameters:
+        - { $ref: "#/components/parameters/IdParam" }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 10 }
+        - name: category
+          in: query
+          schema: { type: string, enum: [PROPOSAL, REPORT, REFERENCE] }
+        - name: subType
+          in: query
+          schema:
+            type: string
+            enum:
+              [
+                PROPOSE_REPAIR,
+                PROPOSE_INK,
+                PROPOSE_PROCUREMENT,
+                CHECK_DAMAGE,
+                CONFIRM_STATUS,
+                MANUAL,
+              ]
+        - name: isActive
+          in: query
+          schema: { type: boolean }
+        - name: keyword
+          in: query
+          schema: { type: string, maxLength: 100 }
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum:
+              [
+                createdAt,
+                updatedAt,
+                title,
+                documentCode,
+                serviceDate,
+                actualCost,
+              ]
+            default: createdAt
+        - name: order
+          in: query
+          schema: { type: string, enum: [asc, desc], default: desc }
+        - name: workflowStatus
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected, cancelled, completed]
+        - name: createdBy
+          in: query
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+        - name: department
+          in: query
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+        - name: fromDate
+          in: query
+          schema: { type: string, format: date }
+        - name: toDate
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Document" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   # ================= MEDICAL DEVICE =================
   # ⚠️ GHI CHÚ: route file gốc (`medicalDevice.routes.ts`) chỉ định nghĩa
   # path tương đối "/:assetId/profile" — file `app.ts` (nơi mount prefix)
