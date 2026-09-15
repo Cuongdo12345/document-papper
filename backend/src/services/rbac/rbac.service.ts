@@ -11,6 +11,7 @@ import {User} from "../../models/users/user.model";
 import ApiError from "../../shared/errors/ApiError";
 import { clearPermissionCache, clearAllPermissionCache } from "./permission.cache";
 import { assertPolicyConditionSyntaxValid } from "../../shared/utils/Policycondition.evaluator";
+import { escapeRegex } from "../../shared/utils/regex.util";
 import {
   NotificationType,
 } from "../../models/notifications/notification.model";
@@ -91,16 +92,18 @@ export const getPermissionService = async (query: any) => {
   if (resource) filter.resource = resource;
   if (action) filter.action = action;
  
+  // DEV-010/IMP-015 (SEC-36/RV06-02): escape trước khi đưa vào $regex.
   if (keyword) {
+    const safeKeyword = escapeRegex(keyword);
     filter.$or = [
-      { name: { $regex: keyword, $options: "i" } },
-      { description: { $regex: keyword, $options: "i" } },
+      { name: { $regex: safeKeyword, $options: "i" } },
+      { description: { $regex: safeKeyword, $options: "i" } },
     ];
   }
- 
+
   const skip = (page - 1) * limit;
   const sortOption: any = { [sortBy]: order === "asc" ? 1 : -1 };
- 
+
   const [items, total] = await Promise.all([
     Permission.find(filter).sort(sortOption).skip(skip).limit(limit),
     Permission.countDocuments(filter),
@@ -112,7 +115,11 @@ export const getPermissionService = async (query: any) => {
       page,
       limit,
       total,
-      totalPage: Math.ceil(total / limit),
+      // DEV-025/ARCH-31: đổi `totalPage`→`totalPages` — khớp convention đa số
+      // domain khác VÀ khớp field đã document sẵn trong OpenAPI (chỉ có
+      // `totalPages`), trước đây RBAC là 1 trong 2 nơi lệch khỏi cả 2 nguồn
+      // sự thật đó.
+      totalPages: Math.ceil(total / limit),
     },
   };
 };
@@ -272,13 +279,14 @@ export const getRoleService = async (query: any) => {
  
   const filter: any = {};
  
+  // DEV-010/IMP-015 (SEC-36/RV06-02): escape trước khi đưa vào $regex.
   if (keyword) {
-    filter.name = { $regex: keyword, $options: "i" };
+    filter.name = { $regex: escapeRegex(keyword), $options: "i" };
   }
- 
+
   const skip = (page - 1) * limit;
   const sortOption: any = { [sortBy]: order === "asc" ? 1 : -1 };
- 
+
   const [items, total] = await Promise.all([
     Role.find(filter)
       .populate("permissions")
@@ -294,7 +302,11 @@ export const getRoleService = async (query: any) => {
       page,
       limit,
       total,
-      totalPage: Math.ceil(total / limit),
+      // DEV-025/ARCH-31: đổi `totalPage`→`totalPages` — khớp convention đa số
+      // domain khác VÀ khớp field đã document sẵn trong OpenAPI (chỉ có
+      // `totalPages`), trước đây RBAC là 1 trong 2 nơi lệch khỏi cả 2 nguồn
+      // sự thật đó.
+      totalPages: Math.ceil(total / limit),
     },
   };
 };
@@ -329,6 +341,29 @@ export const updateRoleService = async (id: any, payload: any) => {
   }
 
   const safePayload = pickWhitelisted(payload, ROLE_UPDATE_WHITELIST);
+
+  // 🔒 SECURITY FIX (DEV-001 / SEC-28 / RV02-01 — rename-to-ADMIN backdoor):
+  // `authorizePermission.middleware.ts` cấp Super-Admin bypass bằng cách so
+  // khớp CHUỖI `role.name === "ADMIN"`. Trước bản vá này, `updateRoleService`
+  // chỉ whitelist `name` nhưng KHÔNG chặn giá trị — 1 user có `ROLE_UPDATE`
+  // có thể (1) đổi role ADMIN gốc sang tên khác rồi (2) đổi 1 role bất kỳ
+  // khác thành "ADMIN", tạo backdoor toàn quyền độc lập với ISS-01 (đã fix).
+  // Guard dưới đây bảo lưu chuỗi "ADMIN" là tên bất biến của ĐÚNG 1 role hệ
+  // thống: không cho đổi role đang tên "ADMIN" sang tên khác, và không cho
+  // đổi role khác thành "ADMIN".
+  if (
+    role.name === "ADMIN" &&
+    safePayload.name !== undefined &&
+    safePayload.name !== "ADMIN"
+  ) {
+    throw ApiError.forbidden('Không thể đổi tên role hệ thống "ADMIN".');
+  }
+  if (role.name !== "ADMIN" && safePayload.name === "ADMIN") {
+    throw ApiError.forbidden(
+      'Không thể đặt tên role thành "ADMIN" — tên này được bảo lưu cho role hệ thống.'
+    );
+  }
+
   Object.assign(role, safePayload);
   const saved = await role.save();
 
@@ -472,13 +507,14 @@ export const getPolicieService = async (query: any) => {
   if (resource) filter.resource = resource;
   if (action) filter.action = action;
  
+  // DEV-010/IMP-015 (SEC-36/RV06-02): escape trước khi đưa vào $regex.
   if (keyword) {
-    filter.name = { $regex: keyword, $options: "i" };
+    filter.name = { $regex: escapeRegex(keyword), $options: "i" };
   }
- 
+
   const skip = (page - 1) * limit;
   const sortOption: any = { [sortBy]: order === "asc" ? 1 : -1 };
- 
+
   const [items, total] = await Promise.all([
     Policy.find(filter).sort(sortOption).skip(skip).limit(limit),
     Policy.countDocuments(filter),
@@ -490,7 +526,11 @@ export const getPolicieService = async (query: any) => {
       page,
       limit,
       total,
-      totalPage: Math.ceil(total / limit),
+      // DEV-025/ARCH-31: đổi `totalPage`→`totalPages` — khớp convention đa số
+      // domain khác VÀ khớp field đã document sẵn trong OpenAPI (chỉ có
+      // `totalPages`), trước đây RBAC là 1 trong 2 nơi lệch khỏi cả 2 nguồn
+      // sự thật đó.
+      totalPages: Math.ceil(total / limit),
     },
   };
 };

@@ -90,4 +90,14 @@ AssetSchema.index({ category: 1, status: 1 });
 AssetSchema.index({ assignedTo: 1 });
 AssetSchema.index({ name: "text", assetCode: "text", serialNumber: "text" });
 
+/**
+ * DEV-018/IMP-024 (PERF-03 mở rộng phạm vi bởi RV07-02): Phase 10 gốc chỉ
+ * ghi nhận `Document` thiếu index `isActive` cho dashboard — RV07-02 xác
+ * nhận `Asset` có CÙNG gap (`assetDashboard.service.ts` lọc `{isActive:
+ * true}` ở nhiều aggregate) mà trước đây KHÔNG có index nào chứa
+ * `isActive`/`deletedAt`. Cùng shape với index tương ứng trên `Document`
+ * (`document.model.ts`) cho nhất quán.
+ */
+AssetSchema.index({ isActive: 1, deletedAt: 1, createdAt: -1 });
+
 export const Asset = model<IAsset>("Asset", AssetSchema);

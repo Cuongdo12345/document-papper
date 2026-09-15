@@ -287,9 +287,24 @@ export const exportAuditLogsExcel = async (query: ExportAuditFilter, res: any) =
  * giản (không dùng regex phức tạp/backtracking), khác hẳn tình huống
  * `$regex` search (mục #5 trong đề xuất trước) — nên KHÔNG áp dụng lại kỹ
  * thuật escape regex của Excel module ở đây vì bản chất vấn đề khác nhau.
+ *
+ * ⚠️ DEV-015/MEDIUM-07 (CSV/Excel Formula Injection, SEC-15): quy tắc RFC
+ * 4180 ở trên KHÔNG neutralize ký tự kích hoạt công thức (`=`, `+`, `-`,
+ * `@`, tab) — nếu 1 field (VD `note`, free-text) bắt đầu bằng các ký tự này,
+ * Excel/LibreOffice có thể diễn giải nội dung như 1 công thức khi người NHẬN
+ * mở file. Prefix `'` (single quote) cho field bắt đầu bằng các ký tự này
+ * TRƯỚC khi áp quy tắc quoting RFC 4180 — Excel hiển thị `'` như dấu hiệu
+ * "ép kiểu text", không hiển thị dấu `'` ra ngoài.
  */
+const FORMULA_INJECTION_TRIGGER = /^[=+\-@\t]/;
+
 const escapeCsvField = (value: unknown): string => {
-  const str = String(value ?? "");
+  let str = String(value ?? "");
+
+  if (FORMULA_INJECTION_TRIGGER.test(str)) {
+    str = `'${str}`;
+  }
+
   const needsQuoting = /[",\n\r]/.test(str);
 
   if (!needsQuoting) return str;

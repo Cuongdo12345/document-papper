@@ -36,7 +36,7 @@ router.get(
   "/",
   authenticate,
   authorizePermission("ASSET_CATEGORY_VIEW"),
-  // validateQuery(QueryAssetCategoryDTO),
+  validateQuery(QueryAssetCategoryDTO),
   getAllAssetCategories,
 );
 

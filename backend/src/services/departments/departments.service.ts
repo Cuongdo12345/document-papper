@@ -4,6 +4,8 @@ import UserAudit from "../../models/users/userAudit.model";
 import ApiError from "../../shared/errors/ApiError";
 import { User } from "../../models/users/user.model";
 import {Document} from "../../models/documents/document.model";
+import { Asset } from "../../models/assets/asset.model";
+import { escapeRegex } from "../../shared/utils/regex.util";
 
 // ================================ SERVICE MỚI CHUYỂN LOGIC XỬ LÝ LIÊN QUAN ĐẾN DEPARTMENT VỀ ĐÂY ================================
 // Service sẽ chứa logic xử lý nghiệp vụ liên quan đến department, ví dụ: tạo khoa, lấy danh sách khoa, v.v.
@@ -61,20 +63,23 @@ export const getAllDepartmentsService = async (query: any) => {
   const filter: any = {};
 
   // 🔎 SEARCH KEYWORD CHUNG
+  // DEV-010/IMP-015 (SEC-36/RV06-02): escape trước khi đưa vào $regex —
+  // chặn ReDoS/lỗi regex khi keyword chứa ký tự đặc biệt.
   if (keyword) {
+    const safeKeyword = escapeRegex(keyword);
     filter.$or = [
-      { code: { $regex: keyword, $options: "i" } },
-      { name: { $regex: keyword, $options: "i" } },
+      { code: { $regex: safeKeyword, $options: "i" } },
+      { name: { $regex: safeKeyword, $options: "i" } },
     ];
   }
 
   // 🔎 FILTER RIÊNG
   if (code) {
-    filter.code = { $regex: code, $options: "i" };
+    filter.code = { $regex: escapeRegex(code), $options: "i" };
   }
 
   if (name) {
-    filter.name = { $regex: name, $options: "i" };
+    filter.name = { $regex: escapeRegex(name), $options: "i" };
   }
 
   // 📄 PAGINATION
@@ -202,6 +207,21 @@ export const deleteDepartmentService = async (
   if (documentExists) {
     throw ApiError.badRequest(
       "Không thể xoá khoa vì vẫn còn document thuộc khoa này"
+    );
+  }
+
+  // ✅ CHECK ASSET ĐANG GÁN CHO KHOA (DEV-012/IMP-017)
+  // Asset.department là field bắt buộc (khoa/phòng đang quản lý tài sản) —
+  // nếu xoá Department mà không check, tài sản sẽ mang reference "mồ côi"
+  // vĩnh viễn. Chỉ check reference HIỆN TẠI (Asset.department), KHÔNG check
+  // AssetAssignmentHistory (log bất biến, chỉ mang tính lịch sử/audit —
+  // cho phép dangling reference ở đây, quyết định đã xác nhận với người
+  // dùng, tránh khoá cứng không bao giờ xoá được Department từng có phát
+  // sinh luân chuyển tài sản).
+  const assetExists = await Asset.exists({ department: id });
+  if (assetExists) {
+    throw ApiError.badRequest(
+      "Không thể xoá khoa vì vẫn còn tài sản đang gán cho khoa này"
     );
   }
 

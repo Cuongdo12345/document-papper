@@ -8,10 +8,16 @@ import {
   getReportsByProposalService,
   restoreDocumentService,
   deleteDocumentsByMonthService,
+  getDocumentVersionsService,
 } from "../../services/documents/document.service";
 
 import { catchAsync } from "../../shared/utils/catchAsync";
 import ApiError from "../../shared/errors/ApiError";
+// DEV-040 (2026-09-10): tra permission trực tiếp qua cache — KHÔNG dùng
+// `req.user.permissions` (field đó LUÔN rỗng, `auth.middleware.ts` chỉ khởi
+// tạo `[]`, không nơi nào gán lại — xem `shared/types/express.d.ts`).
+import { getCachedPermissions } from "../../services/rbac/permission.cache";
+import { PERMISSIONS } from "../../shared/constants/permission.constant";
 
 /* ===============================
    CREATE
@@ -45,11 +51,38 @@ export const getDocumentById = catchAsync(async (req: Request, res: Response) =>
 });
 
 /* ===============================
+   GET VERSION HISTORY (Roadmap A4)
+=============================== */
+export const getDocumentVersions = catchAsync(async (req: Request, res: Response) => {
+  const versions = await getDocumentVersionsService(req.params.id);
+
+  res.json({
+    success: true,
+    message: "Lấy lịch sử phiên bản thành công",
+    data: versions,
+  });
+});
+
+/* ===============================
    GET ALL
 =============================== */
 export const getAllDocuments = catchAsync(async (req: Request, res: Response) => {
 
-  const result = await getAllDocumentsService(req.query);
+  // DEV-030: department-scoping cho danh sách — đồng bộ cách suy ra `isAdmin`
+  // đã dùng ở `updateDocuments` bên dưới (DEV-001A: ưu tiên `isSystemRole`).
+  //
+  // DEV-040 (2026-09-10): thêm `canViewAllDepartments` — permission
+  // `DOCUMENT_VIEW_ALL_DEPARTMENTS` (IT đã được gán) cho phép bypass
+  // department-scoping giống `isAdmin`, xem `getAllDocumentsService`.
+  const userPermissions = await getCachedPermissions(req.user!._id.toString());
+
+  const result = await getAllDocumentsService({
+    query: req.query,
+    callerDepartment: req.user!.department,
+    // 🔒 DEV-001A Phase B hoàn tất (DEV-047, 2026-09-12).
+    isAdmin: req.user!.role.isSystemRole === true,
+    canViewAllDepartments: userPermissions.includes(PERMISSIONS.DOCUMENT_VIEW_ALL_DEPARTMENTS),
+  });
 
   res.json({
     success: true,
@@ -72,7 +105,8 @@ export const updateDocuments = catchAsync(async (req: Request, res: Response) =>
     id: req.params.id,
     userId: req.user!._id,
     callerDepartment: req.user!.department,
-    isAdmin: req.user!.role.name === "ADMIN",
+    // 🔒 DEV-001A Phase B hoàn tất (DEV-047, 2026-09-12).
+    isAdmin: req.user!.role.isSystemRole === true,
     updateData: req.body,
   });
 
@@ -102,6 +136,8 @@ export const deleteDocuments = catchAsync(async (req: Request, res: Response) =>
     id: req.params.id,
     userId: user._id,
     role: user.role.name,
+    // 🔒 DEV-001A: ưu tiên cờ security identity, giữ `role` (literal) làm lưới đỡ (Phase A).
+    isSystemRole: user.role.isSystemRole === true,
   });
 
   res.json({
@@ -128,11 +164,18 @@ export const deleteDocumentsByMonth = catchAsync(async (req: Request, res: Respo
     throw ApiError.badRequest("month và year là bắt buộc");
   }
 
-  const result = await deleteDocumentsByMonthService(
+  const result = await deleteDocumentsByMonthService({
     month,
     year,
-    { category, subType, department }
-  );
+    filters: { category, subType, department },
+    // DEV-006 — cần userId để gán `deletedBy` (soft-delete), đồng bộ pattern
+    // với `deleteDocuments` (xoá đơn lẻ) ở trên.
+    userId: req.user!._id,
+    // MỚI (DEV-044, 2026-09-12) — đồng bộ đúng cách `deleteDocuments` (xoá
+    // đơn lẻ) ở trên đã truyền, để service áp guard ADMIN-only.
+    role: req.user!.role.name,
+    isSystemRole: req.user!.role.isSystemRole === true,
+  });
 
   res.json({
     success: true,
@@ -146,7 +189,20 @@ export const deleteDocumentsByMonth = catchAsync(async (req: Request, res: Respo
 =============================== */
 export const getReportsByProposals = catchAsync(async (req: Request, res: Response) => {
 
-  const data = await getReportsByProposalService(req.params.proposalId);
+  // DEV-030 (bổ sung): department-scoping, đồng bộ `getAllDocuments` ở trên.
+  // `callerRole` MỚI (2026-09-10, DEV-038) — cho phép ngoại lệ "từng tham
+  // gia workflow" bất kể phòng ban, xem `getReportsByProposalService`.
+  // `canViewAllDepartments` MỚI (2026-09-10, DEV-040) — đồng bộ `getAllDocuments`.
+  const userPermissions = await getCachedPermissions(req.user!._id.toString());
+
+  const data = await getReportsByProposalService({
+    proposalId: req.params.proposalId,
+    callerDepartment: req.user!.department,
+    // 🔒 DEV-001A Phase B hoàn tất (DEV-047, 2026-09-12).
+    isAdmin: req.user!.role.isSystemRole === true,
+    callerRole: req.user!.role.name,
+    canViewAllDepartments: userPermissions.includes(PERMISSIONS.DOCUMENT_VIEW_ALL_DEPARTMENTS),
+  });
 
   res.json({
     success: true,
@@ -163,7 +219,8 @@ export const restoreDocuments = catchAsync(async (req: Request, res: Response) =
   const result = await restoreDocumentService({
     documentId: req.params.id,
     userId: req.user!._id,
-    isAdmin: req.user?.role.name === "ADMIN",
+    // 🔒 DEV-001A Phase B hoàn tất (DEV-047, 2026-09-12).
+    isAdmin: req.user?.role.isSystemRole === true,
   });
 
   res.json({

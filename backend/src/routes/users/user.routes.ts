@@ -14,6 +14,7 @@ import {
   resetPasswordByAdmin,
   getMe,
   updateMe,
+  assignUserRole,
 } from "../../controllers/users/user.controller";
 import { authenticate } from "../../middlewares/auth.middleware";
 import { authorizePermission } from "../../middlewares/authorizePermission.middleware";
@@ -26,6 +27,8 @@ import {
   UpdateUserDTO,
   ChangePasswordDTO,
   GetUsersQueryDTO,
+  AssignRoleDTO,
+  ResetPasswordByAdminDTO,
 } from "../../dto/users/users.dto";
 
 const router = Router();
@@ -41,8 +44,10 @@ router.post(
 router.get(
   "/",
   authenticate,
-  authorizePermission("USER_READ"),
-  // validateQuery(GetUsersQueryDTO),
+  // DEV-013/MEDIUM-04/ARCH-25: "USER_READ" KHÔNG tồn tại trong permission
+  // catalog (permission.constant.ts) — sửa đúng thành USER_VIEW.
+  authorizePermission("USER_VIEW"),
+  validateQuery(GetUsersQueryDTO),
   getUsers,
 );
 
@@ -51,7 +56,9 @@ router.get("/me", authenticate, getMe);
 router.get(
   "/:id",
   authenticate,
-  authorizePermission("USER_DETAIL"),
+  // DEV-013/MEDIUM-04/ARCH-25: "USER_DETAIL" KHÔNG tồn tại trong permission
+  // catalog — sửa đúng thành USER_VIEW_DETAIL.
+  authorizePermission("USER_VIEW_DETAIL"),
   getUserById,
 );
 
@@ -63,6 +70,19 @@ router.put(
   authorizePermission("USER_UPDATE"),
   validateBody(UpdateUserDTO),
   updateUser,
+);
+
+// TASK-002 (Việc 2): endpoint riêng để gán role cho user, wire lại
+// assignRole() (vốn trước đây là dead code) — dùng permission RIÊNG
+// "USER_ASSIGN_ROLE", tách khỏi "USER_UPDATE" (không cho phép đổi role qua
+// PUT /:id nữa kể từ TASK-001). assignRole() tự chặn gán ADMIN + chặn tự đổi
+// role chính mình + tự clear permission cache.
+router.patch(
+  "/:id/role",
+  authenticate,
+  authorizePermission("USER_ASSIGN_ROLE"),
+  validateBody(AssignRoleDTO),
+  assignUserRole,
 );
 
 router.delete(
@@ -91,6 +111,9 @@ router.patch(
   "/reset-password/:id",
   authenticate,
   authorizePermission("USER_RESET_PASSWORD"),
+  // DEV-021/SEC-02: trước đây route này KHÔNG có validateBody nào —
+  // `req.body.newPassword` không giới hạn độ dài/kiểu dữ liệu.
+  validateBody(ResetPasswordByAdminDTO),
   resetPasswordByAdmin,
 );
 

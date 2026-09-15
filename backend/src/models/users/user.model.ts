@@ -71,6 +71,17 @@ const UserSchema = new Schema<IUser>(
     },
 
   // 🔥 block permission
+  //
+  // ⚠️ DEV-022/RV02-02: field này KHÔNG có bất kỳ tác dụng nào với user
+  // đang giữ role ADMIN (`role.isSystemRole===true` — DEV-047, Phase B hoàn
+  // tất, không còn so khớp `role.name` nữa)
+  // — `authorizePermission.middleware.ts` cho ADMIN bypass hoàn toàn TRƯỚC
+  // khi tới bước đọc `denyPermissions` (chỉ áp dụng ở
+  // `getUserEffectivePermissions()`, permission.service.ts, chạy SAU bước
+  // bypass). Nếu nghiệp vụ cần tạo "ADMIN bị giới hạn 1 số quyền" (semi-
+  // restricted admin), gán `denyPermissions` cho 1 tài khoản ADMIN sẽ
+  // KHÔNG có tác dụng gì — cần thiết kế lại middleware (đổi thứ tự check,
+  // hoặc bỏ bypass tuyệt đối) trước khi dùng theo cách đó.
       denyPermissions: {
       type: [Schema.Types.ObjectId],
       ref: "Permission",

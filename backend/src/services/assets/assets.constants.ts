@@ -12,6 +12,15 @@
  * phải đi qua service/route riêng (cấp phát, thu hồi, thanh lý — Giai đoạn
  * 2) để đảm bảo ghi lại lịch sử luân chuyển và validate điều kiện chuyển
  * trạng thái, không cho phép PATCH thẳng qua update thông thường.
+ *
+ * DEV-010/IMP-014 (H-07=SEC-35=RV06-01, 2026-09-01): ĐÃ BỎ `isActive` khỏi
+ * whitelist này — cùng lý do với `status`. `isActive` là field soft-delete,
+ * trước đây cho phép user chỉ có `ASSET_UPDATE` (không cần `ASSET_DELETE`)
+ * tự đặt `isActive:false` qua `PUT/PATCH /assets/:id`, bỏ qua HOÀN TOÀN
+ * guard "không xoá asset đang IN_USE/UNDER_MAINTENANCE" và audit trail
+ * `deletedAt`/`deletedBy` mà `deleteAssetService()` đang thực hiện đúng.
+ * Muốn soft-delete/khôi phục Asset — dùng đúng endpoint xoá/khôi phục
+ * (`ASSET_DELETE`), không PATCH thẳng field này nữa.
  */
 
 export const ASSET_UPDATE_WHITELIST = [
@@ -26,7 +35,6 @@ export const ASSET_UPDATE_WHITELIST = [
   "warrantyExpiredAt",
   "supplier",
   "specs",
-  "isActive",
 ] as const;
 
 export const ASSET_CATEGORY_UPDATE_WHITELIST = [

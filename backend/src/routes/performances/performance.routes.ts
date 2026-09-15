@@ -1,19 +1,26 @@
 import { Router } from "express";
 import { getPerformanceDashboard } from "../../controllers/performances/performance.controller";
 import { authenticate } from "../../middlewares/auth.middleware";
+import { authorizePermission } from "../../middlewares/authorizePermission.middleware";
 
-// ⚠️ SỬA (review):
-//  1. Bỏ import `authorizePermission` — KHÔNG dùng ở đây theo quyết định:
-//     phân quyền cho endpoint này chỉ cần check `role.name === "ADMIN"` ở
-//     tầng controller (`performance.controller.ts`), không cần permission
-//     riêng ở route. Nếu sau này cần cho phép user có quyền cụ thể (không
-//     chỉ ADMIN) xem dashboard hiệu năng, thêm lại
-//     `authorizePermission("PERFORMANCE_VIEW")` ở đây.
-//  2. Bỏ import `performanceMiddleware` — middleware đo thời gian request đã
-//     được gắn GLOBAL ở `app.ts` (áp dụng cho mọi request, không riêng route
-//     này), import ở đây là thừa/dead code, không có tác dụng gì.
+// DEV-011/IMP-016 (H-10=SEC-37=RV11-01): comment cũ ở đây từng nói phân
+// quyền "chỉ cần check role.name === 'ADMIN' ở tầng controller" — nhưng
+// `performance.controller.ts` KHÔNG HỀ có check đó (đã xác minh qua source),
+// nên endpoint này thực tế 0 authorization — bất kỳ user đã `authenticate`
+// nào cũng xem được. Nay bật lại đúng cách đã gợi ý sẵn trong comment cũ:
+// `authorizePermission("PERFORMANCE_VIEW")` — permission mới, chỉ gán cho
+// ADMIN (`permission.constant.ts`), khớp đúng ý định gốc "chỉ ADMIN".
+//
+// Bỏ import `performanceMiddleware` — middleware đo thời gian request đã
+// được gắn GLOBAL ở `app.ts` (áp dụng cho mọi request, không riêng route
+// này), import ở đây là thừa/dead code, không có tác dụng gì.
 const router = Router();
 
-router.get("/dashboard", authenticate, getPerformanceDashboard);
+router.get(
+  "/dashboard",
+  authenticate,
+  authorizePermission("PERFORMANCE_VIEW"),
+  getPerformanceDashboard,
+);
 
 export default router;

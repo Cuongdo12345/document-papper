@@ -238,9 +238,20 @@ export const checkInAsset = catchAsync(async (req: Request, res: Response) => {
  */
 export const getAssetDocuments = catchAsync(
   async (req: Request, res: Response) => {
+    // DEV-030: `getAllDocumentsService` đổi signature sang
+    // `{query, callerDepartment, isAdmin}` để department-scoping cho non-admin
+    // (xem `document.controller.ts::getAllDocuments`) — endpoint này gọi
+    // CHUNG service đó nên PHẢI truyền đủ 2 field mới, nếu không sẽ là đường
+    // vòng bỏ qua scoping vừa thêm (đọc Document xuyên khoa qua route Asset).
     const result = await getAllDocumentsService({
-      ...req.query,
-      relatedAsset: req.params.id,
+      query: {
+        ...req.query,
+        relatedAsset: req.params.id,
+      },
+      callerDepartment: req.user!.department,
+      // 🔒 DEV-001A Phase B hoàn tất (DEV-047, 2026-09-12): chỉ còn đọc cờ
+      // security identity `isSystemRole`, đã gỡ lưới đỡ literal "ADMIN".
+      isAdmin: req.user!.role.isSystemRole === true,
     });
 
     res.json({

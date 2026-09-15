@@ -6,6 +6,7 @@ import {
   ASSET_CATEGORY_UPDATE_WHITELIST,
   pickWhitelisted,
 } from "../assets.constants";
+import { escapeRegex } from "../../../shared/utils/regex.util";
 
 /**
  * 📌 CREATE ASSET CATEGORY
@@ -44,14 +45,22 @@ export const createAssetCategoryService = async (payload: {
  * 📌 GET ALL ASSET CATEGORIES
  */
 export const getAllAssetCategoriesService = async (query: any) => {
-  const { keyword, page = 1, limit = 10 } = query;
+  const { keyword, page = 1, limit = 10, isActive } = query;
 
-  const filter: any = { isActive: true };
+  // ⚠️ SỬA (Asset Categories UI, 2026-09-09): trước đây `filter.isActive`
+  // HARD-CODE `true`, không đọc query — không ai liệt kê lại được danh mục
+  // đã xoá mềm để khôi phục qua `PATCH /:id/restore`. Đọc đúng biến `isActive`
+  // đã destructure (qua `QueryAssetCategoryDTO`, boolean hoặc `undefined`),
+  // mặc định `true` CHỈ khi client không truyền field này — cùng pattern đã
+  // sửa ở `getAllAssetsService` (DEV-035).
+  const filter: any = { isActive: isActive === undefined ? true : isActive };
 
+  // DEV-010/IMP-015 (SEC-36/RV06-02): escape trước khi đưa vào $regex.
   if (keyword) {
+    const safeKeyword = escapeRegex(keyword);
     filter.$or = [
-      { code: { $regex: keyword, $options: "i" } },
-      { name: { $regex: keyword, $options: "i" } },
+      { code: { $regex: safeKeyword, $options: "i" } },
+      { name: { $regex: safeKeyword, $options: "i" } },
     ];
   }
 

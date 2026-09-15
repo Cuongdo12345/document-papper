@@ -1,6 +1,7 @@
 // dto/assets/calibrationRecord.dto.ts
 import { z } from "zod";
 import { CalibrationResult } from "../../interfaces/assets/calibrationRecord.interface";
+import { objectId } from "../common.dto";
 
 /**
  * CreateCalibrationRecordDTO — ghi nhận 1 lần kiểm định mới.
@@ -32,3 +33,27 @@ export const CreateCalibrationRecordDTO = z
     message: "nextDueDate phải sau calibratedAt",
     path: ["nextDueDate"],
   });
+
+/**
+ * Params cho 2 route thao tác trên giấy chứng nhận 1 bản ghi cụ thể (A2,
+ * 2026-09-15) — tải (`GET .../certificate/download`) và thay thế
+ * (`PUT .../certificate`).
+ */
+export const CalibrationCertificateParamsDTO = z.object({
+  assetId: objectId("Asset ID không hợp lệ"),
+  recordId: objectId("Record ID không hợp lệ"),
+});
+
+/**
+ * Body cho `PUT .../calibration-records/:recordId/certificate` — thay thế
+ * chứng nhận đã lưu (sửa lỗi upload nhầm file, theo yêu cầu user sau khi
+ * hoàn thành A2 gốc). CHỦ Ý CHỈ có `certificateFileUrl` — `certificateFile`
+ * (file mới, nếu có) đi qua `req.file` (multer), không phải field JSON body.
+ * Validate "đúng 1 trong 2, không được cả hai lẫn KHÔNG cái nào" nằm ở
+ * SERVICE (`updateCalibrationCertificateService`), không phải ở DTO —
+ * cùng lý do `CreateCalibrationRecordDTO` không tự validate được quan hệ
+ * giữa `certificateFile` (req.file) và `certificateFileUrl` (req.body).
+ */
+export const UpdateCalibrationCertificateDTO = z.object({
+  certificateFileUrl: z.string().trim().optional(),
+});

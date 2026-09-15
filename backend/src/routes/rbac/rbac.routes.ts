@@ -58,7 +58,7 @@ router.get(
   "/permissions",
   authenticate,
   authorizePermission("PERMISSION_VIEW"),
-  // validateQuery(GetPermissionsQueryDTO),
+  validateQuery(GetPermissionsQueryDTO),
   getPermissions,
 );
 // ⚠️ MỚI: GET permission detail — dùng chung permission "PERMISSION_VIEW"
@@ -75,6 +75,10 @@ router.put(
   "/permissions/:id",
   authenticate,
   authorizePermission("PERMISSION_UPDATE"),
+  // DEV-013/ARCH-29: thiếu validateParams(IdParamDTO) — trước đây `:id` sai
+  // định dạng ObjectId rơi thẳng xuống Mongoose CastError thay vì 400 chuẩn
+  // hoá ở tầng route, không nhất quán với GET cùng resource.
+  validateParams(IdParamDTO),
   validateBody(UpdatePermissionDTO),
   updatePermission,
 );
@@ -82,6 +86,7 @@ router.delete(
   "/permissions/:id",
   authenticate,
   authorizePermission("PERMISSION_DELETE"),
+  validateParams(IdParamDTO),
   deletePermission,
 );
 
@@ -97,7 +102,7 @@ router.get(
   "/roles",
   authenticate,
   authorizePermission("ROLE_VIEW"),
-  // validateQuery(GetRolesQueryDTO),
+  validateQuery(GetRolesQueryDTO),
   getRoles,
 );
 // ⚠️ MỚI: GET role detail (kèm populate permissions).
@@ -112,6 +117,8 @@ router.put(
   "/roles/:id",
   authenticate,
   authorizePermission("ROLE_UPDATE"),
+  // DEV-013/ARCH-29: thêm validateParams — cùng lý do PUT /permissions/:id.
+  validateParams(IdParamDTO),
   validateBody(UpdateRoleDTO), // ⚠️ CHỈ cho phép `name` — xem rbac.dto.ts
   updateRole,
 );
@@ -119,12 +126,14 @@ router.delete(
   "/roles/:id",
   authenticate,
   authorizePermission("ROLE_DELETE"),
+  validateParams(IdParamDTO),
   deleteRole,
 );
 router.post(
   "/roles/:id/assign-permissions",
   authenticate,
   authorizePermission("ROLE_ASSIGN_PERMISSIONS"), // permission riêng, không dùng chung ROLE_UPDATE
+  validateParams(IdParamDTO),
   validateBody(AssignPermissionsDTO),
   assignPermissionsToRole,
 );
@@ -141,7 +150,7 @@ router.get(
   "/policies",
   authenticate,
   authorizePermission("POLICY_VIEW"),
-  // validateQuery(GetPoliciesQueryDTO),
+  validateQuery(GetPoliciesQueryDTO),
   getPolicies,
 );
 // ⚠️ MỚI: GET policy detail.
@@ -156,6 +165,8 @@ router.put(
   "/policies/:id",
   authenticate,
   authorizePermission("POLICY_UPDATE"),
+  // DEV-013/ARCH-29: thêm validateParams — cùng lý do PUT /permissions/:id.
+  validateParams(IdParamDTO),
   validateBody(UpdatePolicyDTO),
   updatePolicy,
 );
@@ -163,6 +174,7 @@ router.delete(
   "/policies/:id",
   authenticate,
   authorizePermission("POLICY_DELETE"),
+  validateParams(IdParamDTO),
   deletePolicy,
 );
 

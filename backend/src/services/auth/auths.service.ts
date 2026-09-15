@@ -10,7 +10,7 @@ import {
   generateAccessToken,
   generateRefreshToken,
   hashResetToken,
-  generateResetToken
+  generateResetToken,
 } from "../../shared/helpers/auth.helper";
 import { sendMail } from "../../shared/utils/mailer";
 import { buildPasswordResetEmail } from "../../shared/helpers/passwordReset.template";
@@ -178,18 +178,24 @@ export const login = async (username: string, password: string) => {
     throw ApiError.unauthorized("Tên đăng nhập hoặc mật khẩu không đúng");
   }
 
+  // DEV-021/SEC-04: trước đây truyền thêm `role`/`department` (object đã
+  // populate) vào payload JWT dù `generateAccessToken`'s doc-comment khẳng
+  // định "chỉ gồm {id}" — JWT chỉ ký, không mã hoá, lộ thông tin dư thừa cho
+  // bất kỳ ai decode token. `authenticate` middleware chỉ dùng `decoded.id`.
   const accessToken = generateAccessToken({
     id: user._id.toString(),
-    role: user.role,
-    department: user.department,
   });
 
   const refreshToken = generateRefreshToken(user._id.toString());
 
   // Lưu refresh token vào database để quản lý (có thể thêm trường revoked để thu hồi token khi cần)
+  // DEV-014/MEDIUM-05: lưu HASH (SHA-256) thay vì plaintext — nếu DB bị lộ
+  // (backup, injection, insider), attacker không có ngay token dùng được.
+  // Client vẫn nhận `refreshToken` GỐC (raw) trong response — chỉ bản lưu
+  // trong DB được hash, giống hệt quy ước `PasswordResetToken` đã có.
   await RefreshToken.create({
     user: user._id,
-    token: refreshToken,
+    token: hashResetToken(refreshToken),
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
   });
 
@@ -231,22 +237,30 @@ export const login = async (username: string, password: string) => {
  *    `populate("user")` không populate lồng, nên 2 field này là ObjectId
  *    thô, khác hẳn payload từ `login()` — nay populate đủ để token từ
  *    refresh có shape giống hệt token từ login).
+ *
+ * ⚠️ SỬA (DEV-014):
+ *  - MEDIUM-05: `RefreshToken.token` giờ lưu HASH — tra cứu DB phải hash
+ *    `refreshToken` (raw, client gửi lên) trước khi `findOne`, khớp cách lưu
+ *    ở `login()`.
+ *  - MEDIUM-06: `jwt.verify()` trước đây KHÔNG bọc try/catch — token hết
+ *    hạn/hỏng ném lỗi thư viện (`JsonWebTokenError`/`TokenExpiredError`)
+ *    thẳng ra ngoài, rơi vào nhánh lỗi 500 chung của `errorHandler` (lộ
+ *    message thư viện, sai status code — đúng phải 401). Nay bọc try/catch,
+ *    map về `ApiError.unauthorized`.
  */
 export const refresh = async (refreshToken: string) => {
   if (!refreshToken) {
     throw ApiError.badRequest("REFRESH_TOKEN_REQUIRED");
   }
 
+  // DEV-021/SEC-04: trước đây populate cả `role`/`department` của `user` để
+  // đưa vào payload JWT — nay `generateAccessToken()` chỉ ký `{id}`, phần
+  // dưới hàm này chỉ còn dùng `user.isActive`/`user._id` nên bỏ populate lồng
+  // không cần thiết (đỡ 1 lượt query phụ mỗi lần refresh).
   const storedToken = await RefreshToken.findOne({
-    token: refreshToken,
+    token: hashResetToken(refreshToken),
     revoked: false
-  }).populate({
-    path: "user",
-    populate: [
-      { path: "role", select: "name" },
-      { path: "department", select: "code name" },
-    ],
-  });
+  }).populate({ path: "user", select: "isActive" });
 
   if (!storedToken) {
     throw ApiError.badRequest("Refresh token không hợp lệ hoặc đã bị thu hồi");
@@ -258,16 +272,19 @@ export const refresh = async (refreshToken: string) => {
     throw ApiError.badRequest("Tài khoản đã bị khóa");
   }
 
-  jwt.verify(
-    refreshToken,
-    process.env.JWT_REFRESH_SECRET as string,
-    { algorithms: ["HS256"] }
-  );
+  try {
+    jwt.verify(
+      refreshToken,
+      process.env.JWT_REFRESH_SECRET as string,
+      { algorithms: ["HS256"] }
+    );
+  } catch (err) {
+    throw ApiError.unauthorized("Refresh token không hợp lệ hoặc đã hết hạn");
+  }
 
+  // DEV-021/SEC-04: cùng lý do như `login()` ở trên — chỉ ký `{id}`.
   const newAccessToken = generateAccessToken({
     id: user._id.toString(),
-    role: user.role,
-    department: user.department,
   });
 
   return { accessToken: newAccessToken };
@@ -284,6 +301,9 @@ export const refresh = async (refreshToken: string) => {
  * trước đây chỉ match theo `token`, nghĩa là user A (đã authenticate hợp lệ)
  * có thể truyền refreshToken của user B trong body và revoke được token của
  * B. Nay chỉ tự thu hồi được token của chính mình.
+ *
+ * ⚠️ SỬA (DEV-014/MEDIUM-05): `RefreshToken.token` giờ lưu HASH — hash
+ * `refreshToken` (raw) trước khi so khớp, khớp cách lưu ở `login()`.
  */
 export const logout = async (refreshToken: string, userId: any) => {
   if (!refreshToken) {
@@ -291,7 +311,7 @@ export const logout = async (refreshToken: string, userId: any) => {
   }
 
   await RefreshToken.findOneAndUpdate(
-    { token: refreshToken, user: userId },
+    { token: hashResetToken(refreshToken), user: userId },
     { revoked: true }
   );
 

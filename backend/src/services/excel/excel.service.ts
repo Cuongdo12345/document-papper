@@ -410,7 +410,12 @@ export const importDocumentsExcel = async (
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(fileBuffer as any);
 
-  const sheet = workbook.getWorksheet(1);
+  // BUG FIX: `getWorksheet(1)` tra theo ID GỐC lưu trong file .xlsx (không
+  // phải vị trí tab) — file do Excel/LibreOffice/WPS lưu qua nhiều lần
+  // xoá/tạo sheet thường có ID sheet đầu != 1, khiến hàm trả về undefined
+  // dù file hợp lệ. `workbook.worksheets[0]` mới đúng nghĩa "sheet đầu tiên
+  // theo vị trí tab" (typed rõ trong exceljs: "return worksheets in order").
+  const sheet = workbook.worksheets[0];
   if (!sheet) throw ApiError.badRequest("Không tìm thấy sheet");
 
   validateImportHeaderRow(sheet);
@@ -490,27 +495,36 @@ export const importDocumentsExcel = async (
         continue;
       }
 
-      let proposal: any = await Document.findOne({
-        category: DocumentCategory.PROPOSAL,
-        subType,
-        department: department._id,
-        title,
-        createdAt,
-        "meta.items.deviceName": deviceName,
-      });
-
-      const action: "create" | "update" = proposal ? "update" : "create";
+      let proposal: any;
+      let action: "create" | "update";
 
       let willCreateReport = false;
       const parsedInspection = parseInspectionJSONLike(inspectionResult);
 
       if (!dryRun) {
-        // Trả kết quả TỪ callback, không mutate biến ngoài (`proposal`) bên
-        // trong — nếu withTransaction retry do lỗi tạm thời, callback chạy lại
-        // từ đầu với state SẠCH (đọc lại `proposal` gốc qua closure, không bị
-        // "nhiễm" giá trị đã gán ở attempt trước đó bị rollback).
+        // DEV-025/ARCH-21: trước đây `proposal` được đọc (`Document.findOne`)
+        // TRƯỚC khi vào transaction — window TOCTOU (time-of-check-to-time-
+        // of-use): 2 import đồng thời cùng dòng dữ liệu đều đọc "chưa tồn
+        // tại" rồi cùng tạo mới → trùng lặp Proposal thay vì 1 create + 1
+        // update như kỳ vọng. Nay đọc lại NGAY BÊN TRONG transaction (cùng
+        // `session`) — đúng pattern đã dùng cho `existingReport` bên dưới —
+        // đóng race window. Trả kết quả TỪ callback (không mutate biến
+        // ngoài) — nếu `withTransaction` retry do lỗi tạm thời, callback
+        // chạy lại từ đầu với state SẠCH (đọc lại `proposal` thật trong
+        // transaction mới, không bị "nhiễm" giá trị từ attempt trước đã
+        // rollback).
         const txResult = await withTransaction(async (session) => {
-          let currentProposal = proposal;
+          let currentProposal = await Document.findOne({
+            category: DocumentCategory.PROPOSAL,
+            subType,
+            department: department._id,
+            title,
+            createdAt,
+            "meta.items.deviceName": deviceName,
+          }).session(session);
+          const currentAction: "create" | "update" = currentProposal
+            ? "update"
+            : "create";
           let reportCreated = false;
 
           if (!currentProposal) {
@@ -597,15 +611,32 @@ export const importDocumentsExcel = async (
             }
           }
 
-          return { proposal: currentProposal, reportCreated };
+          return {
+            proposal: currentProposal,
+            reportCreated,
+            action: currentAction,
+          };
         });
 
         // Chỉ gán biến ngoài SAU KHI transaction đã resolve thành công — không
         // còn khả năng bị "nhiễm" state từ 1 attempt đã rollback.
         proposal = txResult.proposal;
         willCreateReport = txResult.reportCreated;
+        action = txResult.action;
       } else {
-        // dryRun: không ghi DB, chỉ xác định willCreateReport để hiển thị preview.
+        // dryRun: không ghi DB, chỉ ĐỌC (không transaction — không có gì để
+        // ghi nên không có race điều kiện thật, chỉ ảnh hưởng độ chính xác
+        // của preview) để xác định action/willCreateReport hiển thị preview.
+        proposal = await Document.findOne({
+          category: DocumentCategory.PROPOSAL,
+          subType,
+          department: department._id,
+          title,
+          createdAt,
+          "meta.items.deviceName": deviceName,
+        });
+        action = proposal ? "update" : "create";
+
         if (parsedInspection && parsedInspection.items.length) {
           if (proposal?._id) {
             const reportSubType =
@@ -669,214 +700,6 @@ export const importDocumentsExcel = async (
   return result;
 };
 
-// export interface ImportOptions {
-//   dryRun?: boolean;
-//   fileName?: string;
-// }
-
-// export const importDocumentsExcel = async (fileBuffer: Buffer, userId: any, options: ImportOptions = {}) => {
-//   const { dryRun = false, fileName = "unknown.xlsx" } = options;
-
-//   const workbook = new ExcelJS.Workbook();
-//   await workbook.xlsx.load(fileBuffer as any);
-
-//   const sheet = workbook.getWorksheet(1);
-//   if (!sheet) throw ApiError.badRequest("Không tìm thấy sheet");
-
-//   validateImportHeaderRow(sheet);
-
-//   const totalDataRows = sheet.rowCount - 1;
-//   if (totalDataRows > MAX_IMPORT_ROWS) {
-//     throw ApiError.badRequest(
-//       `File vượt quá ${MAX_IMPORT_ROWS} dòng dữ liệu (hiện có ${totalDataRows} dòng) — vui lòng chia nhỏ file.`,
-//     );
-//   }
-
-//   const result = {
-//     dryRun,
-//     created: 0,
-//     updated: 0,
-//     reportsCreated: 0,
-//     totalRows: 0,
-//     errors: [] as any[],
-//     preview: [] as any[],
-//   };
-
-//   const departmentNames = new Set<string>();
-//   for (let i = 2; i <= sheet.rowCount; i++) {
-//     const name = sheet.getRow(i).getCell(3).value?.toString().trim();
-//     if (name) departmentNames.add(name);
-//   }
-
-//   const departmentMap = await findDepartmentsCaseInsensitive(departmentNames);
-
-//   for (let i = 2; i <= sheet.rowCount; i++) {
-//     const row = sheet.getRow(i);
-
-//     const isRowBlank = [2, 3, 4, 5, 6, 7, 8, 9, 10].every((col) => {
-//       const value = row.getCell(col).value;
-//       return value === null || value === undefined || String(value).trim() === "";
-//     });
-//     if (isRowBlank) continue;
-
-//     result.totalRows++;
-
-//     try {
-//       const subType = row.getCell(2).value?.toString().trim();
-//       const departmentName = row.getCell(3).value?.toString().trim();
-//       const title = row.getCell(4).value?.toString().trim();
-//       const deviceName = row.getCell(5).value?.toString().trim();
-//       const createdAt = parseExcelDateStrict(row.getCell(6).value, `Ngày đề xuất (dòng ${i})`);
-//       const quantity = Number(row.getCell(7).value) || 0;
-//       const unitPrice = Number(row.getCell(8).value) || 0;
-//       const note = row.getCell(9).value?.toString().trim();
-//       const inspectionResult = row.getCell(10).value?.toString().trim();
-
-//       const totalPrice = quantity * unitPrice;
-
-//       if (!subType || !departmentName) {
-//         result.errors.push({ row: i, message: "Thiếu Loại giấy hoặc Khoa" });
-//         continue;
-//       }
-
-//       if (!VALID_PROPOSAL_SUBTYPES.includes(subType)) {
-//         result.errors.push({ row: i, message: "Loại giấy không hợp lệ" });
-//         continue;
-//       }
-
-//       const department = departmentMap.get(normalizeDepartmentKey(departmentName));
-//       if (!department) {
-//         result.errors.push({ row: i, message: `Không tìm thấy khoa: ${departmentName}` });
-//         continue;
-//       }
-
-//       let proposal: any = await Document.findOne({
-//         category: DocumentCategory.PROPOSAL,
-//         subType,
-//         department: department._id,
-//         title,
-//         createdAt,
-//         "meta.items.deviceName": deviceName,
-//       });
-
-//       const action: "create" | "update" = proposal ? "update" : "create";
-
-//       if (!proposal) {
-//         if (!dryRun) {
-//           const documentCode = await generateDocumentCode(
-//             DocumentCategory.PROPOSAL,
-//             department._id as Types.ObjectId,
-//             createdAt,
-//           );
-
-//           proposal = await Document.create({
-//             documentCode,
-//             category: DocumentCategory.PROPOSAL,
-//             subType,
-//             department: department._id,
-//             title,
-//             createdAt,
-//             createdBy: userId,
-//             meta: {
-//               items: [{ deviceName, quantity, unitPrice, totalPrice, note }],
-//               totalAmount: totalPrice,
-//             },
-//           });
-//         }
-//         result.created++;
-//       } else {
-//         if (!dryRun) {
-//           proposal.meta.items = [{ deviceName, quantity, unitPrice, totalPrice, note }];
-//           proposal.meta.totalAmount = totalPrice;
-//           await proposal.save();
-//         }
-//         result.updated++;
-//       }
-
-//       const parsedInspection = parseInspectionJSONLike(inspectionResult);
-//       let willCreateReport = false;
-
-//       if (parsedInspection && parsedInspection.items.length) {
-//         const reportSubType = subType === "PROPOSE_INK" ? "CONFIRM_STATUS" : "CHECK_DAMAGE";
-
-//         const existingReport = proposal?._id
-//           ? await Document.findOne({
-//               category: DocumentCategory.REPORT,
-//               subType: reportSubType,
-//               referenceTo: proposal._id,
-//             })
-//           : null;
-
-//         if (!existingReport) {
-//           willCreateReport = true;
-
-//           if (!dryRun) {
-//             const reportCode = await generateDocumentCode(
-//               DocumentCategory.REPORT,
-//               department._id as Types.ObjectId,
-//               createdAt,
-//             );
-
-//             await Document.create({
-//               documentCode: reportCode,
-//               category: DocumentCategory.REPORT,
-//               subType: reportSubType,
-//               department: department._id,
-//               referenceTo: [proposal._id],
-//               createdAt,
-//               createdBy: userId,
-//               title:
-//                 reportSubType === "CONFIRM_STATUS"
-//                   ? "Biên bản xác nhận tình trạng thiết bị"
-//                   : "Biên bản kiểm tra tình trạng hư hỏng",
-//               meta: {
-//                 inspectionResult: parsedInspection.inspectionResult,
-//                 items: parsedInspection.items,
-//                 totalAmount: parsedInspection.totalAmount,
-//               },
-//             });
-//           }
-
-//           result.reportsCreated++;
-//         }
-//       }
-
-//       if (dryRun) {
-//         result.preview.push({
-//           row: i,
-//           action,
-//           department: departmentName,
-//           title,
-//           deviceName,
-//           willCreateReport,
-//         });
-//       }
-//     } catch (error: any) {
-//       result.errors.push({ row: i, message: error.message || "Lỗi không xác định" });
-//     }
-//   }
-
-//   try {
-//     await ImportHistory.create({
-//       importedBy: userId,
-//       fileName,
-//       mode: dryRun ? "dryRun" : "commit",
-//       status: resolveImportStatus(result),
-//       totalRows: result.totalRows,
-//       created: result.created,
-//       updated: result.updated,
-//       reportsCreated: result.reportsCreated,
-//       errorCount: result.errors.length,
-//       errors: result.errors.slice(0, MAX_STORED_ERRORS),
-//     });
-
-//   } catch (auditErr) {
-//     console.error("[importDocumentsExcel] Ghi audit trail thất bại:", auditErr);
-//   }
-
-//   return result;
-// };
-
 /* =========================================================================
    LỊCH SỬ IMPORT (audit trail) — GET /excel/import-history
 ========================================================================= */
@@ -925,7 +748,9 @@ export const syncDepartmentFromExcel = async (fileBuffer: Buffer) => {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(fileBuffer as any);
 
-  const worksheet = workbook.getWorksheet(1);
+  // BUG FIX: xem giải thích ở `importDocumentsExcel` phía trên cùng file —
+  // `getWorksheet(1)` tra theo ID gốc, không theo vị trí tab.
+  const worksheet = workbook.worksheets[0];
   if (!worksheet) throw ApiError.badRequest("Không tìm thấy sheet Excel");
 
   const totalDataRows = worksheet.rowCount - 1;

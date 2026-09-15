@@ -115,3 +115,20 @@ export const QueryDocumentDTO = z.object({
       message: "toDate không hợp lệ",
     }),
 });
+
+/**
+ * DELETE-BY-MONTH (DEV-021/SEC-12) — `DELETE /api/documents/delete-by-month`
+ * trước đây KHÔNG có `validateBody` nào (route tự comment "chưa xử lý
+ * validation ở đây") — controller chỉ check `!month || !year` (falsy), không
+ * ép kiểu/giới hạn khoảng giá trị. Kết hợp `deleteDocumentsByMonthService`
+ * dùng `new Date(year, month - 1, 1)` trực tiếp (không tự validate), input
+ * bất thường (chuỗi không phải số, object qua NoSQL-style body) có thể tạo
+ * `Invalid Date`/`NaN` trong filter của 1 thao tác xoá hàng loạt.
+ */
+export const DeleteDocumentsByMonthDTO = z.object({
+  month: z.coerce.number().int().min(1, "month phải từ 1-12").max(12, "month phải từ 1-12"),
+  year: z.coerce.number().int().min(2000, "year không hợp lệ").max(2100, "year không hợp lệ"),
+  category: z.enum(Object.values(DocumentCategory) as [string, ...string[]]).optional(),
+  subType: z.enum(Object.values(DocumentSubType) as [string, ...string[]]).optional(),
+  department: objectId("Department ID không hợp lệ").optional(),
+});

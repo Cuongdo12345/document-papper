@@ -3,7 +3,9 @@ import { generateDocumentCode } from "../../shared/utils/generateDocumentCode";
 import ApiError from "../../shared/errors/ApiError";
 import UserAudit from "../../models/users/userAudit.model";
 import { DocumentSubType } from "../../models/documents/document.model";
+import { DocumentVersion } from "../../models/documents/documentVersion.model";
 import { Asset, AssetStatus } from "../../models/assets/asset.model";
+import WorkflowInstance from "../../models/documents/workflowInstance.model";
 import {
   validateDocumentRule,
   validateReference,
@@ -22,7 +24,8 @@ import {
   findActiveDocument,
   findDocuments,
   countDocuments,
-  deleteDocumentsByFilter,
+  softDeleteDocumentsByFilter,
+  findDocumentIdsByFilter,
   findProposalById,
   findReportsByProposal,
   countReportsByProposal,
@@ -30,10 +33,14 @@ import {
   findPendingRepairProposalForAsset,
 } from "./documents.query";
 import { DOCUMENT_UPDATE_WHITELIST } from "./documents.constants";
+import { applyDepartmentFilter, canViewAcrossDepartments, isSameDepartment } from "./documents.scope";
 import type {
   CreateDocumentPayload,
+  GetAllDocumentsPayload,
+  GetReportsByProposalPayload,
   UpdateDocumentPayload,
   DeleteDocumentPayload,
+  DeleteDocumentsByMonthPayload,
 } from "./documents.types";
 
 import {
@@ -116,16 +123,20 @@ export const createDocumentService = async (payload: CreateDocumentPayload) => {
       );
     }
 
-    // Chặn tạo TRÙNG đề xuất sửa chữa khi asset đã có 1 đề xuất khác chưa
-    // duyệt xong — tránh 2 workflow độc lập cùng tranh nhau đổi trạng thái
-    // 1 asset (xem giải thích đầy đủ ở `findPendingRepairProposalForAsset`).
-    const pendingProposal =
-      await findPendingRepairProposalForAsset(relatedAsset);
-    if (pendingProposal) {
-      throw ApiError.badRequest(
-        `Tài sản này đang có 1 đề xuất sửa chữa khác chưa duyệt xong (mã: ${pendingProposal.documentCode ?? pendingProposal._id})`,
-      );
-    }
+    // ⚠️ SỬA (DEV-045, 2026-09-12 — RV05-07 TOCTOU, ghi nhận từ DEV-025,
+    // xác nhận lại ở `docs/30_DEVELOPMENT_COMPLETION_AUDIT.md` Mục 3/9 #2):
+    // check "trùng đề xuất sửa chữa" TRƯỚC ĐÂY đọc Ở ĐÂY — TRƯỚC khi vào
+    // transaction bên dưới — window TOCTOU (time-of-check-to-time-of-use):
+    // 2 request tạo đề xuất đồng thời cho CÙNG 1 asset đều đọc "chưa có đề
+    // xuất pending nào" rồi CÙNG được tạo mới → 2 workflow độc lập cùng
+    // tranh nhau đổi trạng thái 1 asset khi duyệt xong (đúng hệ quả mà check
+    // này sinh ra để ngăn). Cùng họ lỗi với ARCH-21 (đã fix ở
+    // `excel.service.ts`, dò trùng Proposal khi import Excel).
+    //
+    // Nay chuyển hẳn xuống ĐỌC BÊN TRONG `withTransaction` (dùng
+    // `findPendingRepairProposalForAsset(relatedAsset, session)`, cùng
+    // pattern ARCH-21) — xem code trong callback bên dưới. Đóng lại đúng
+    // ĐÂY (không còn check ở ngoài) để tránh double-check thừa/lệch logic.
   }
 
   const documentCode = await generateDocumentCode(category, department);
@@ -134,6 +145,29 @@ export const createDocumentService = async (payload: CreateDocumentPayload) => {
 
   // Chuỗi ghi cần transaction: tạo Document + ghi UserAudit "CREATE".
   const doc = await withTransaction(async (session) => {
+    // MỚI (DEV-045, 2026-09-12 — RV05-07 TOCTOU): dò trùng đề xuất sửa chữa
+    // NGAY TRONG transaction, đọc qua đúng `session` — xem giải thích đầy đủ
+    // ở nhánh validate PROPOSE_REPAIR phía trên. Đặt NGAY ĐẦU callback,
+    // TRƯỚC `createDocument`, để throw ở đây rollback toàn bộ transaction
+    // (chưa ghi gì) — không lãng phí ghi UserAudit cho 1 lần tạo bị từ chối.
+    //
+    // ⚠️ Đánh đổi CHỦ Ý: `documentCode` (dòng `generateDocumentCode` phía
+    // trên) đã được cấp PHÁT TRƯỚC khi vào đây (áp dụng cho MỌI loại
+    // document, không riêng PROPOSE_REPAIR — không di dời để tránh mở rộng
+    // phạm vi sửa ra ngoài đúng bug RV05-07). Nếu nhánh dưới đây throw, mã
+    // `documentCode` đó bị bỏ phí (tạo khoảng trống trong dãy số) — đây là
+    // hệ quả PHỤ chấp nhận được (chỉ ảnh hưởng thẩm mỹ đánh số, KHÔNG ảnh
+    // hưởng tính đúng đắn dữ liệu), đổi lại đóng đúng race điều kiện chính
+    // (2 đề xuất trùng lặp cho cùng 1 asset).
+    if (subType === DocumentSubType.PROPOSE_REPAIR) {
+      const pendingProposal = await findPendingRepairProposalForAsset(relatedAsset, session);
+      if (pendingProposal) {
+        throw ApiError.badRequest(
+          `Tài sản này đang có 1 đề xuất sửa chữa khác chưa duyệt xong (mã: ${pendingProposal.documentCode ?? pendingProposal._id})`,
+        );
+      }
+    }
+
     const created = await createDocument(
       {
         documentCode,
@@ -204,7 +238,12 @@ export const createDocumentService = async (payload: CreateDocumentPayload) => {
 /* ===============================
    GET ALL
 =============================== */
-export const getAllDocumentsService = async (query: any) => {
+export const getAllDocumentsService = async ({
+  query,
+  callerDepartment,
+  isAdmin = false,
+  canViewAllDepartments = false,
+}: GetAllDocumentsPayload) => {
   const {
     page,
     limit,
@@ -248,6 +287,38 @@ export const getAllDocumentsService = async (query: any) => {
       relatedAsset,
     }),
   );
+
+  // DEV-030 (yêu cầu user 2026-09-06): "user nào login vào chỉ được cho phép
+  // thấy tài liệu của khoa đó" — trước đây `department` chỉ là 1 filter TUỲ
+  // CHỌN do CLIENT tự truyền qua query string; nếu client không truyền, non-
+  // admin thấy được document của TẤT CẢ khoa trong danh sách (chỉ `GET /:id`
+  // mới bị chặn khác khoa, từ DEV-009A). Nay ÉP CỨNG `filter.department` theo
+  // khoa của người gọi cho non-admin, GHI ĐÈ bất kỳ giá trị `department` nào
+  // client truyền trong query (không cho non-admin tự chọn xem khoa khác).
+  // ADMIN (bypass) giữ nguyên hành vi cũ — vẫn lọc theo `department` query
+  // (nếu có) hoặc xem tất cả (nếu không truyền).
+  //
+  // Fail-closed: nếu non-admin không có `department` (dữ liệu user thiếu
+  // field này) thì ép `filter.department = null` — KHÔNG document nào khớp
+  // (`department` là `required:true` trong schema, không bao giờ `null`) —
+  // thay vì để `filter.department = undefined` (Mongo/Mongoose bỏ qua field
+  // `undefined` khi build query, tương đương KHÔNG lọc gì — lộ toàn bộ dữ
+  // liệu, ngược lại hoàn toàn với ý định).
+  //
+  // MỚI (DEV-040, 2026-09-10 — user báo lỗi trực tiếp: đã gán permission cho
+  // IT qua UI "Phân quyền" nhưng danh sách vẫn rỗng/chỉ thấy khoa mình).
+  // Root cause: nhánh này trước đây CHỈ có 1 lối thoát — `isAdmin` — hoàn
+  // toàn KHÔNG đọc permission nào, nên KHÔNG permission nào gán qua UI có
+  // thể tác động tới đây. `canViewAllDepartments` (permission
+  // `DOCUMENT_VIEW_ALL_DEPARTMENTS`, IT đã được gán — rolePermission.map.ts)
+  // là lối thoát THỨ HAI, song song `isAdmin`, KHÔNG thay thế.
+  //
+  // MỚI (DEV-041, 2026-09-11): logic OR này được RÚT sang
+  // `applyDepartmentFilter()` (`documents.scope.ts`) — dùng chung với
+  // `getReportsByProposalService` bên dưới, thay vì mỗi hàm tự viết lại
+  // (nguyên nhân trực tiếp gây chuỗi 5 bug liên tiếp DEV-030→040, xem
+  // DEV-041.md). KHÔNG đổi hành vi so với bản trước.
+  applyDepartmentFilter(filter, { isAdmin, canViewAllDepartments, callerDepartment });
 
   // `fromDate`/`toDate` đã được `QueryDocumentDTO` validate là parse được
   // (Missing Validation #3) trước khi tới đây, nên `new Date(...)` luôn hợp lệ.
@@ -318,6 +389,26 @@ export const getDocumentDetailService = async (id: any) => {
 };
 
 /* ===============================
+   VERSION HISTORY (Roadmap A4)
+=============================== */
+/**
+ * 📌 GET — lịch sử nội dung (title/meta) của 1 document, mới nhất trước.
+ * CHỈ ĐỌC (không có restore — quyết định đã chốt với user: mục đích thuần
+ * kiểm toán, xem lại "trước khi sửa nó viết gì"). KHÔNG bao gồm nội dung
+ * HIỆN TẠI (đã có sẵn ở `getDocumentDetailService`) — chỉ các bản ĐÃ BỊ
+ * thay thế.
+ */
+export const getDocumentVersionsService = async (documentId: any) => {
+  validateObjectId(documentId, "Document ID không hợp lệ");
+
+  const versions = await DocumentVersion.find({ document: documentId })
+    .sort({ versionNumber: -1 })
+    .populate("editedBy", "fullName username");
+
+  return versions;
+};
+
+/* ===============================
    UPDATE
 =============================== */
 export const updateDocumentService = async ({
@@ -338,10 +429,20 @@ export const updateDocumentService = async ({
   // không kiểm tra gì ngoài permission chung `DOCUMENT_UPDATE` ở route, bất
   // kỳ ai có quyền đó sửa được mọi document của mọi phòng ban. Nay ràng buộc
   // theo department, đồng bộ với "khác khoa" đã có ở Create.
+  //
+  // MỚI (DEV-041, 2026-09-11): phép so sánh "cùng phòng ban" RÚT sang
+  // `isSameDepartment()` (`documents.scope.ts`) — dùng chung với 2 hàm XEM ở
+  // trên. CỐ TÌNH KHÔNG dùng `canViewAcrossDepartments()`/
+  // `canViewAllDepartments` ở đây — permission đó CHỈ áp dụng hành động XEM
+  // (xem giải thích ở `documents.scope.ts` + `permission.constant.ts`), sửa
+  // document khác khoa vẫn CHỈ dành cho ADMIN, giữ nguyên hành vi cũ. Giữ
+  // nguyên thứ tự `callerDepartment &&` — nếu thiếu `callerDepartment`
+  // (dữ liệu user thiếu field) thì KHÔNG throw ở đây (khác thiết kế
+  // fail-closed của `getAllDocumentsService`) — hành vi CŨ, không đổi.
   if (
     !isAdmin &&
     callerDepartment &&
-    document.department.toString() !== callerDepartment.toString()
+    !isSameDepartment(document.department, callerDepartment)
   ) {
     throw ApiError.forbidden("Không có quyền sửa document của phòng ban khác");
   }
@@ -386,13 +487,45 @@ export const updateDocumentService = async ({
     return document;
   }
 
+  // Roadmap A4 (Document versioning, 2026-09-15) — chụp lại nội dung CŨ
+  // (title/meta — đúng 2 field DOCUMENT_UPDATE_WHITELIST cho phép sửa qua
+  // route này) TRƯỚC KHI bị `Object.assign` ghi đè ngay bên dưới.
+  // `editedBy`/`editedAt` lấy từ `document.updatedBy`/`updatedAt` HIỆN TẠI
+  // (người/thời điểm đã TẠO RA nội dung sắp bị thay thế) — KHÔNG PHẢI
+  // `userId` của lần sửa này (đó là người đóng version cũ lại, không phải
+  // người viết ra nó). Fallback `createdBy`/`createdAt` cho lần sửa ĐẦU TIÊN
+  // (khi đó `updatedBy`/`updatedAt` chưa từng được set bởi 1 edit thật nào).
+  const previousSnapshot = {
+    title: document.title,
+    meta: document.meta,
+    editedBy: document.updatedBy ?? document.createdBy,
+    editedAt: document.updatedAt ?? document.createdAt ?? new Date(),
+  };
+
   Object.assign(document, safeUpdate);
   document.updatedBy = new Types.ObjectId(userId);
   // Bỏ set tay `updatedAt` (Technical Debt #5) — model đã bật
   // `{ timestamps: true }`, Mongoose tự cập nhật field này khi `.save()`.
 
-  // Chuỗi ghi cần transaction: ghi UserAudit "UPDATE" + save Document.
+  // Chuỗi ghi cần transaction: DocumentVersion (bản cũ) + UserAudit "UPDATE"
+  // + save Document — atomic, không có window nào giữa lúc document đổi và
+  // lúc bản cũ được lưu lại (tránh mất lịch sử nếu 1 write giữa chừng lỗi).
   await withTransaction(async (session) => {
+    const versionCount = await DocumentVersion.countDocuments({
+      document: document._id,
+    }).session(session);
+
+    await DocumentVersion.create(
+      [
+        {
+          document: document._id,
+          versionNumber: versionCount + 1,
+          ...previousSnapshot,
+        },
+      ],
+      { session },
+    );
+
     await UserAudit.create(
       [
         {
@@ -417,12 +550,17 @@ export const deleteDocumentService = async ({
   id,
   userId,
   role,
+  isSystemRole,
 }: DeleteDocumentPayload) => {
   validateObjectId(id, "ID không hợp lệ");
 
   const document = await getActiveDocumentOrFail(id);
 
-  if (role !== "ADMIN") throw ApiError.forbidden("Không có quyền");
+  // 🔒 DEV-001A Phase B hoàn tất (DEV-047, 2026-09-12): chỉ còn đọc cờ
+  // security identity `isSystemRole`, đã gỡ lưới đỡ literal "ADMIN".
+  if (!(isSystemRole === true)) {
+    throw ApiError.forbidden("Không có quyền");
+  }
 
   // Sửa Missing Validation #5 — lỗ hổng nghiêm trọng nhất module theo phân
   // tích Business: trước đây xoá PROPOSAL mà không kiểm tra còn REPORT nào
@@ -437,6 +575,18 @@ export const deleteDocumentService = async ({
         `Không thể xoá: đang có ${reportCount} biên bản tham chiếu tới đề xuất này`,
       );
     }
+  }
+
+  // DEV-016/MEDIUM-11 (RV05-06): trước đây soft-delete Document không kiểm
+  // tra `workflowStatus` — nếu còn "pending", WorkflowInstance liên quan vẫn
+  // hoạt động bình thường (approver vẫn duyệt/từ chối được), kéo theo
+  // side-effect đổi Asset thật (`syncAssetOnDocumentApproved`) cho 1 document
+  // đã bị ẩn khỏi luồng active thông thường. Chặn xoá, buộc admin tự xử lý
+  // workflow (huỷ/chờ duyệt xong) trước khi xoá Document.
+  if (document.workflowStatus === "pending") {
+    throw ApiError.badRequest(
+      "Không thể xoá: document đang có workflow ở trạng thái chờ duyệt (pending) — cần huỷ hoặc chờ workflow xử lý xong trước",
+    );
   }
 
   document.isActive = false;
@@ -464,13 +614,32 @@ export const deleteDocumentService = async ({
 };
 
 /* ===============================
-   DELETE many by month
+   DELETE (SOFT) many by month
 =============================== */
-export const deleteDocumentsByMonthService = async (
-  month: number,
-  year: number,
-  filters: any = {},
-) => {
+export const deleteDocumentsByMonthService = async ({
+  month,
+  year,
+  filters = {},
+  userId,
+  role,
+  isSystemRole,
+}: DeleteDocumentsByMonthPayload) => {
+  // 🔒 MỚI (DEV-044, 2026-09-12 — Remaining Issue từ DEV-006, xác nhận lại ở
+  // `docs/30_DEVELOPMENT_COMPLETION_AUDIT.md` Mục 3/9 #3): trước đây hàm này
+  // KHÔNG có guard nào ngoài permission `DOCUMENT_DELETE` ở route — bất kỳ
+  // role nào giữ permission đó (hiện tại: ADMIN + IT, sau DEV-041) xoá được
+  // HÀNG LOẠT document theo tháng của BẤT KỲ phòng ban nào (client tự truyền
+  // `department` filter, không bị ép về khoa mình). Xoá ĐƠN LẺ đã yêu cầu
+  // ADMIN thật từ DEV-006 (`deleteDocumentService`) — bulk-delete có blast
+  // radius LỚN HƠN nhiều (cả tháng dữ liệu, nhiều phòng ban cùng lúc) nên
+  // PHẢI cùng mức bảo vệ, không được lỏng hơn. Dùng ĐÚNG guard/pattern đã có
+  // (không sáng chế cơ chế mới).
+  // 🔒 DEV-001A Phase B hoàn tất (DEV-047, 2026-09-12): chỉ còn đọc cờ
+  // security identity `isSystemRole`, đã gỡ lưới đỡ literal "ADMIN".
+  if (!(isSystemRole === true)) {
+    throw ApiError.forbidden("Chỉ ADMIN được xoá hàng loạt document theo tháng");
+  }
+
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 0, 23, 59, 59);
 
@@ -481,20 +650,64 @@ export const deleteDocumentsByMonthService = async (
     ...buildDocumentFilter(filters),
   };
 
-  // Chỉ 1 write trên 1 collection (`deleteMany` trên Document) — KHÔNG cần
+  // DEV-006/IMP-006 (H-06=ISS-02=RV05-05): trước đây `deleteMany` (hard
+  // delete) không kiểm tra tham chiếu, để lại dangling reference vĩnh viễn ở
+  // WorkflowInstance.documentId/Document.referenceTo/Notification.resourceId.
+  // Nay chuyển sang soft-delete (isActive/deletedAt/deletedBy), ĐỒNG BỘ
+  // pattern với `deleteDocumentService()` — document vẫn tồn tại trong DB
+  // nên WorkflowInstance/Notification KHÔNG còn dangling (populate vẫn trả
+  // về document, chỉ `isActive=false` thay vì null).
+  //
+  // Document.referenceTo vẫn cần xử lý riêng: 1 PROPOSAL còn REPORT active
+  // tham chiếu mà bị soft-delete sẽ làm `getReportsByProposalService` báo
+  // 404 "Không tìm thấy proposal" (`findProposalById` lọc `isActive:true`)
+  // dù REPORT đó vẫn active — đây là breakage luồng nghiệp vụ đang chạy,
+  // không chỉ là "dữ liệu mồ côi" ở tầng DB. Loại các PROPOSAL này khỏi
+  // batch, dùng lại ĐÚNG điều kiện guard đã có ở `deleteDocumentService`
+  // (Missing Validation #5, qua `countReportsByProposal`) để không lệch
+  // logic giữa xoá đơn lẻ và xoá hàng loạt.
+  const proposalIdsInScope = await findDocumentIdsByFilter({
+    ...query,
+    category: "PROPOSAL",
+  });
+
+  const referencedProposalIds: any[] = [];
+  for (const proposalId of proposalIdsInScope) {
+    const reportCount = await countReportsByProposal(proposalId);
+    if (reportCount > 0) {
+      referencedProposalIds.push(proposalId);
+    }
+  }
+
+  const finalQuery =
+    referencedProposalIds.length > 0
+      ? { ...query, _id: { $nin: referencedProposalIds } }
+      : query;
+
+  // Chỉ 1 write trên 1 collection (`updateMany` trên Document) — KHÔNG cần
   // transaction (transaction chỉ có ý nghĩa khi ghi NHIỀU collection cần
   // atomic cùng nhau).
-  const result = await deleteDocumentsByFilter(query);
+  const result = await softDeleteDocumentsByFilter(finalQuery, userId);
 
   return {
-    deletedCount: result.deletedCount,
+    deletedCount: result.modifiedCount,
+    // Số PROPOSAL bị loại khỏi batch vì còn REPORT active tham chiếu — minh
+    // bạch cho caller biết vì sao deletedCount có thể nhỏ hơn tổng số
+    // document khớp filter tháng/năm.
+    skippedCount: referencedProposalIds.length,
   };
 };
 
 /* ===============================
    Get report by proposal
 =============================== */
-export const getReportsByProposalService = async (proposalId: any) => {
+export const getReportsByProposalService = async ({
+  proposalId,
+  callerDepartment,
+  isAdmin = false,
+  callerRole,
+  canViewAllDepartments = false,
+}: GetReportsByProposalPayload) => {
   validateObjectId(proposalId, "Proposal id không hợp lệ");
 
   const proposalObjectId = new Types.ObjectId(proposalId);
@@ -503,6 +716,53 @@ export const getReportsByProposalService = async (proposalId: any) => {
 
   if (!proposal) {
     throw ApiError.notFound("Không tìm thấy proposal");
+  }
+
+  // DEV-030 (bổ sung) — đồng bộ rule "chỉ thấy tài liệu cùng khoa" đã áp dụng
+  // cho `GET /:id` (DEV-009A) và `GET /documents` (DEV-030): endpoint này là
+  // 1 đường đọc Document KHÁC (proposal + reports tham chiếu), nếu không
+  // chặn ở đây thì non-admin vẫn đọc được nội dung proposal/report của
+  // phòng ban khác chỉ bằng cách biết/đoán `proposalId`, dù đã bị chặn ở
+  // 2 endpoint kia — bypass hoàn toàn ý định ban đầu.
+  // `proposal.department` đã được `findProposalById` populate thành object
+  // `{_id, name, code}` (khác `document.department` raw ObjectId ở nơi
+  // khác) — so sánh qua `_id`.
+  //
+  // ⚠️ BUG PHÁT HIỆN + FIX (2026-09-10, user báo lỗi thật qua tab "Lịch sử
+  // duyệt" mới, DEV-038): trước đây rule "cùng khoa" KHÔNG có ngoại lệ nào
+  // — khác `GET /:id` (đã có Policy ABAC `pendingApproverRole`/
+  // `workflowParticipantRole`, `loadDocument.middleware.ts`), endpoint này
+  // chặn CỨNG mọi approver khác phòng ban, dù workflow đang pending HAY đã
+  // xong. Thêm đúng 1 ngoại lệ tương đương (đồng bộ với Policy mới ở
+  // `loadDocument.middleware.ts`): role người gọi từng có mặt ở BẤT KỲ bước
+  // nào (mọi trạng thái) của BẤT KỲ WorkflowInstance nào gắn với proposal
+  // này → vẫn cho xem, dù khác phòng ban. CHỦ Ý chỉ query `WorkflowInstance`
+  // khi thật sự cần (ADMIN/cùng phòng ban đã đủ điều kiện thì bỏ qua luôn,
+  // tránh 1 query DB thừa cho trường hợp phổ biến nhất).
+  // MỚI (DEV-041, 2026-09-11): `isSameDepartment`/`canViewAcrossDepartments`
+  // RÚT sang `documents.scope.ts` — dùng chung với `getAllDocumentsService`
+  // ở trên, thay vì tự viết lại phép so sánh (xem giải thích đầy đủ ở đầu
+  // file đó + DEV-041.md Mục 1.3/3.2C). KHÔNG đổi hành vi so với bản trước.
+  const sameDepartment = isSameDepartment(proposal.department._id, callerDepartment);
+
+  // MỚI (DEV-040, 2026-09-10) — đồng bộ đúng lối thoát `canViewAllDepartments`
+  // vừa thêm ở `getAllDocumentsService` (permission `DOCUMENT_VIEW_ALL_
+  // DEPARTMENTS`, IT đã được gán) — không đồng bộ điểm này thì IT thấy được
+  // document/list rồi nhưng bấm vào "biên bản liên quan" của 1 proposal khác
+  // khoa vẫn 403 (cùng lớp bug DEV-039 vừa gặp, khác trigger).
+  if (!canViewAcrossDepartments({ isAdmin, canViewAllDepartments }) && !sameDepartment) {
+    const isWorkflowParticipant =
+      !!callerRole &&
+      (await WorkflowInstance.exists({
+        documentId: proposal._id,
+        "steps.role": callerRole,
+      }));
+
+    if (!isWorkflowParticipant) {
+      throw ApiError.forbidden(
+        "Không có quyền xem proposal/report của phòng ban khác",
+      );
+    }
   }
 
   if (!proposal.referenceTo) {

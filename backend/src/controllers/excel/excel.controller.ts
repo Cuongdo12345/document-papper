@@ -27,7 +27,9 @@ import ApiError from "../../shared/errors/ApiError";
  *   bắt buộc, user không thể tự ý export khoa khác bằng cách sửa query string.
  */
 export const exportDocumentsExcel = catchAsync(async (req: Request, res: Response) => {
-  const isAdmin = req.user?.role?.name === "ADMIN";
+  // 🔒 DEV-001A Phase B hoàn tất (DEV-047, 2026-09-12): chỉ còn đọc cờ
+  // security identity `isSystemRole`, đã gỡ lưới đỡ literal "ADMIN".
+  const isAdmin = req.user?.role?.isSystemRole === true;
 
   if (!isAdmin && !req.user?.department) {
     throw ApiError.forbidden("Tài khoản của bạn chưa được gán khoa nên không thể export");
@@ -83,7 +85,9 @@ export const importDocumentsExcelData = catchAsync(async (req: Request, res: Res
  * thường, mà là ràng buộc bắt buộc áp trước khi vào service.
  */
 export const getImportHistory = catchAsync(async (req: Request, res: Response) => {
-  const isAdmin = req.user?.role?.name === "ADMIN";
+  // 🔒 DEV-001A Phase B hoàn tất (DEV-047, 2026-09-12): chỉ còn đọc cờ
+  // security identity `isSystemRole`, đã gỡ lưới đỡ literal "ADMIN".
+  const isAdmin = req.user?.role?.isSystemRole === true;
 
   const data = await listImportHistory(req.query, {
     importedBy: isAdmin ? undefined : req.user!._id,

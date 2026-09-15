@@ -23,14 +23,20 @@ export const findActiveDocument = (id: any) => {
  * cùng tranh nhau đổi trạng thái 1 asset (VD: đề xuất A duyệt xong trước,
  * chuyển asset sang UNDER_MAINTENANCE, rồi đề xuất B duyệt xong sau đó lại
  * cố set UNDER_MAINTENANCE lần nữa — vô nghĩa và dễ gây nhầm lẫn báo cáo).
+ *
+ * `session` MỚI (DEV-045, 2026-09-12 — RV05-07 TOCTOU): tham số optional để
+ * gọi được TỪ BÊN TRONG 1 transaction (`createDocumentService`), cùng
+ * pattern `createDocument()` ở trên + ARCH-21 (`excel.service.ts`) — đọc qua
+ * đúng `session` của transaction đang tạo document, thay vì đọc rời rạc
+ * ngoài transaction (window TOCTOU rộng hơn).
  */
-export const findPendingRepairProposalForAsset = (assetId: any) => {
+export const findPendingRepairProposalForAsset = (assetId: any, session?: ClientSession) => {
   return Document.findOne({
     relatedAsset: assetId,
     subType: DocumentSubType.PROPOSE_REPAIR,
     workflowStatus: "pending",
     isActive: true,
-  });
+  }).session(session ?? null);
 };
 
 /**
@@ -68,10 +74,30 @@ export const findDocuments = (filter: any, options: any) => {
 };
 
 /* ===============================
-   DELETE MANY BY FILTER
+   SOFT-DELETE MANY BY FILTER
 =============================== */
-export const deleteDocumentsByFilter = (query: any) => {
-  return Document.deleteMany(query);
+/**
+ * DEV-006/IMP-006 (H-06=ISS-02=RV05-05): thay `deleteDocumentsByFilter`
+ * (hard `deleteMany`) cũ — hard-delete để lại dangling reference vĩnh viễn ở
+ * WorkflowInstance.documentId/Document.referenceTo/Notification.resourceId
+ * vì row Document biến mất hoàn toàn. Nay soft-delete hàng loạt, ĐỒNG BỘ 3
+ * field với `deleteDocumentService()` (xoá đơn lẻ) — document vẫn tồn tại
+ * trong DB nên các reference trên KHÔNG còn dangling (populate vẫn trả về
+ * document, chỉ `isActive=false` thay vì null).
+ */
+export const softDeleteDocumentsByFilter = (query: any, deletedBy: any) => {
+  return Document.updateMany(query, {
+    $set: { isActive: false, deletedAt: new Date(), deletedBy },
+  });
+};
+
+/**
+ * Lấy `_id` của các Document khớp filter — dùng để xác định phần nào trong
+ * batch "xoá theo tháng" cần loại trừ (xem `findProposalIdsWithActiveReports`
+ * ở `document.service.ts`).
+ */
+export const findDocumentIdsByFilter = (query: any) => {
+  return Document.distinct("_id", query);
 };
 
 /* ===============================

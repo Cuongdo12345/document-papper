@@ -21,6 +21,8 @@ import {
   CALIBRATION_DUE_ALLOWED_SORT_BY,
 } from "../../services/dashboard/medicalDeviceDashboard.service";
 
+import { getOverdueApprovalsListService } from "../../services/dashboard/workflowDashboard.service";
+
 import ApiError from "../../shared/errors/ApiError";
 import { parsePaginationQuery, parseOptionalDate } from "../../shared/utils/Queryparsing.util";
 import { catchAsync } from "../../shared/utils/catchAsync"; 
@@ -91,7 +93,9 @@ export const adminDashboardSummary = catchAsync(async (req: Request, res: Respon
   // Route cho phép ADMIN (bypass) HOẶC bất kỳ user nào có quyền
   // DASHBOARD_READ; endpoint admin-summary business yêu cầu CHỈ ADMIN mới
   // được xem — nên vẫn cần check thêm ở đây, không phải logic thừa.
-  if (req.user!.role.name !== "ADMIN") {
+  // 🔒 DEV-001A Phase B hoàn tất (DEV-047, 2026-09-12): chỉ còn đọc cờ
+  // security identity `isSystemRole`, đã gỡ lưới đỡ literal "ADMIN".
+  if (!(req.user!.role.isSystemRole === true)) {
     throw ApiError.forbidden("Chỉ ADMIN được truy cập dashboard");
   }
 
@@ -326,6 +330,19 @@ export const getMedicalDeviceCalibrationDue = catchAsync(async (req: Request, re
         sortOrder,
       }),
   );
- 
+
+  res.json({ success: true, ...data });
+});
+
+/* =====================================================================
+   Roadmap B1 (SLA & nhắc việc Workflow) — "Đề xuất trễ hạn"
+===================================================================== */
+export const getWorkflowOverdueApprovals = catchAsync(async (req: Request, res: Response) => {
+  const data = await getOrSetCache(
+    `dashboard:workflowOverdueApprovals:${JSON.stringify(req.query)}`,
+    DASHBOARD_CACHE_TTL_MS,
+    () => getOverdueApprovalsListService(req.query),
+  );
+
   res.json({ success: true, ...data });
 });

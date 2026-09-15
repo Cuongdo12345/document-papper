@@ -107,7 +107,9 @@ import { ApiPerformanceModel } from "../../models/apiPerformance/apiPerformance.
  *  + thời gian trung bình ở từng layer (DB, service, controller)
  *  + số lần bị slow (tổng thời gian > 800ms)
  * + số lần lỗi (status >= 400)
- * // Cần đảm bảo endpoint này được bảo vệ, chỉ admin mới có quyền truy cập
+ * // DEV-011/IMP-016: endpoint đã được bảo vệ ở tầng route
+ * // (`authorizePermission("PERFORMANCE_VIEW")`, chỉ gán cho ADMIN) — TODO
+ * // này đã xử lý xong, không phải tự check role trong controller.
  * // Có thể thêm tính năng phân trang nếu dữ liệu quá lớn, hoặc cache kết quả để giảm tải cho DB
  * // Cần đảm bảo rằng việc truy vấn thống kê này được tối ưu, có thể sử dụng index trên trường createdAt và endpoint để tăng tốc độ truy vấn
  * // Cần log rõ ràng nếu có lỗi xảy ra trong quá trình truy vấn để dễ dàng debug

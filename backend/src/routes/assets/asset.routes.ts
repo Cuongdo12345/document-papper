@@ -56,7 +56,7 @@ router.get(
   "/",
   authenticate,
   authorizePermission("ASSET_VIEW"),
-  // validateQuery(QueryAssetDTO),
+  validateQuery(QueryAssetDTO),
   getAllAssets,
 );
 
@@ -160,7 +160,7 @@ router.get(
   authenticate,
   authorizePermission("ASSET_VIEW_DETAIL"),
   validateParams(IdParamDTO),
-  // validateQuery(QueryAssetAssignmentHistoryDTO),
+  validateQuery(QueryAssetAssignmentHistoryDTO),
   getAssetAssignmentHistory,
 );
 

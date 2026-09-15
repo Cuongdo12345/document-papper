@@ -14,7 +14,9 @@ export const CreateUserDTO = z.object({
     .string()
     .min(5, "Tên tối thiểu 5 ký tự")
     .regex(/^[a-zA-Z0-9_]+$/, "Username chỉ chứa chữ, số, _"),
-  password: z.string().min(5, "Password tối thiểu 5 ký tự"),
+  // DEV-021/SEC-02: min(5) → min(8) — đặt mật khẩu MỚI (admin tạo user),
+  // không phải xác thực mật khẩu cũ nên nâng ngưỡng an toàn.
+  password: z.string().min(8, "Password tối thiểu 8 ký tự"),
   fullName: z.string().min(1, "Tên không được để trống"),
   // role là object { name, ... } khi đã populate ở phía service (service hiện đọc role.name),
   // nhưng input của client chỉ cần gửi roleId — validate roleId ở đây.
@@ -34,16 +36,38 @@ export const UpdateUserDTO = z.object({
   isActive: z.boolean().optional(),
 });
 
+/**
+ * ASSIGN ROLE (TASK-002, Việc 2) — DTO cho endpoint riêng gán role cho user,
+ * wire lại `assignRole()` (users.service.ts) vốn trước đây là dead code.
+ */
+export const AssignRoleDTO = z.object({
+  roleId: ObjectIdSchema,
+  resetPermissions: z.boolean().optional(),
+});
+
 export const ChangePasswordDTO = z
   .object({
+    // `oldPassword` xác thực mật khẩu CŨ đã tồn tại — GIỮ NGUYÊN min(5) (nâng
+    // ngưỡng ở đây sẽ chặn user có mật khẩu 5-7 ký tự tạo dưới policy cũ tự
+    // đổi mật khẩu). DEV-021/SEC-02: chỉ nâng `newPassword` (min(5)→min(8)).
     oldPassword: z.string().min(5),
-    newPassword: z.string().min(5),
+    newPassword: z.string().min(8, "Password mới tối thiểu 8 ký tự"),
     confirmPassword: z.string(),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
     message: "Password không khớp",
     path: ["confirmPassword"],
   });
+
+/**
+ * RESET PASSWORD BY ADMIN (DEV-021/SEC-02) — `PATCH /api/users/reset-password/:id`
+ * trước đây KHÔNG có validateBody/DTO nào — controller đọc thẳng
+ * `req.body.newPassword` (`any`, không giới hạn độ dài/kiểu dữ liệu). Thêm
+ * DTO tối thiểu, cùng ngưỡng min(8) với các luồng đặt mật khẩu mới khác.
+ */
+export const ResetPasswordByAdminDTO = z.object({
+  newPassword: z.string().min(8, "Password mới tối thiểu 8 ký tự"),
+});
 
 /**
  * GET USERS — Query DTO cho danh sách user (filter + pagination + sort)

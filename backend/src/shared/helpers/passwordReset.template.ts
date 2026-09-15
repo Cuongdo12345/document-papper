@@ -1,3 +1,5 @@
+import { escapeHtml } from "../utils/html.util";
+
 /**
  * passwordReset.template.ts — nội dung email reset mật khẩu.
  * Tách riêng khỏi service để dễ chỉnh sửa nội dung/giao diện mà không đụng
@@ -12,7 +14,14 @@ export const buildPasswordResetEmail = (params: {
 
   const subject = "Yêu cầu đặt lại mật khẩu";
 
-  const greeting = fullName ? `Xin chào ${fullName},` : "Xin chào,";
+  // DEV-015/MEDIUM-10 (13_SHARED_CODE_REVIEW.md #3): `fullName` là free-text
+  // user tự đặt lúc đăng ký/được tạo — escape trước khi nội suy vào HTML
+  // (bản `text` thuần không cần escape, giữ nguyên `fullName` gốc để đọc tự
+  // nhiên trong email client không hỗ trợ HTML).
+  const greeting = fullName
+    ? `Xin chào ${escapeHtml(fullName)},`
+    : "Xin chào,";
+  const greetingText = fullName ? `Xin chào ${fullName},` : "Xin chào,";
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
@@ -33,7 +42,7 @@ export const buildPasswordResetEmail = (params: {
   `;
 
   const text =
-    `${greeting}\n\n` +
+    `${greetingText}\n\n` +
     `Hệ thống nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.\n` +
     `Truy cập đường dẫn sau để đặt lại mật khẩu (hết hạn sau ${expiresInMinutes} phút):\n` +
     `${resetLink}\n\n` +

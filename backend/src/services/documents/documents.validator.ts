@@ -2,7 +2,6 @@ import { DOCUMENT_RULES } from "../../shared/constants/documentRules";
 import ApiError from "../../shared/errors/ApiError";
 import { Document, DocumentCategory, DocumentSubType } from "../../models/documents/document.model";
 import { Types } from "mongoose";
-import { DOCUMENT_WORKFLOW, STATUS_PERMISSION, DocumentStatus } from "../../shared/constants/workflow-docs";
 
 export const validateDocumentRule = (category: DocumentCategory, subType: DocumentSubType) => {
   const rule = DOCUMENT_RULES[subType];
@@ -95,40 +94,6 @@ export const validateRestorePermission = ({
 
   if (!isAdmin && !isOwner) {
     throw ApiError.forbidden("Bạn không có quyền khôi phục document này");
-  }
-};
-
-//=================================
-// [DEPRECATED — dead code, chưa xác nhận có consumer nào khác trong codebase]
-// 2 hàm dưới đây được viết cho 1 thiết kế trạng thái cũ (`DocumentStatus`,
-// field `repairStatus`) không còn tồn tại trong schema `Document` hiện tại
-// (model hiện dùng `workflowStatus`, luồng trạng thái thực tế đang chạy qua
-// `workflow.service.ts` — đã sửa role-per-step + chặn xử lý workflow đã kết
-// thúc ở đó). Giữ lại tạm thời để không phá vỡ import ở nơi khác nếu có,
-// nhưng KHÔNG dùng 2 hàm này cho luồng Document hiện tại.
-// TODO (Technical Debt #2): xác nhận không còn consumer nào rồi xoá hẳn.
-//=================================
-export const validateStatusTransition = (
-  current: DocumentStatus,
-  next: DocumentStatus
-) => {
-  const allowed = DOCUMENT_WORKFLOW[current];
-
-  if (!allowed.includes(next)) {
-    throw ApiError.badRequest(
-      `Không thể chuyển trạng thái từ ${current} → ${next}`
-    );
-  }
-};
-
-export const validateStatusPermission = (
-  next: DocumentStatus,
-  role: string
-) => {
-  const roles = STATUS_PERMISSION[next];
-
-  if (!roles.includes(role)) {
-    throw ApiError.forbidden("Không có quyền thực hiện hành động này");
   }
 };
 

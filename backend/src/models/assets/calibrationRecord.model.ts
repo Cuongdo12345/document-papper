@@ -24,6 +24,8 @@ const CalibrationRecordSchema = new Schema<ICalibrationRecord>(
       required: true,
     },
     certificateFileUrl: { type: String, trim: true },
+    // (A2, 2026-09-15) xem giải thích đầy đủ ở `ICalibrationRecord`.
+    certificateFileId: { type: Schema.Types.ObjectId, ref: "Upload" },
     nextDueDate: { type: Date, required: true },
 
     recordedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },

@@ -2,9 +2,11 @@ import mongoose from "mongoose";
 import { Asset, AssetStatus } from "../../../models/assets/asset.model";
 import { AssetCategory } from "../../../models/assets/assetCategory.model";
 import Department from "../../../models/departments/department.model";
+import { MedicalDeviceProfile } from "../../../models/assets/medicalDeviceProfile.model";
 import ApiError from "../../../shared/errors/ApiError";
 import { generateAssetCode } from "../../../shared/helpers/generateAssetCode";
 import { ASSET_UPDATE_WHITELIST, pickWhitelisted } from "../assets.constants";
+import { escapeRegex } from "../../../shared/utils/regex.util";
 
 const ASSET_POPULATE = [
   { path: "category", select: "code name" },
@@ -55,19 +57,27 @@ export const getAllAssetsService = async (query: any) => {
     department,
     category,
     status,
+    isActive,
     page = 1,
     limit = 10,
     sortBy = "createdAt",
     order = "desc",
   } = query;
- 
-  const filter: any = { isActive: true };
- 
+
+  // ⚠️ SỬA (FE-06 follow-up, 2026-09-07): trước đây `filter.isActive` HARD-CODE
+  // `true`, không đọc query — không ai (kể cả ADMIN) liệt kê lại được tài sản
+  // đã xoá mềm để khôi phục. Đọc đúng biến `isActive` đã destructure (qua
+  // `QueryAssetDTO`, boolean hoặc `undefined`), mặc định `true` CHỈ khi client
+  // không truyền field này — cùng pattern đã sửa ở `getAllDocumentsService`.
+  const filter: any = { isActive: isActive === undefined ? true : isActive };
+
+  // DEV-010/IMP-015 (SEC-36/RV06-02): escape trước khi đưa vào $regex.
   if (keyword) {
+    const safeKeyword = escapeRegex(keyword);
     filter.$or = [
-      { name: { $regex: keyword, $options: "i" } },
-      { assetCode: { $regex: keyword, $options: "i" } },
-      { serialNumber: { $regex: keyword, $options: "i" } },
+      { name: { $regex: safeKeyword, $options: "i" } },
+      { assetCode: { $regex: safeKeyword, $options: "i" } },
+      { serialNumber: { $regex: safeKeyword, $options: "i" } },
     ];
   }
  
@@ -217,25 +227,39 @@ export const deleteAssetService = async (id: any, userId?: any) => {
  * (`relatedAsset`), cần bổ sung thêm điều kiện chặn hard-delete nếu vẫn
  * còn Document (đề xuất sửa chữa/thanh lý...) tham chiếu tới asset này —
  * hiện tại (Giai đoạn 1) chưa có field đó nên chưa check được.
+ *
+ * DEV-012/IMP-018: bổ sung chặn hard-delete nếu Asset còn gắn
+ * `MedicalDeviceProfile` (hồ sơ pháp lý/kiểm định thiết bị y tế) — dữ liệu
+ * kiểm định (lịch sử hiệu chuẩn, số đăng ký lưu hành...) KHÔNG THỂ khôi
+ * phục sau khi Asset bị xoá vĩnh viễn (Mongo xoá cứng document, không có
+ * cascade). Yêu cầu xoá `MedicalDeviceProfile` (qua nghiệp vụ riêng của
+ * module Medical Device, nếu có) trước khi hard-delete Asset.
  */
 export const hardDeleteAssetService = async (id: any) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw ApiError.badRequest("ID tài sản không hợp lệ");
   }
- 
+
   const asset = await Asset.findById(id);
   if (!asset) {
     throw ApiError.notFound("Không tìm thấy tài sản");
   }
- 
+
   if (asset.isActive) {
     throw ApiError.badRequest(
       "Chỉ có thể xoá vĩnh viễn tài sản đã được xoá mềm trước đó — vui lòng gọi xoá thường (soft delete) trước",
     );
   }
- 
+
+  const medicalProfileExists = await MedicalDeviceProfile.exists({ asset: id });
+  if (medicalProfileExists) {
+    throw ApiError.badRequest(
+      "Không thể xoá vĩnh viễn tài sản vì vẫn còn hồ sơ thiết bị y tế (kiểm định/hiệu chuẩn) gắn với tài sản này",
+    );
+  }
+
   await Asset.deleteOne({ _id: id });
- 
+
   return true;
 };
  

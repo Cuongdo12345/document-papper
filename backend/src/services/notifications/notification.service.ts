@@ -12,6 +12,8 @@ import { Role } from "../../models/rbac/role.model";
 import ApiError from "../../shared/errors/ApiError";
 import { toOptionalObjectId } from "../../shared/utils/Mongoid.util";
 import { sendMail } from "../../shared/utils/mailer";
+import { escapeHtml } from "../../shared/utils/html.util";
+import type { BroadcastNotificationInput } from "../../dto/notifications/notification.dto";
 
 /* =====================================================================
    TẠO NOTIFICATION (điểm gọi từ CÁC SERVICE KHÁC)
@@ -97,10 +99,13 @@ const sendEmailForNotification = async (
   const user = await User.findById(recipientId).select("email fullName");
   if (!user?.email) return; // user cũ chưa migrate email — bỏ qua, không throw
 
+  // DEV-015/MEDIUM-10 (RV10-02): `message` là free-text (có thể chứa
+  // Document.title/tên tự đặt của user khác) — escape trước khi nội suy vào
+  // HTML email, tránh HTML/email injection.
   await sendMail({
     to: user.email,
     subject: title,
-    html: `<p>${message}</p>`,
+    html: `<p>${escapeHtml(message)}</p>`,
   });
 
   await Notification.findByIdAndUpdate(notificationId, {
@@ -302,4 +307,118 @@ export const deleteNotification = async (
   }
 
   return { deleted: true };
+};
+
+/* =====================================================================
+   ADMIN — quản trị Notification (MỚI, 2026-09-10) — xem
+   `notification.dto.ts` cho bối cảnh đầy đủ. Tái dùng `notifyUserIds`
+   (helper broadcast đã có sẵn, đang chạy ổn định cho 4 module khác) thay vì
+   viết lại vòng lặp gửi — chỉ thêm bước RESOLVE danh sách user theo `scope`.
+===================================================================== */
+
+/** Resolve `scope` → danh sách `_id` user THẬT SỰ tồn tại + đang active — không tin tưởng payload client gửi lên chứa ID rác/user đã bị vô hiệu hoá. */
+const resolveBroadcastRecipientIds = async (
+  input: BroadcastNotificationInput,
+): Promise<Types.ObjectId[]> => {
+  if (input.scope === "ALL") {
+    const users = await User.find({ isActive: true }).select("_id");
+    return users.map((u) => u._id);
+  }
+
+  if (input.scope === "ROLE") {
+    const role = await Role.findOne({ name: input.roleName }).select("_id");
+    if (!role) {
+      throw ApiError.badRequest(`Role "${input.roleName}" không tồn tại`);
+    }
+    const users = await User.find({ role: role._id, isActive: true }).select("_id");
+    return users.map((u) => u._id);
+  }
+
+  if (input.scope === "DEPARTMENT") {
+    const deptId = toOptionalObjectId(input.departmentId, "departmentId không hợp lệ");
+    if (!deptId) return [];
+    const users = await User.find({ department: deptId, isActive: true }).select("_id");
+    return users.map((u) => u._id);
+  }
+
+  // scope === "USERS"
+  const ids = (input.userIds ?? [])
+    .map((id) => toOptionalObjectId(id))
+    .filter((id): id is Types.ObjectId => !!id);
+  if (ids.length === 0) return [];
+  const users = await User.find({ _id: { $in: ids }, isActive: true }).select("_id");
+  return users.map((u) => u._id);
+};
+
+/**
+ * Soạn + gửi thông báo hệ thống (`type: SYSTEM` — enum có sẵn từ đầu nhưng
+ * CHƯA từng có điểm gọi nào dùng tới, xem `notification.types.ts`) tới nhiều
+ * user cùng lúc. `createdBy` = ADMIN đang gọi (audit "ai gửi thông báo này").
+ */
+export const broadcastNotificationService = async (
+  createdBy: string | Types.ObjectId,
+  input: BroadcastNotificationInput,
+) => {
+  const recipientIds = await resolveBroadcastRecipientIds(input);
+
+  if (recipientIds.length === 0) {
+    throw ApiError.badRequest("Không tìm thấy người nhận nào khớp phạm vi đã chọn");
+  }
+
+  await notifyUserIds(recipientIds, {
+    createdBy,
+    type: NotificationType.SYSTEM,
+    title: input.title,
+    message: input.message,
+    priority: input.priority as NotificationPriority | undefined,
+    sendEmail: input.sendEmail,
+  });
+
+  return { recipientCount: recipientIds.length };
+};
+
+/**
+ * Xem thông báo của BẤT KỲ user nào (giám sát/debug — vd "user X báo không
+ * nhận được thông báo duyệt tài liệu, kiểm tra xem hệ thống đã tạo bản ghi
+ * chưa"). KHÁC HẲN `getNotificationsForUser`: KHÔNG tự khoá `recipient` theo
+ * người gọi — permission `NOTIFICATION_VIEW_ALL` (chỉ ADMIN) là ranh giới
+ * bảo mật duy nhất ở đây, PHẢI luôn gắn kèm middleware đó ở route, không
+ * được gọi hàm này từ bất kỳ route nào thiếu permission tương ứng.
+ */
+export const getAllNotificationsAdmin = async (options: {
+  page: number;
+  limit: number;
+  recipient?: string;
+  isRead?: boolean;
+  type?: string;
+}) => {
+  const filter: Record<string, unknown> = {};
+
+  if (options.recipient) {
+    const recipientId = toOptionalObjectId(options.recipient, "recipient không hợp lệ");
+    if (recipientId) filter.recipient = recipientId;
+  }
+  if (options.isRead !== undefined) filter.isRead = options.isRead;
+  if (options.type) filter.type = options.type;
+
+  const skip = (options.page - 1) * options.limit;
+
+  const [items, total] = await Promise.all([
+    Notification.find(filter)
+      .populate("recipient", "username email fullName")
+      .populate("createdBy", "username email fullName")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(options.limit)
+      .lean(),
+    Notification.countDocuments(filter),
+  ]);
+
+  return {
+    items,
+    total,
+    page: options.page,
+    limit: options.limit,
+    totalPages: Math.ceil(total / options.limit) || 1,
+  };
 };

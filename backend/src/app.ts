@@ -3,7 +3,6 @@ import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
 import morgan from "morgan";
-import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
 import { randomUUID } from "crypto";
 
@@ -21,7 +20,9 @@ import rbacRoutes from "./routes/rbac/rbac.routes";
 import notificationRoutes from "./routes/notifications/notification.routes";
 import assetCategoryRoutes from "./routes/assets/assetCategory.routes";
 import medicalDeviceRoutes from "./routes/assets/medicalDevice.routes";
+import assetMaintenancePlanRoutes from "./routes/assets/assetMaintenancePlan.routes";
 import assetRoutes from "./routes/assets/asset.routes";
+import inventoryRoutes from "./routes/inventory/inventory.routes";
 
 import { performanceMiddleware } from "./middlewares/performance.middleware";
 import { errorHandler } from "./middlewares/error.middleware";
@@ -75,15 +76,20 @@ if (process.env.NODE_ENV === "development") {
 /* ===============================
    🚦 RATE LIMIT (auth)
 ================================= */
-// Giới hạn số lần đăng nhập để ngăn chặn brute-force attacks
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20, // giới hạn 20 request mỗi 15 phút
-  message: "Too many login attempts, please try later",
-});
-
-// Chỉ áp dụng rate limit cho các route auth
-app.use("/api/auths", authLimiter);
+// DEV-023/ARCH-26: trước đây có 2 rate-limiter ĐỘC LẬP cùng cấu hình (20
+// req/15 phút) áp cho cùng 1 nhóm route `/api/auths/*` — `authLimiter` mount
+// RỘNG ở đây (toàn bộ prefix `/api/auths`) VÀ `authRateLimiter`
+// (`middlewares/authRateLimiter.middleware.ts`) gắn RIÊNG ở
+// `register`/`login`/`refresh-token` (`auth.routes.ts`) — 2 bộ đếm KHÔNG
+// chia sẻ store, dễ nhầm lẫn khi cần chỉnh ngưỡng (sửa 1 chỗ tưởng đủ).
+// Hợp nhất còn 1 nguồn: xoá limiter chung ở đây, dùng
+// `authRateLimiter` (đã có `ApiError.tooManyRequests` + doc-comment rõ
+// ràng hơn) gắn TƯỜNG MINH ở từng route trong `auth.routes.ts` — bao gồm
+// cả `reset-password` (trước đây chỉ được bảo vệ NGẦM qua limiter chung ở
+// đây, nay được gắn tường minh để không mất bảo vệ khi bỏ mount rộng này).
+// `forgot-password` CHỦ Ý không dùng `authRateLimiter` — đã có giới hạn
+// riêng ở tầng service (3 req/15 phút/user, xem comment
+// `authRateLimiter.middleware.ts`), 2 cơ chế phục vụ 2 mục đích khác nhau.
 
 /* ===============================
    📈 PERFORMANCE TRACKING
@@ -112,7 +118,15 @@ app.use("/api/rbac", rbacRoutes)
 app.use("/api/notifications", notificationRoutes)
 app.use("/api/assets/asset-categories", assetCategoryRoutes)
 app.use("/api/assets/medical-devices", medicalDeviceRoutes)
+// Roadmap B2 (2026-09-15) — PHẢI mount TRƯỚC "/api/assets" (assetRoutes)
+// bên dưới, cùng lý do assetCategoryRoutes/medicalDeviceRoutes: Express
+// khớp theo thứ tự đăng ký, "/api/assets" (path rộng hơn, có :id ở route
+// con) sẽ "nuốt" mất "/api/assets/maintenance-plans" nếu bị đăng ký trước.
+app.use("/api/assets/maintenance-plans", assetMaintenancePlanRoutes)
 app.use("/api/assets", assetRoutes)
+// Roadmap B3 (2026-09-15) — module MỚI, không có prefix con nào khác cần
+// mount trước (không giống các nhánh /api/assets/* ở trên).
+app.use("/api/inventory", inventoryRoutes)
 
 /* ===============================
    ❌ GLOBAL ERROR HANDLER

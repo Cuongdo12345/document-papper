@@ -8,6 +8,8 @@ import {
 import {
   createCalibrationRecord,
   getCalibrationHistory,
+  downloadCalibrationCertificate,
+  updateCalibrationCertificate,
 } from "../../controllers/assets/calibrationRecord.controller";
 import { authenticate } from "../../middlewares/auth.middleware";
 import { authorizePermission } from "../../middlewares/authorizePermission.middleware";
@@ -20,7 +22,11 @@ import {
   CreateMedicalDeviceProfileDTO,
   UpdateMedicalDeviceProfileDTO,
 } from "../../dto/assets/medicalDevice.dto";
-import { CreateCalibrationRecordDTO } from "../../dto/assets/calibrationRecord.dto";
+import {
+  CreateCalibrationRecordDTO,
+  CalibrationCertificateParamsDTO,
+  UpdateCalibrationCertificateDTO,
+} from "../../dto/assets/calibrationRecord.dto";
 import { createUploader } from "../../services/upload/upload.middleware";
 
 const router = Router();
@@ -99,6 +105,40 @@ router.get(
   authorizePermission("MEDICAL_DEVICE_VIEW"),
   validateParams(assetIdParam),
   getCalibrationHistory,
+);
+
+/**
+ * A2 (2026-09-15) — tải file giấy chứng nhận kiểm định thật đã upload
+ * (`certificateFileId`). Cùng permission với xem lịch sử (`MEDICAL_DEVICE_VIEW`)
+ * — không dùng ownership-check như `GET /api/upload/:id/download`, xem lý
+ * do ở JSDoc `getCalibrationCertificateFileService`. 2 segment path riêng
+ * ("/:recordId/certificate/download") nên không xung đột thứ tự route với
+ * "/:assetId/calibration-records" (GET/POST) ở trên.
+ */
+router.get(
+  "/:assetId/calibration-records/:recordId/certificate/download",
+  authenticate,
+  authorizePermission("MEDICAL_DEVICE_VIEW"),
+  validateParams(CalibrationCertificateParamsDTO),
+  downloadCalibrationCertificate,
+);
+
+/**
+ * Thay thế chứng nhận đã lưu — theo yêu cầu user sau khi A2 gốc hoàn thành
+ * ("upload nhầm file thì sửa lại được"). CÙNG permission `MEDICAL_DEVICE_CALIBRATE`
+ * với ghi nhận kiểm định mới (KHÔNG dùng MEDICAL_DEVICE_UPDATE của PUT
+ * /profile — sửa chứng nhận là hành động thuộc nhóm "kiểm định", không phải
+ * chỉnh sửa thông tin hồ sơ thiết bị thông thường). Multer PHẢI chạy TRƯỚC
+ * `validateBody` — cùng lý do đã ghi ở route POST tạo bản ghi phía trên.
+ */
+router.put(
+  "/:assetId/calibration-records/:recordId/certificate",
+  authenticate,
+  authorizePermission("MEDICAL_DEVICE_CALIBRATE"),
+  validateParams(CalibrationCertificateParamsDTO),
+  certificateUploader.single("certificateFile"),
+  validateBody(UpdateCalibrationCertificateDTO),
+  updateCalibrationCertificate,
 );
 
 /* =====================================================================

@@ -128,7 +128,20 @@ export const performanceMiddleware = (
 
     pushPerformanceLog({
       method: req.method,
-      endpoint: req.route?.path || req.originalUrl,
+      // DEV-018/IMP-025 (RV11-02): `req.route.path` CHỈ là phần path tương
+      // đối trong router con (VD "/:id"), KHÔNG bao gồm `req.baseUrl` (VD
+      // "/api/documents") — đây là hành vi CHUẨN của Express, không phải
+      // bug của Express, nhưng khiến hàng chục domain khác nhau dùng
+      // chung pattern phổ biến ("/:id", "/", "/:id/read"...) bị GỘP LẪN
+      // vào cùng 1 nhóm khi `performance.controller.ts` group theo
+      // `endpoint` — hỏng đúng mục đích cốt lõi của dashboard hiệu năng
+      // (biết endpoint NÀO chậm). Ghép `req.baseUrl` vào trước để mỗi
+      // domain có 1 khoá thống kê riêng biệt; khi route không khớp
+      // (`req.route` undefined, VD 404) vẫn fallback về `req.originalUrl`
+      // như cũ.
+      endpoint: req.route?.path
+        ? `${req.baseUrl}${req.route.path}`
+        : req.originalUrl,
       status: res.statusCode,
       totalTime,
       user: req.user?._id,

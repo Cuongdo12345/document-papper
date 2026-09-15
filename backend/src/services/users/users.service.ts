@@ -4,8 +4,9 @@ import { Role } from "../../models/rbac/role.model";
 import Department from "../../models/departments/department.model";
 import UserAudit from "../../models/users/userAudit.model";
 import RefreshToken from "../../models/auth/refreshToken.model";
+import { Asset } from "../../models/assets/asset.model";
 import ApiError from "../../shared/errors/ApiError";
-import { clearPermissionCache } from "../rbac/permission.cache";
+import { clearPermissionCache, getCachedPermissions } from "../rbac/permission.cache";
 
 // import { createUserSchema } from "../dtos/users/user.dto";
 
@@ -37,6 +38,19 @@ import { clearPermissionCache } from "../rbac/permission.cache";
 
     const role = await Role.findById(roleId);
     if (!role) throw ApiError.notFound("Role không tồn tại");
+
+    // 🔒 FIX TASK-002 (Việc 1 — mở rộng ISS-01/SEC-05, docs/tasks/TASK-002.md):
+    // trước đây create() KHÔNG chặn tạo thẳng user với role ADMIN — sau khi
+    // update() đã được chặn (TASK-001), create() là con đường API DUY NHẤT còn
+    // lại có thể tạo ra 1 user ADMIN (register() luôn gán DEFAULT_REGISTER_ROLE_NAME,
+    // không thể chọn role). Áp cùng safeguard để nhất quán: không có endpoint
+    // API nào còn có thể tạo/gán role ADMIN — việc tạo ADMIN mới (nếu cần)
+    // phải thực hiện trực tiếp trong DB, ngoài phạm vi ứng dụng.
+    // 🔒 DEV-001A Phase B hoàn tất (DEV-047, 2026-09-12): chỉ còn đọc cờ
+    // security identity `isSystemRole`, đã gỡ lưới đỡ literal "ADMIN".
+    if (role.isSystemRole === true) {
+      throw ApiError.badRequest("Không thể tạo user với role ADMIN qua endpoint này");
+    }
 
     if (role.name === "USER") {
       if (!department) throw ApiError.badRequest("User khoa phải gắn khoa");
@@ -131,7 +145,9 @@ import { clearPermissionCache } from "../rbac/permission.cache";
         page,
         limit,
         total,
-        totalPage: Math.ceil(total / limit)
+        // DEV-025/ARCH-31: đổi `totalPage`→`totalPages` — khớp convention đa
+        // số domain khác VÀ khớp field đã document sẵn trong OpenAPI.
+        totalPages: Math.ceil(total / limit)
       }
     };
   }
@@ -181,10 +197,35 @@ import { clearPermissionCache } from "../rbac/permission.cache";
     if (roleId !== undefined) {
       role = await Role.findById(roleId);
       if (!role) throw ApiError.notFound("Role không tồn tại");
+
+      // 🔒 FIX ISS-01/SEC-05 (docs/tasks/TASK-001.md): chặn gán role ADMIN qua
+      // endpoint cập nhật thông thường này — đây là con đường leo thang đặc
+      // quyền nghiêm trọng nhất tìm được trong toàn bộ RBAC (bất kỳ user nào
+      // có USER_UPDATE có thể tự thăng cấp bản thân/người khác lên ADMIN).
+      // Đồng nhất với safeguard đã có sẵn ở assignRole() cùng file — không có
+      // ngoại lệ, kể cả người gọi vốn đã là ADMIN.
+      // 🔒 DEV-001A Phase B hoàn tất (DEV-047, 2026-09-12): chỉ còn đọc cờ
+      // security identity `isSystemRole`, đã gỡ lưới đỡ literal "ADMIN".
+      if (role.isSystemRole === true) {
+        throw ApiError.badRequest("Không thể gán role ADMIN qua endpoint này");
+      }
     }
 
-    // 5. Validate department nếu role (mới hoặc giữ nguyên) là USER
-    if (role?.name === "USER" && department) {
+    // 5. Validate department nếu role HIỆU LỰC (mới nếu request đổi role,
+    // hoặc role HIỆN TẠI của user nếu request không đổi role) là USER.
+    //
+    // DEV-016/MEDIUM-12 (RV16-02): trước đây chỉ check `role?.name==="USER"`
+    // — biến `role` CHỈ được gán khi client gửi kèm `roleId` (xem bước 4).
+    // Nếu request CHỈ đổi `department` (không gửi `role`), `role` giữ
+    // nguyên `undefined` → điều kiện luôn `false`, BẤT KỂ role hiện tại của
+    // user có phải "USER" hay không — Department không được validate,
+    // `user.department` có thể bị gán 1 ObjectId không tồn tại. Nay resolve
+    // role hiện tại của user (nếu request không đổi role) trước khi quyết
+    // định có cần validate Department hay không — đối xứng với việc `Role`
+    // luôn được validate bất kể context (bước 4 ở trên).
+    const effectiveRole = role ?? (await Role.findById(user.role).select("name"));
+
+    if (effectiveRole?.name === "USER" && department) {
       const dept = await Department.findById(department);
       if (!dept) throw ApiError.notFound("Khoa không tồn tại");
     }
@@ -195,6 +236,11 @@ import { clearPermissionCache } from "../rbac/permission.cache";
       if (existed) throw ApiError.conflict("Username đã tồn tại");
     }
 
+    // 🔒 FIX ISS-01/SEC-08: lưu lại role CŨ trước khi ghi đè, để biết chính
+    // xác role có thực sự đổi hay không (client có thể gửi lại đúng roleId
+    // hiện tại) — dùng để quyết định có cần clear permission cache hay không.
+    const oldRoleId = user.role?.toString();
+
     // 7. Gán dữ liệu mới
     if (fullName !== undefined) user.fullName = fullName;
     if (role !== undefined) user.role = role._id;
@@ -203,6 +249,14 @@ import { clearPermissionCache } from "../rbac/permission.cache";
 
     // 8. Save
     await user.save();
+
+    // 🔒 FIX ISS-01/SEC-08 (docs/tasks/TASK-001.md): trước đây hàm này KHÔNG
+    // invalidate permission cache khi role đổi — permission cache (TTL 5 phút,
+    // permission.cache.ts) của user vẫn giữ quyền CŨ tối đa 5 phút sau khi role
+    // đã đổi trong DB. Chỉ clear khi role THỰC SỰ đổi, tránh clear thừa.
+    if (role !== undefined && oldRoleId !== role._id.toString()) {
+      clearPermissionCache(user._id.toString());
+    }
 
     // 9. Audit log
     await UserAudit.create({
@@ -241,9 +295,30 @@ import { clearPermissionCache } from "../rbac/permission.cache";
     }
 
     // const role = user.role as any;
-    const role = await Role.findById(user.role).select("name");
-    if (role?.name === "ADMIN") {
+    // 🔒 DEV-001A: thêm "isSystemRole" vào projection — trước đây chỉ select
+    // "name" nên field mới sẽ luôn undefined nếu không bổ sung ở đây.
+    const role = await Role.findById(user.role).select("name isSystemRole");
+    // 🔒 DEV-001A Phase B hoàn tất (DEV-047, 2026-09-12): chỉ còn đọc cờ
+    // security identity `isSystemRole`, đã gỡ lưới đỡ literal "ADMIN".
+    if (role?.isSystemRole === true) {
       throw ApiError.badRequest("Không thể vô hiệu hóa tài khoản ADMIN");
+    }
+
+    // DEV-016/RV16-03: trước đây disable() không kiểm tra Asset đang gán cho
+    // user — tài sản vẫn "đang cấp phát" (assignedTo=id) cho 1 tài khoản đã
+    // bị khoá, dù `assertUserExists` (assetAssignment.service.ts) đã chặn
+    // CẤP PHÁT MỚI cho user isActive:false — chỉ thiếu phòng thủ ở chiều
+    // "khoá tài khoản đang có tài sản". Cùng pattern `deleteDepartmentService`
+    // đã dùng cho User/Document — chặn, buộc thu hồi tài sản (qua
+    // `returnAssetService` có sẵn) trước khi khoá tài khoản.
+    const hasAssignedAsset = await Asset.exists({
+      assignedTo: id,
+      isActive: true,
+    });
+    if (hasAssignedAsset) {
+      throw ApiError.badRequest(
+        "Không thể vô hiệu hóa: user vẫn còn tài sản đang được gán — cần thu hồi tài sản trước",
+      );
     }
 
     user.isActive = false;
@@ -321,6 +396,21 @@ import { clearPermissionCache } from "../rbac/permission.cache";
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
 
+    // DEV-021/SEC-01: trước đây `changePassword` KHÔNG thu hồi refresh token
+    // nào — khác 3 luồng đổi mật khẩu còn lại (`resetPassword`,
+    // `resetPasswordByAdmin`, `disable`) đều `RefreshToken.updateMany(...,
+    // {revoked:true})`. Nếu kẻ tấn công đã có refresh token hợp lệ của nạn
+    // nhân (đánh cắp trước đó), nạn nhân tự đổi mật khẩu (kịch bản phổ biến
+    // khi nghi ngờ lộ mật khẩu) KHÔNG đẩy được kẻ tấn công ra khỏi phiên —
+    // token cũ vẫn dùng được tới khi hết hạn tự nhiên (7 ngày). Thu hồi TOÀN
+    // BỘ refresh token (kể cả phiên hiện tại của chính user) — cùng mức độ
+    // triệt để với 3 luồng kia; `changePassword()` không nhận refresh token
+    // hiện tại làm tham số nên không có cách nào loại trừ riêng nó.
+    await RefreshToken.updateMany(
+      { user: user._id },
+      { revoked: true }
+    );
+
     await UserAudit.create({
       user: user._id,
       action: "CHANGE_PASSWORD",
@@ -362,6 +452,20 @@ import { clearPermissionCache } from "../rbac/permission.cache";
     if (!user) throw ApiError.notFound("User không tồn tại");
     if (!user.isActive) throw ApiError.badRequest("User đã bị vô hiệu hóa");
 
+    // 🔒 SECURITY FIX (DEV-002 / SEC-29 / RV03-01): docstring hàm này mô tả
+    // "Nếu role là ADMIN => không cho reset password" nhưng code trước đây
+    // KHÔNG có check nào — bất kỳ user nào giữ permission `USER_RESET_PASSWORD`
+    // đều reset được mật khẩu của ADMIN (đường account-takeover thứ 3, độc
+    // lập với `SEC-05`/ISS-01 và `SEC-28`/RV02-01 đã fix). Cùng pattern OR
+    // (DEV-001A) đã áp dụng ở `disable()` cùng file: ưu tiên cờ security
+    // identity bất biến, giữ literal "ADMIN" làm lưới đỡ Phase A.
+    const targetRole = await Role.findById(user.role).select("name isSystemRole");
+    // 🔒 DEV-001A Phase B hoàn tất (DEV-047, 2026-09-12): chỉ còn đọc cờ
+    // security identity `isSystemRole`, đã gỡ lưới đỡ literal "ADMIN".
+    if (targetRole?.isSystemRole === true) {
+      throw ApiError.badRequest("Không thể reset mật khẩu tài khoản ADMIN");
+    }
+
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
 
@@ -385,20 +489,44 @@ import { clearPermissionCache } from "../rbac/permission.cache";
    * Kiểm tra user tồn tại và isActive
    * Trả về thông tin user (không bao gồm password)
    * Nếu user không tồn tại hoặc bị vô hiệu hóa => 404
-   * @param userId 
-   * @returns 
+   *
+   * ⚠️ RBAC MICRO-FIX (FE-00 blocker, xem docs/frontend/tasks/FE-00.md Mục 10.1):
+   * trước đây response CHỈ populate `role.name` và KHÔNG trả effective
+   * permissions — FE không có cách nào biết quyền thật của user hiện tại
+   * ngoài field `role.name`. Bổ sung ADDITIVE (không đổi/xoá field cũ):
+   *   - `role.isSystemRole` (field CÓ SẴN ở Role model — chỉ thêm vào select
+   *     populate, không tạo field mới).
+   *   - `permissions: string[]` — effective permission (role ∪ extraPermissions
+   *     − denyPermissions), REUSE `getCachedPermissions()` (permission.cache.ts,
+   *     đã có cache 5 phút + tự resolve ObjectId -> permission name qua
+   *     `getUserEffectivePermissions()`, permission.service.ts) — KHÔNG tự
+   *     viết lại logic tính permission, KHÔNG tạo cache thứ hai.
+   * `extraPermissions`/`denyPermissions` GIỮ NGUYÊN dạng ObjectId thô như cũ
+   * (backward-compatible, không breaking change) — `permissions[]` là field
+   * MỚI chứa kết quả cuối cùng đã resolve tên, không phải thay thế 2 field đó.
+   * ADMIN/isSystemRole KHÔNG được special-case ở đây — `getCachedPermissions`
+   * trả đúng những gì role đó thực sự có trong DB, khớp semantics thật của
+   * `authorizePermission.middleware.ts` (bypass ADMIN nằm ở middleware đó,
+   * không phải ở endpoint này).
+   * @param userId
+   * @returns
    */
   export const getMeService = async(userId: any) => {
 
     const user = await User.findById(userId)
-      .select("-__v").populate("role", "name")
+      .select("-__v").populate("role", "name isSystemRole")
     .populate("department", "code name");
 
     if (!user || !user.isActive) {
       throw ApiError.badRequest("Không tìm thấy hoặc không hoạt động");
     }
 
-    return user;
+    const permissions = await getCachedPermissions(userId.toString());
+
+    return {
+      ...user.toObject(),
+      permissions,
+    };
   }
 
   /**
@@ -425,6 +553,19 @@ import { clearPermissionCache } from "../rbac/permission.cache";
 
     if (!Object.keys(updates).length) {
       throw ApiError.badRequest("Không có trường hợp hợp lệ để cập nhật");
+    }
+
+    // ⚠️ SỬA (2026-09-10, DEV note FE-14 #24): trước đây hàm này KHÔNG check
+    // trùng username trước khi update — khác `update()` (PUT /users/:id,
+    // dòng ~234) đã có sẵn check này. Hệ quả: đổi sang username đã tồn tại
+    // qua `PATCH /users/me` (Profile) ném thẳng lỗi driver MongoDB E11000
+    // thô ra khỏi `findOneAndUpdate`, rơi vào nhánh "lỗi không xác định" của
+    // `error.middleware.ts` → trả 500 generic thay vì lỗi rõ nghĩa. Thêm
+    // đúng pattern `update()` đã dùng (`ApiError.conflict`, loại trừ chính
+    // user hiện tại bằng `_id: { $ne: userId } }`).
+    if (updates.username) {
+      const existed = await User.findOne({ username: updates.username, _id: { $ne: userId } });
+      if (existed) throw ApiError.conflict("Username đã tồn tại");
     }
 
     const updatedUser = await User.findOneAndUpdate(
@@ -472,7 +613,9 @@ export const assignRole = async (
   if (!role) throw ApiError.notFound("Role không tồn tại");
  
   // 🔥 Optional: không cho assign ADMIN lung tung
-  if (role.name === "ADMIN") {
+  // 🔒 DEV-001A Phase B hoàn tất (DEV-047, 2026-09-12): chỉ còn đọc cờ
+  // security identity `isSystemRole`, đã gỡ lưới đỡ literal "ADMIN".
+  if (role.isSystemRole === true) {
     throw ApiError.badRequest("Không thể gán role ADMIN");
   }
  

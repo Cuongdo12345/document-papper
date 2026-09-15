@@ -1,0 +1,689 @@
+<!doctype html>
+<title>Hồ Sơ Phân Tích</title>
+<meta name="description" content="Bản đồ trực quan 23 tài liệu phân tích Document Papper — từ khảo sát ban đầu đến roadmap thực thi cuối cùng.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F5F6F8;
+    --surface:#FFFFFF;
+    --surface-2:#EEF1F4;
+    --border:#DFE3E8;
+    --border-strong:#C7CED6;
+    --ink:#17202B;
+    --ink-2:#46515F;
+    --ink-muted:#7B8794;
+    --accent:#2E6F86;
+    --accent-strong:#1F4E60;
+    --accent-soft:#E4EEF1;
+
+    --sev-critical:#c22f2f;
+    --sev-high:#d9682f;
+    --sev-medium:#a97a10;
+    --sev-low:#5c7181;
+    --status-good:#0f8a3f;
+
+    --font-display:'IBM Plex Sans Condensed', 'Arial Narrow', sans-serif;
+    --font-body:'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono:'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0E1318;
+      --surface:#161D24;
+      --surface-2:#1B232C;
+      --border:#2A343E;
+      --border-strong:#3A4753;
+      --ink:#E7ECEF;
+      --ink-2:#B7C1CA;
+      --ink-muted:#7E8B98;
+      --accent:#74B8CC;
+      --accent-strong:#9AD1E1;
+      --accent-soft:#182A31;
+
+      --sev-critical:#e0645a;
+      --sev-high:#e79a5c;
+      --sev-medium:#d9ae52;
+      --sev-low:#8fa0af;
+      --status-good:#4bbf7c;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0E1318;
+    --surface:#161D24;
+    --surface-2:#1B232C;
+    --border:#2A343E;
+    --border-strong:#3A4753;
+    --ink:#E7ECEF;
+    --ink-2:#B7C1CA;
+    --ink-muted:#7E8B98;
+    --accent:#74B8CC;
+    --accent-strong:#9AD1E1;
+    --accent-soft:#182A31;
+
+    --sev-critical:#e0645a;
+    --sev-high:#e79a5c;
+    --sev-medium:#d9ae52;
+    --sev-low:#8fa0af;
+    --status-good:#4bbf7c;
+  }
+
+  *{ box-sizing:border-box; }
+  html{ text-size-adjust:100%; }
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--font-body);
+    font-size:15px;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{ font-family:var(--font-display); text-wrap:balance; margin:0; }
+  p{ margin:0; }
+  ::selection{ background:var(--accent-soft); color:var(--accent-strong); }
+
+  .wrap{ max-width:1180px; margin:0 auto; padding:0 28px; }
+
+  /* ============ MASTHEAD ============ */
+  .masthead{
+    border-bottom:1px solid var(--border);
+    padding:56px 0 40px;
+    background:
+      linear-gradient(180deg, var(--surface-2) 0%, var(--bg) 100%);
+  }
+  .eyebrow{
+    font-family:var(--font-mono);
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--accent);
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:18px;
+  }
+  .eyebrow::before{
+    content:"";
+    width:7px; height:7px;
+    background:var(--accent);
+    display:inline-block;
+    flex:none;
+  }
+  .masthead h1{
+    font-size:clamp(32px, 4.4vw, 50px);
+    font-weight:700;
+    letter-spacing:-.01em;
+    color:var(--ink);
+    max-width:15ch;
+  }
+  .masthead .lede{
+    margin-top:16px;
+    max-width:62ch;
+    font-size:16.5px;
+    color:var(--ink-2);
+  }
+  .masthead .lede b{ color:var(--ink); font-weight:600; }
+
+  .stat-row{
+    margin-top:36px;
+    display:grid;
+    grid-template-columns:repeat(4, 1fr);
+    border:1px solid var(--border);
+    background:var(--surface);
+  }
+  .stat-tile{
+    padding:18px 20px;
+    border-right:1px solid var(--border);
+  }
+  .stat-tile:last-child{ border-right:none; }
+  .stat-tile .num{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:30px;
+    line-height:1;
+    color:var(--ink);
+    font-variant-numeric:tabular-nums;
+  }
+  .stat-tile .num small{ font-size:16px; color:var(--ink-muted); font-weight:600; margin-left:2px;}
+  .stat-tile .lbl{
+    margin-top:7px;
+    font-size:12.5px;
+    color:var(--ink-muted);
+    letter-spacing:.01em;
+  }
+
+  /* ============ FILTER NAV ============ */
+  .filter-bar{
+    position:sticky; top:0; z-index:20;
+    background:color-mix(in oklab, var(--bg) 88%, transparent);
+    backdrop-filter:blur(10px) saturate(140%);
+    border-bottom:1px solid var(--border);
+  }
+  .filter-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:12px 0;
+    overflow-x:auto;
+  }
+  .filter-row .flabel{
+    font-family:var(--font-mono);
+    font-size:11px;
+    color:var(--ink-muted);
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    margin-right:6px;
+    flex:none;
+  }
+  .chip{
+    font-family:var(--font-body);
+    font-weight:500;
+    font-size:13.5px;
+    color:var(--ink-2);
+    background:var(--surface);
+    border:1px solid var(--border);
+    padding:7px 14px;
+    cursor:pointer;
+    white-space:nowrap;
+    transition:background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .chip:hover{ border-color:var(--border-strong); }
+  .chip[aria-pressed="true"]{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:#fff;
+  }
+  :root[data-theme="dark"] .chip[aria-pressed="true"]{ color:#0E1318; }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .chip[aria-pressed="true"]{ color:#0E1318; } }
+
+  /* ============ SECTIONS ============ */
+  section{ padding:52px 0; }
+  .cluster + .cluster{ border-top:1px solid var(--border); }
+
+  .section-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    gap:24px;
+    margin-bottom:26px;
+    flex-wrap:wrap;
+  }
+  .section-head h2{ font-size:23px; font-weight:700; color:var(--ink); }
+  .section-head .range{
+    font-family:var(--font-mono);
+    font-size:12px;
+    color:var(--accent);
+    background:var(--accent-soft);
+    padding:4px 9px;
+    letter-spacing:.02em;
+  }
+  .section-desc{
+    max-width:66ch;
+    color:var(--ink-2);
+    font-size:14.5px;
+    margin-top:6px;
+  }
+  .section-desc code{
+    font-family:var(--font-mono);
+    background:var(--surface-2);
+    padding:1px 5px;
+    border:1px solid var(--border);
+    font-size:12.5px;
+  }
+
+  /* ============ PHASE CARDS ============ */
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));
+    gap:1px;
+    background:var(--border);
+    border:1px solid var(--border);
+  }
+  .card{
+    background:var(--surface);
+    padding:20px 20px 18px;
+    display:flex;
+    flex-direction:column;
+  }
+  .card > summary{
+    list-style:none;
+    cursor:pointer;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .card > summary::-webkit-details-marker{ display:none; }
+  .card-top{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .idx{
+    font-family:var(--font-mono);
+    font-size:12px;
+    color:var(--ink-muted);
+    letter-spacing:.03em;
+  }
+  .expand-hint{
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    color:var(--ink-muted);
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    transition:transform .18s ease;
+  }
+  details[open] .expand-hint{ transform:rotate(180deg); }
+  .card h3{
+    font-size:17.5px;
+    font-weight:700;
+    color:var(--ink);
+    line-height:1.25;
+  }
+  .card .scope{
+    font-size:13.5px;
+    color:var(--ink-2);
+    line-height:1.5;
+  }
+  .card .foot{
+    margin-top:12px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 8px;
+    align-items:center;
+  }
+  .stat-pill{
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    color:var(--ink-2);
+    background:var(--surface-2);
+    border:1px solid var(--border);
+    padding:3px 8px;
+    font-variant-numeric:tabular-nums;
+  }
+  .card .detail{
+    margin-top:14px;
+    padding-top:14px;
+    border-top:1px solid var(--border);
+    font-size:13.5px;
+    color:var(--ink-2);
+    line-height:1.6;
+  }
+  .card .detail .src{
+    display:block;
+    margin-top:10px;
+    font-family:var(--font-mono);
+    font-size:11px;
+    color:var(--ink-muted);
+  }
+
+  /* ============ FINDINGS CHART ============ */
+  .chart-card{
+    border:1px solid var(--border);
+    background:var(--surface);
+    padding:30px 32px 26px;
+  }
+  .chart-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:20px;
+    flex-wrap:wrap;
+    margin-bottom:24px;
+  }
+  .chart-head h3{ font-size:18px; font-weight:700; }
+  .chart-head .src-note{
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    color:var(--ink-muted);
+  }
+  .bar-row{
+    display:grid;
+    grid-template-columns:120px 1fr 70px;
+    align-items:center;
+    gap:14px;
+    padding:10px 0;
+  }
+  .bar-row + .bar-row{ border-top:1px solid var(--border); }
+  .bar-name{
+    display:flex; align-items:center; gap:8px;
+    font-size:13.5px; font-weight:600; color:var(--ink);
+  }
+  .bar-name::before{
+    content:"";
+    width:9px; height:9px;
+    border-radius:50%;
+    flex:none;
+  }
+  .bar-row.r-crit .bar-name::before{ background:var(--sev-critical); }
+  .bar-row.r-high .bar-name::before{ background:var(--sev-high); }
+  .bar-row.r-med .bar-name::before{ background:var(--sev-medium); }
+  .bar-row.r-low .bar-name::before{ background:var(--sev-low); }
+  .bar-track{
+    height:14px;
+    background:var(--surface-2);
+    position:relative;
+    overflow:hidden;
+  }
+  .bar-fill{
+    height:100%;
+    border-radius:0 4px 4px 0;
+  }
+  .bar-row.r-crit .bar-fill{ background:var(--sev-critical); }
+  .bar-row.r-high .bar-fill{ background:var(--sev-high); }
+  .bar-row.r-med .bar-fill{ background:var(--sev-medium); }
+  .bar-row.r-low .bar-fill{ background:var(--sev-low); }
+  .bar-count{
+    font-family:var(--font-mono);
+    font-weight:600;
+    font-size:14px;
+    color:var(--ink);
+    text-align:right;
+    font-variant-numeric:tabular-nums;
+  }
+  .chart-foot{
+    margin-top:18px;
+    padding-top:16px;
+    border-top:1px solid var(--border);
+    font-size:13px;
+    color:var(--ink-muted);
+  }
+  .chart-foot code{
+    font-family:var(--font-mono);
+    background:var(--surface-2);
+    padding:1px 5px;
+    border:1px solid var(--border);
+    font-size:11.5px;
+  }
+
+  /* ============ BRIDGE (then/now) ============ */
+  .bridge{
+    background:var(--surface-2);
+    border-top:1px solid var(--border);
+    border-bottom:1px solid var(--border);
+  }
+  .bridge-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:1px;
+    background:var(--border);
+    border:1px solid var(--border);
+    margin-top:26px;
+  }
+  .bridge-col{ background:var(--surface); padding:24px 26px; }
+  .bridge-col .tag{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    padding:3px 8px;
+    display:inline-block;
+    margin-bottom:14px;
+  }
+  .bridge-col.then .tag{ color:var(--sev-critical); background:color-mix(in oklab, var(--sev-critical) 14%, transparent); }
+  .bridge-col.now .tag{ color:var(--status-good); background:color-mix(in oklab, var(--status-good) 14%, transparent); }
+  .bridge-col ul{ margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:11px; }
+  .bridge-col li{
+    display:flex; gap:10px;
+    font-size:14px; color:var(--ink-2);
+    line-height:1.5;
+  }
+  .bridge-col li b{ color:var(--ink); font-weight:600; }
+  .bridge-col li .mk{ flex:none; font-family:var(--font-mono); font-size:13px; color:var(--ink-muted); }
+  .bridge-col code{ font-family:var(--font-mono); font-size:12.5px; background:var(--surface-2); padding:0 4px; border:1px solid var(--border); }
+
+  .dev-stats{
+    margin-top:20px;
+    display:flex;
+    gap:1px;
+    background:var(--border);
+    border:1px solid var(--border);
+  }
+  .dev-stat{ flex:1; background:var(--surface); padding:16px 18px; }
+  .dev-stat .num{ font-family:var(--font-display); font-weight:700; font-size:24px; color:var(--status-good); font-variant-numeric:tabular-nums; }
+  .dev-stat .lbl{ font-size:12px; color:var(--ink-muted); margin-top:4px; }
+
+  /* ============ FOOTER ============ */
+  footer{ padding:36px 0 60px; }
+  footer .prov{
+    font-size:12.5px;
+    color:var(--ink-muted);
+    max-width:70ch;
+    line-height:1.6;
+  }
+  footer .prov code{
+    font-family:var(--font-mono);
+    background:var(--surface-2);
+    padding:1px 5px;
+    border:1px solid var(--border);
+    font-size:11.5px;
+  }
+
+  a{ color:var(--accent); }
+
+  @media (max-width:760px){
+    .stat-row{ grid-template-columns:repeat(2,1fr); }
+    .stat-tile:nth-child(2){ border-right:none; }
+    .bridge-grid{ grid-template-columns:1fr; }
+    .bar-row{ grid-template-columns:96px 1fr 54px; gap:10px; }
+  }
+</style>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Document Papper &middot; Post-Analysis Knowledge Base</div>
+    <h1>23 tài liệu, một hệ thống được đọc từng lớp</h1>
+    <p class="lede">Từ khảo sát bề mặt đầu tiên đến roadmap thực thi cuối cùng — <b>lộ trình phân tích Document &amp; Medical Device Manager</b>, phase 01 → 23, không suy đoán điều gì chưa có bằng chứng trong source.</p>
+
+    <div class="stat-row">
+      <div class="stat-tile"><div class="num">23</div><div class="lbl">tài liệu phân tích, 01 → 23</div></div>
+      <div class="stat-tile"><div class="num">51<small>+</small></div><div class="lbl">vấn đề ghi nhận trong risk register</div></div>
+      <div class="stat-tile"><div class="num">2 <small>&rarr; 0</small></div><div class="lbl">CRITICAL còn mở (đã đóng qua DEV-001A/005)</div></div>
+      <div class="stat-tile"><div class="num">25<small>/25</small></div><div class="lbl">development task đã DONE</div></div>
+    </div>
+  </div>
+</header>
+
+<nav class="filter-bar">
+  <div class="wrap">
+    <div class="filter-row" id="filterRow">
+      <span class="flabel">Lọc theo cụm</span>
+      <button class="chip" data-filter="all" aria-pressed="true">Tất cả 23</button>
+      <button class="chip" data-filter="baseline" aria-pressed="false">Baseline &middot; 01–13</button>
+      <button class="chip" data-filter="deepdive" aria-pressed="false">Audit &amp; Planning &middot; 14–19</button>
+      <button class="chip" data-filter="synthesis" aria-pressed="false">Global Synthesis &middot; 20–23</button>
+    </div>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <section class="cluster" data-cluster="baseline">
+    <div class="section-head">
+      <div>
+        <h2>Baseline — khảo sát từ đầu</h2>
+        <p class="section-desc">13 tài liệu gốc, đọc trực tiếp source ở từng lớp hệ thống — kiến trúc, backend, database, API, auth/RBAC, nghiệp vụ, bảo mật, hiệu năng — không giả định điều gì chưa có bằng chứng.</p>
+      </div>
+      <span class="range">PHASE 01–13</span>
+    </div>
+    <div class="grid" id="grid-baseline"></div>
+  </section>
+
+  <section class="cluster" data-cluster="deepdive">
+    <div class="section-head">
+      <div>
+        <h2>Audit &amp; Planning — xác minh &amp; lên kế hoạch</h2>
+        <p class="section-desc">6 tài liệu đối chiếu lại baseline với source mới nhất và 17 module code review độc lập, rồi biến finding đã xác nhận thành kế hoạch hành động có scope/rủi ro/effort rõ ràng — chưa sửa dòng code nào.</p>
+      </div>
+      <span class="range">PHASE 14–19</span>
+    </div>
+    <div class="grid" id="grid-deepdive"></div>
+  </section>
+
+  <section class="cluster" data-cluster="synthesis">
+    <div class="section-head">
+      <div>
+        <h2>Global Synthesis — tổng hợp cuối cùng</h2>
+        <p class="section-desc">4 tài liệu gộp toàn bộ 19 phase trước + 17 module review thành 1 bức tranh duy nhất, khử trùng lặp theo ID, chốt mức độ ưu tiên và thứ tự thực thi cho cả dự án.</p>
+      </div>
+      <span class="range">PHASE 20–23</span>
+    </div>
+    <div class="grid" id="grid-synthesis"></div>
+  </section>
+
+  <section id="findings-section">
+    <div class="section-head">
+      <div>
+        <h2>Bức tranh finding cuối cùng</h2>
+        <p class="section-desc">Tổng dedup xuyên suốt 23 tài liệu + 17 module review, theo <code>23_CODE_REVIEW_ROADMAP.md</code> — mỗi vấn đề thật chỉ tính 1 lần, dùng ID xuất hiện sớm nhất.</p>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-head">
+        <h3>Số lượng finding theo mức độ nghiêm trọng</h3>
+        <span class="src-note">nguồn: docs/23_CODE_REVIEW_ROADMAP.md §1</span>
+      </div>
+      <div class="bar-row r-crit">
+        <span class="bar-name">Critical</span>
+        <div class="bar-track"><div class="bar-fill" style="width:7%"></div></div>
+        <span class="bar-count">2</span>
+      </div>
+      <div class="bar-row r-high">
+        <span class="bar-name">High</span>
+        <div class="bar-track"><div class="bar-fill" style="width:50%"></div></div>
+        <span class="bar-count">14</span>
+      </div>
+      <div class="bar-row r-med">
+        <span class="bar-name">Medium</span>
+        <div class="bar-track"><div class="bar-fill" style="width:100%"></div></div>
+        <span class="bar-count">~28</span>
+      </div>
+      <div class="bar-row r-low">
+        <span class="bar-name">Low</span>
+        <div class="bar-track"><div class="bar-fill" style="width:96%"></div></div>
+        <span class="bar-count">~27</span>
+      </div>
+      <p class="chart-foot">14 HIGH = 10 security + 4 architecture (<code>ARCH-04/05/06/27</code>), dẫn đầu bởi chuỗi IDOR 4-finding ở domain Upload. Cả 2 CRITICAL — backdoor rename Role→ADMIN (<code>SEC-28</code>) và bug nghiệp vụ Asset không đồng bộ (<code>RV05-01</code>) — đã đóng sau đó, xem cột bên dưới.</p>
+    </div>
+  </section>
+
+  <section class="bridge" id="bridge-section" style="margin:0 -28px; padding-left:28px; padding-right:28px;">
+    <div class="wrap" style="padding:52px 0;">
+      <div class="section-head">
+        <div>
+          <h2>Từ phân tích đến hành động</h2>
+          <p class="section-desc">23 tài liệu chỉ ghi nhận — không sửa gì. Việc thực thi diễn ra riêng, qua 25 development task (<code>DEV-001 → DEV-025</code>) theo đúng thứ tự ưu tiên mà Phase 19/23 đã sắp xếp.</p>
+        </div>
+      </div>
+
+      <div class="bridge-grid">
+        <div class="bridge-col then">
+          <span class="tag">Tại phase 23 — 2026-08-31</span>
+          <ul>
+            <li><span class="mk">&times;</span><span><b>2 đường account-takeover ADMIN</b> còn mở song song (<code>SEC-05</code> qua <code>PUT /users/:id</code>, <code>SEC-28</code> rename Role→"ADMIN").</span></li>
+            <li><span class="mk">&times;</span><span><b>1 bug nghiệp vụ CRITICAL</b> — Asset không đồng bộ trạng thái sau khi duyệt hồ sơ, chạy sai âm thầm, không throw lỗi nào.</span></li>
+            <li><span class="mk">&times;</span><span><b>0 test khả dụng</b> — toolchain Jest đã bị gỡ khỏi git, 4 bộ test cũ chỉ còn ở <code>dist/</code>.</span></li>
+            <li><span class="mk">&times;</span><span>Chuỗi IDOR 4-finding ở domain Upload — xem được, sửa được, xoá được file của người khác.</span></li>
+            <li><span class="mk">&times;</span><span>Code chết tích luỹ qua nhiều đợt, 2 rate-limiter trùng cấu hình, field response lệch tên giữa domain.</span></li>
+          </ul>
+        </div>
+        <div class="bridge-col now">
+          <span class="tag">Hiện tại — 2026-09-02</span>
+          <ul>
+            <li><span class="mk">&check;</span><span><b>0 CRITICAL còn mở</b> — cả 2 đường ADMIN backdoor đã đóng (<code>DEV-001</code>, <code>DEV-001A</code>), bug Asset đã sửa (<code>DEV-005</code>).</span></li>
+            <li><span class="mk">&check;</span><span><b>15 test suite / 87 test PASS</b> — toolchain khôi phục (<code>DEV-004</code>) và tăng trưởng liên tục qua từng task.</span></li>
+            <li><span class="mk">&check;</span><span>Chuỗi IDOR Upload đã đóng đủ 4 điểm — ownership + scoping đúng theo permission (<code>DEV-007</code>).</span></li>
+            <li><span class="mk">&check;</span><span>NoSQL injection ở endpoint list + <code>validateQuery</code> bị comment out đã khôi phục (<code>DEV-008</code>).</span></li>
+            <li><span class="mk">&check;</span><span>5 file dead code xoá hẳn, ~1000 dòng code chết dọn sạch, rate-limiter hợp nhất, response field đồng bộ (<code>DEV-023, DEV-025</code>).</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="dev-stats">
+        <div class="dev-stat"><div class="num">25/25</div><div class="lbl">DEV task DONE</div></div>
+        <div class="dev-stat"><div class="num">15</div><div class="lbl">test suite (từ 0)</div></div>
+        <div class="dev-stat"><div class="num">87</div><div class="lbl">test tự động PASS</div></div>
+        <div class="dev-stat" style="color:var(--ink-muted);"><div class="num" style="color:var(--ink-muted);">1</div><div class="lbl">task còn PAUSED — DEV-009A (ABAC)</div></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="wrap">
+  <p class="prov">
+    Nguồn dữ liệu: <code>docs/01_PROJECT_OVERVIEW.md</code> → <code>docs/23_CODE_REVIEW_ROADMAP.md</code>, đối chiếu <code>docs/00_PROJECT_MEMORY.md</code> và <code>docs/development/tasks/DEV-001.md → DEV-025.md</code>. Theo CLAUDE.md §3: tài liệu 23 phase là <b style="color:var(--ink-2)">baseline lịch sử</b> — mọi con số ở cột "Hiện tại" phản ánh source code thực tế tại thời điểm 2026-09-02, không phải bản thân 23 tài liệu (chúng không tự cập nhật).
+  </p>
+</footer>
+
+<script>
+(function(){
+  var PHASES = {
+    baseline: [
+      { n:"01", title:"Project Overview", scope:"Xác định mục đích, stack và phạm vi repo (chỉ có backend) từ README — khảo sát bề mặt, chưa đánh giá chất lượng.", stat:"khảo sát", detail:"Không tạo finding — chỉ xác lập bối cảnh: hệ thống quản lý tài liệu + tài sản y tế nội bộ, workflow duyệt đa cấp, RBAC + ABAC (policy-based).", src:"docs/01_PROJECT_OVERVIEW.md" },
+      { n:"02", title:"Architecture", scope:"Kiến trúc monolith, layered theo domain, REST/JSON thuần — không frontend, không message queue, không cache layer ngoài.", stat:"1 process", detail:"routes → middlewares → controllers → services → models, backend-only, 1 Node.js process duy nhất, không sharding.", src:"docs/02_ARCHITECTURE.md" },
+      { n:"03", title:"Backend Analysis", scope:"Soi từng lớp: entry point, routes, controllers, services, models, middleware, error handling, cấu hình, dependency ngoài.", stat:"15 route file", detail:"Bootstrap qua backend/server.ts → validate PORT/MONGO_URI bắt buộc trước khi Express tồn tại.", src:"docs/03_BACKEND_ANALYSIS.md" },
+      { n:"04", title:"Database Analysis", scope:"21 model Mongoose, quan hệ, index, transaction, tính toàn vẹn dữ liệu — autoIndex bật tường minh cả ở production.", stat:"21 model", detail:"1 database MongoDB duy nhất, không read replica riêng trong code, transaction qua session.withTransaction().", src:"docs/04_DATABASE_ANALYSIS.md" },
+      { n:"05", title:"API Analysis", scope:"Kiểm kê đầy đủ endpoint thực tế, mapping route→controller→service→DB, đối chiếu khớp với OpenAPI.", stat:"116 operation", detail:"87 path pattern / 116 operation — khớp CHÍNH XÁC với openAPI.yaml (4245 dòng). Toàn bộ endpoint trừ 5 route auth đều bắt buộc JWT.", src:"docs/05_API_ANALYSIS.md" },
+      { n:"06", title:"Frontend Analysis", scope:"Không có tài liệu riêng — repo không chứa bất kỳ mã frontend nào, chỉ có backend/.", stat:"N/A", detail:"Xác nhận nhiều lần độc lập ở các phase sau (11, 12, 14, 15): không có thư mục frontend, không có bất kỳ file .tsx/.vue nào trong repo.", src:"— (file không tồn tại)" },
+      { n:"07", title:"Auth &amp; RBAC", scope:"JWT stateless (access 8h / refresh 7 ngày), bcrypt cost 10, RBAC coarse-grained — không OAuth/SSO/MFA.", stat:"5 lệnh bcrypt", detail:"2 loại token, refresh token lưu bản ghi DB để revoke được. Chỉ username + password, không 2FA.", src:"docs/07_AUTH_RBAC_ANALYSIS.md" },
+      { n:"08", title:"Business Logic", scope:"Domain, actor, quy tắc nghiệp vụ, workflow duyệt đa cấp, side-effect — tự review lại một lần trước khi chốt.", stat:"self-reviewed", detail:"Đọc bổ sung toàn văn submitWorkflow/approveStep để xác minh claim ban đầu — nâng 1 mục lên CONFIRMED, bổ sung 2 rule bị bỏ sót.", src:"docs/08_BUSINESS_LOGIC.md" },
+      { n:"09", title:"Security Analysis", scope:"27 finding SEC-01→27 theo severity — 1 CRITICAL (leo thang đặc quyền ADMIN), toàn bộ tầng ABAC/Policy chết ở runtime.", stat:"1 CRIT · 3 HIGH", detail:"Không có middleware sanitize NoSQL nào trong toàn bộ dependencies; rủi ro operator injection ở nhiều endpoint list.", src:"docs/09_SECURITY_ANALYSIS.md" },
+      { n:"10", title:"Performance Analysis", scope:"N+1 transaction Excel import, tải toàn bộ Document vào RAM khi export, cron cảnh báo N+1 query Role/User.", stat:"9 confirmed", detail:"Đối trọng tích cực: batch-flush performance log, export Document/Asset dùng cursor + streaming WorkbookWriter — thiết kế tốt.", src:"docs/10_PERFORMANCE_ANALYSIS.md" },
+      { n:"11", title:"Technical Debt", scope:"Tổng hợp 30 khoản nợ kỹ thuật (TD-01→30) từ 10 phase trước theo 9 nhóm — không tìm lỗi mới, không refactor.", stat:"TD-01→30", detail:"Nghiêm trọng nhất: tầng ABAC chết + WorkflowInstance.steps[].role là free string + 7 vị trí dead code tích luỹ.", src:"docs/11_TECHNICAL_DEBT.md" },
+      { n:"12", title:"Issues &amp; Risks", scope:"Risk register tổng hợp 51+ issue theo 11 category, xếp theo mức độ nghiêm trọng thực tế — không suy đoán ngoài evidence.", stat:"51+ issue", detail:"Risk cao nhất: leo thang đặc quyền ADMIN (ISS-01) và hard-delete Document không kiểm tra tham chiếu (ISS-02) — cả 2 Critical.", src:"docs/12_ISSUES_AND_RISKS.md" },
+      { n:"13", title:"Final Project Report", scope:"Tổng hợp toàn bộ 12 phase thành 1 báo cáo cuối cho baseline lịch sử — không phân tích source mới.", stat:"12 phase gộp", detail:"Phát hiện và vá 1 điểm không nhất quán giữa 00_PROJECT_MEMORY.md và Phase 11/12 trước khi tổng hợp.", src:"docs/13_FINAL_PROJECT_REPORT.md" }
+    ],
+    deepdive: [
+      { n:"14", title:"Analysis Audit", scope:"Xác minh lại baseline 13-phase với source hiện tại + 16 module code review độc lập — không re-run từ đầu.", stat:"audit", detail:"Đối chiếu working tree tại thời điểm audit: 6 file, +127 dòng, 0 dòng xoá — khớp 100% với ghi nhận TASK-002 ở Memory.", src:"docs/14_ANALYSIS_AUDIT.md" },
+      { n:"15", title:"Architecture Review", scope:"Đánh giá kiến trúc CURRENT STATE dựa trên Phase 02/03/05 + 14_ANALYSIS_AUDIT — bổ sung finding mới.", stat:"+9 finding mới", detail:"Bổ sung ARCH-27→35 (Service/Middleware boundary không type-safe, .env.example lệch biến thực dùng, không structured logger...).", src:"docs/15_ARCHITECTURE_REVIEW.md" },
+      { n:"16", title:"Refactoring Plan", scope:"Biến finding kiến trúc/nợ kỹ thuật đã xác minh thành kế hoạch refactor an toàn — không implement.", stat:"22 candidate", detail:"REF-001→022, mỗi candidate có scope/rủi ro/effort ước lượng riêng — ưu tiên effort thấp cho finding CRITICAL/HIGH liên quan bảo mật.", src:"docs/16_REFACTORING_PLAN.md" },
+      { n:"17", title:"Security Hardening Plan", scope:"Rà soát bảo mật theo 9 trục kỹ thuật, viết lại toàn bộ finding theo format chuẩn mới kèm Attack Preconditions.", stat:"SEC-01→42", detail:"Cấp ID chính thức SEC-28→42 cho finding trước đây chỉ có ID tạm RVxx-yy — không tạo trùng lặp với Phase 09.", src:"docs/17_SECURITY_HARDENING_PLAN.md" },
+      { n:"18", title:"Testing Strategy", scope:"Đánh giá thực trạng testing + xây chiến lược ưu tiên theo rủi ro thực tế — không viết test hàng loạt.", stat:"19 test case", detail:"Phát hiện quan trọng nhất: toolchain Jest đã bị GỠ khỏi git ở commit 5b58fb1 — tình trạng còn xấu hơn baseline ghi nhận.", src:"docs/18_TESTING_STRATEGY.md" },
+      { n:"19", title:"Improvement Roadmap", scope:"Sắp xếp toàn bộ finding đã CONFIRMED thành trình tự thực thi an toàn — tách Quick Win khỏi Large Initiative.", stat:"3 CRIT độc lập", detail:"Kết luận: kiến trúc ổn định, nhưng 3 vấn đề CRITICAL độc lập cộng 0 lưới an toàn test là điều kiện tiên quyết phải xử lý trước.", src:"docs/19_IMPROVEMENT_ROADMAP.md" }
+    ],
+    synthesis: [
+      { n:"20", title:"Global Security Review", scope:"Dedup toàn bộ security finding từ Phase 09 + 16 module review + đối chiếu trạng thái mới nhất trong Memory.", stat:"2C·10H·13M·14L", detail:"3 điểm chú ý nhất: backdoor rename Role→ADMIN (chưa fix lúc này), domain Upload là bề mặt tấn công yếu nhất, resetPassword() thiếu đúng safeguard mô tả trong docstring.", src:"docs/20_GLOBAL_SECURITY_REVIEW.md" },
+      { n:"21", title:"Global Architecture Review", scope:"Dedup kiến trúc từ 8 module review, hợp nhất thêm Phase 15 (ARCH-27→35) vào đúng mục phân loại.", stat:"1C·4H·15M·13L", detail:"4 vấn đề mang tính hệ thống, lặp lại ở ≥3 domain độc lập — không phải lỗi cục bộ 1 file.", src:"docs/21_GLOBAL_ARCHITECTURE_REVIEW.md" },
+      { n:"22", title:"Global Testing Review", scope:"Ma trận Existing/Missing test theo 14 domain nghiệp vụ cụ thể — một lát cắt khác của cùng bộ evidence Phase 18.", stat:"0/14 domain", detail:"0 API/integration test trên toàn bộ 116 endpoint; 4 bộ test cũ từng chạy được chỉ còn dạng compiled, không còn trong git.", src:"docs/22_GLOBAL_TESTING_REVIEW.md" },
+      { n:"23", title:"Final Code Review Roadmap", scope:"Tổng hợp CUỐI CÙNG xuyên toàn bộ 23 tài liệu + 17 module review — chốt danh sách và thứ tự thực thi cho cả dự án.", stat:"2C·14H·~55 khác", detail:"Kết luận điều hành: dự án đã phân tích đầy đủ, hành động thực thi = 0 tại thời điểm này — khoảng cách giữa biết và làm là rủi ro lớn nhất còn lại.", src:"docs/23_CODE_REVIEW_ROADMAP.md" }
+    ]
+  };
+
+  function cardHTML(p){
+    return (
+      '<details class="card">' +
+        '<summary>' +
+          '<div class="card-top"><span class="idx">PHASE ' + p.n + '</span><span class="expand-hint">&#9662;</span></div>' +
+          '<h3>' + p.title + '</h3>' +
+          '<p class="scope">' + p.scope + '</p>' +
+          '<div class="foot"><span class="stat-pill">' + p.stat + '</span></div>' +
+        '</summary>' +
+        '<div class="detail">' + p.detail + '<span class="src">' + p.src + '</span></div>' +
+      '</details>'
+    );
+  }
+
+  Object.keys(PHASES).forEach(function(cluster){
+    var el = document.getElementById('grid-' + cluster);
+    el.innerHTML = PHASES[cluster].map(cardHTML).join('');
+  });
+
+  var chips = document.querySelectorAll('.chip');
+  var clusters = document.querySelectorAll('.cluster');
+  chips.forEach(function(chip){
+    chip.addEventListener('click', function(){
+      chips.forEach(function(c){ c.setAttribute('aria-pressed','false'); });
+      chip.setAttribute('aria-pressed','true');
+      var f = chip.getAttribute('data-filter');
+      clusters.forEach(function(sec){
+        var show = (f === 'all') || (sec.getAttribute('data-cluster') === f);
+        sec.style.display = show ? '' : 'none';
+      });
+    });
+  });
+})();
+</script>

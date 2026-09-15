@@ -16,6 +16,7 @@ import {
   restore,
   resetPassword,
   changePassword,
+  assignRole,
 } from "../../services/users/users.service";
 
 // CONTROLLER LÀ NƠI XỬ LÝ LOGIC LIÊN QUAN ĐẾN REQUEST/RESPONSE
@@ -57,6 +58,19 @@ export const updateUser = catchAsync(async (req: Request, res: Response) => {
   const updated = await update(req.params.id, req.body, req.user!._id);
 
   res.json({ message: "Cập nhật user thành công", data: updated });
+});
+
+// ASSIGN ROLE (TASK-002, Việc 2) — wire lại assignRole() vốn trước đây là
+// dead code, dùng permission riêng USER_ASSIGN_ROLE (xem user.routes.ts).
+export const assignUserRole = catchAsync(async (req: Request, res: Response) => {
+  const updated = await assignRole(
+    req.params.id,
+    req.body.roleId,
+    req.user!._id,
+    req.body.resetPermissions,
+  );
+
+  res.json({ message: "Gán role thành công", data: updated });
 });
 
 // DELETE USER

@@ -28,6 +28,7 @@ import {
 } from "../../../shared/constants/excel.constants";
 import { ImportHistory } from "../../../models/importAudit/importhistory.model";
 import { resolveImportStatus } from "../../../shared/helpers/importStatus.helper";
+import { escapeRegex } from "../../../shared/utils/regex.util";
 
 export interface AssetImportOptions {
   dryRun?: boolean;
@@ -102,11 +103,13 @@ export const exportAssetsExcelPRO = async (query: any, res: any) => {
       filter.status = status;
     }
 
+    // DEV-010/IMP-015 (SEC-36/RV06-02): escape trước khi đưa vào $regex.
     if (keyword) {
+      const safeKeyword = escapeRegex(keyword);
       filter.$or = [
-        { name: { $regex: keyword, $options: "i" } },
-        { assetCode: { $regex: keyword, $options: "i" } },
-        { serialNumber: { $regex: keyword, $options: "i" } },
+        { name: { $regex: safeKeyword, $options: "i" } },
+        { assetCode: { $regex: safeKeyword, $options: "i" } },
+        { serialNumber: { $regex: safeKeyword, $options: "i" } },
       ];
     }
 
@@ -279,7 +282,12 @@ export const importAssetsExcel = async (
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(fileBuffer as any);
 
-  const sheet = workbook.getWorksheet(1);
+  // BUG FIX: `getWorksheet(1)` tra theo ID GỐC lưu trong file .xlsx (không
+  // phải vị trí tab) — file do Excel/LibreOffice/WPS lưu qua nhiều lần
+  // xoá/tạo sheet thường có ID sheet đầu != 1, khiến hàm trả về undefined
+  // dù file hợp lệ. `workbook.worksheets[0]` mới đúng nghĩa "sheet đầu tiên
+  // theo vị trí tab" (typed rõ trong exceljs: "return worksheets in order").
+  const sheet = workbook.worksheets[0];
   if (!sheet) throw ApiError.badRequest("Không tìm thấy sheet");
 
   validateImportHeaderRow(sheet, ASSET_IMPORT_COLUMNS, "GET /assets/import/template");

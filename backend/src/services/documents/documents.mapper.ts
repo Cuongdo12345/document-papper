@@ -1,6 +1,10 @@
 import { Types } from "mongoose";
 import ApiError from "../../shared/errors/ApiError";
 import { FILTERABLE_DOCUMENT_FIELDS } from "./documents.constants";
+// DEV-010 — di chuyển sang shared/utils để Departments/RBAC/Assets dùng
+// chung; re-export tại đây để không phải sửa import ở nơi khác đang dùng
+// `escapeRegex` từ file này (`document.service.ts`).
+export { escapeRegex } from "../../shared/utils/regex.util";
 
 /**
  * Chuẩn hoá `referenceTo` thành mảng ObjectId để khớp schema DB
@@ -29,14 +33,6 @@ export const buildReferenceArray = (referenceTo: any): Types.ObjectId[] => {
 
   return [new Types.ObjectId(referenceTo)];
 };
-
-/**
- * Escape ký tự đặc biệt của regex trước khi đưa vào `$regex` — chặn rủi ro
- * ReDoS / lỗi regex khi `keyword` chứa ký tự có nghĩa đặc biệt trong regex
- * (Missing Validation #2, mục Search).
- */
-export const escapeRegex = (text: string): string =>
-  text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
  * Build filter MongoDB cho Document CHỈ từ danh sách field đã whitelist

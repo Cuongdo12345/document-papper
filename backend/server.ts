@@ -21,6 +21,31 @@ if (!process.env.MONGO_URI) {
   throw new Error("❌ MONGO_URI is not defined in environment variables");
 }
 
+// DEV-014/MEDIUM-09: `app.ts` truyền thẳng `process.env.CLIENT_URL` vào
+// `cors({ origin: ... })` — nếu biến này thiếu, thư viện `cors` fail-OPEN
+// (mặc định `Access-Control-Allow-Origin: *`) thay vì fail-CLOSED, trong khi
+// `credentials: true` vẫn bật. Validate fail-fast NGAY LÚC KHỞI ĐỘNG, cùng
+// cơ chế với PORT/MONGO_URI ở trên — không để server chạy với cấu hình CORS
+// mở toàn bộ do thiếu ENV ngoài ý muốn.
+if (!process.env.CLIENT_URL) {
+  throw new Error("❌ CLIENT_URL is not defined in environment variables");
+}
+
+// DEV-021/SEC-03: `JWT_SECRET`/`JWT_REFRESH_SECRET` trước đây được đọc bằng
+// non-null assertion (`process.env.JWT_SECRET!`) hoặc type-cast (`as
+// string`) ở `auth.middleware.ts`/`auth.helper.ts` — không có check tồn tại
+// tường minh như PORT/MONGO_URI/CLIENT_URL. Nếu 1 trong 2 biến thiếu ở môi
+// trường triển khai, lỗi CHỈ xuất hiện khi có request đầu tiên gọi tới
+// verify/sign với `undefined` (dễ bị bỏ sót khi review triển khai) thay vì
+// fail-fast ngay lúc khởi động — cùng cơ chế với 3 biến ở trên.
+if (!process.env.JWT_SECRET) {
+  throw new Error("❌ JWT_SECRET is not defined in environment variables");
+}
+
+if (!process.env.JWT_REFRESH_SECRET) {
+  throw new Error("❌ JWT_REFRESH_SECRET is not defined in environment variables");
+}
+
 const PORT = Number(process.env.PORT);
 
 // ==============================

@@ -15,7 +15,12 @@ export const LoginDTO = z.object({
 export const RegisterDTO = z.object({
   username: z.string().trim().min(3, "Username tối thiểu 3 ký tự").max(50).regex(/^[a-zA-Z0-9_]+$/),
   email: z.string().trim().toLowerCase().email("Email không hợp lệ"),
-  password: z.string().min(5, "Password tối thiểu 5 ký tự"),
+  // DEV-021/SEC-02: min(5) → min(8) — CHỈ áp dụng cho field ĐẶT MẬT KHẨU MỚI
+  // (đăng ký/đổi/reset), KHÔNG đụng `LoginDTO.password` hay
+  // `ChangePasswordDTO.oldPassword` (xác thực mật khẩu CŨ đã tồn tại) — nâng
+  // ngưỡng ở đó sẽ khoá đăng nhập của user có mật khẩu 5-7 ký tự tạo dưới
+  // policy cũ.
+  password: z.string().min(8, "Password tối thiểu 8 ký tự"),
   confirmPassword: z.string(),
   fullName: z.string().trim().min(1),
 }).refine(data => data.password === data.confirmPassword, {
@@ -39,7 +44,7 @@ export const ForgotPasswordDTO = z.object({
 
 export const ResetPasswordDTO = z.object({
   token: z.string().min(1, "Token không được để trống"),
-  // Giữ cùng ngưỡng tối thiểu với `LoginDTO`/`RegisterDTO` (min 5) — service
+  // DEV-021/SEC-02: min(5) → min(8), đồng bộ `RegisterDTO.password` — service
   // (`resetPassword`) hiện không tự kiểm tra độ dài, dựa hoàn toàn vào DTO.
-  newPassword: z.string().min(5, "Mật khẩu mới tối thiểu 5 ký tự"),
+  newPassword: z.string().min(8, "Mật khẩu mới tối thiểu 8 ký tự"),
 });

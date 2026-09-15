@@ -4,6 +4,7 @@ import { getCachedPermissions } from "../services/rbac/permission.cache";
 import { Policy } from "../models/rbac/policy.model";
 import UserAudit from "../models/users/userAudit.model";
 import { evaluatePolicyConditionSafely } from "../shared/utils/Policycondition.evaluator";
+import type { Permission } from "../shared/constants/permission.constant";
 
 /**
  *  AUTHORIZE PERMISSION
@@ -37,12 +38,16 @@ type AuthorizeOptions = {
  * ghi audit lỗi) vì đây là thao tác phụ, không phải điều kiện bắt buộc để
  * request tiếp tục.
  *
- * LƯU Ý CHƯA GIẢI QUYẾT HẾT (B2): bypass vẫn dựa trên so khớp CHUỖI
- * `role.name === "ADMIN"` thay vì 1 cờ hệ thống riêng (`isSystemAdmin`) —
- * việc đổi sang cờ riêng đòi hỏi sửa schema `Role`/`User` (ngoài phạm vi
- * file được cung cấp ở lượt này). Ghi rõ TODO để xử lý khi có model đó.
+ * 🔒 DEV-001A Phase B HOÀN TẤT (DEV-047, 2026-09-12): Super-Admin bypass giờ
+ * CHỈ đọc cờ security identity bất biến `role.isSystemRole` — đã gỡ bỏ hoàn
+ * toàn nhánh so khớp CHUỖI `role.name === "ADMIN"` (lưới đỡ "Phase A") sau
+ * khi xác nhận migration `isSystemRole:true` đã chạy xong cho role ADMIN
+ * (môi trường DUY NHẤT đang tồn tại của dự án tại thời điểm này — CHƯA có
+ * production riêng, xem `docs/development/tasks/DEV-047.md`). Đổi tên role
+ * khác thành chuỗi "ADMIN" (nếu vượt qua được guard ở `updateRoleService()`)
+ * giờ KHÔNG còn cấp bypass — đóng dứt điểm RV02-01 (role rename hijack).
  */
-const auditAdminBypass = (userId: any, permissions: string | string[]) => {
+const auditAdminBypass = (userId: any, permissions: Permission | Permission[]) => {
   UserAudit.create({
     user: userId,
     action: "AUDIT_DASHBOARD_VIEW", // Không có action riêng cho "PERMISSION_BYPASS" trong
@@ -56,7 +61,12 @@ const auditAdminBypass = (userId: any, permissions: string | string[]) => {
 };
 
 export const authorizePermission =
-  (permissions: string | string[], options?: AuthorizeOptions) =>
+  // DEV-013/ARCH-25: đổi từ `string | string[]` (không ràng buộc kiểu, cho
+  // phép drift permission string không bị bắt ở compile-time) sang union
+  // type `Permission` lấy trực tiếp từ `PERMISSIONS` catalog
+  // (`permission.constant.ts`) — mọi lệnh gọi dùng chuỗi KHÔNG tồn tại
+  // trong catalog giờ là lỗi biên dịch, không còn "âm thầm luôn 403".
+  (permissions: Permission | Permission[], options?: AuthorizeOptions) =>
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = req.user;
@@ -71,7 +81,12 @@ export const authorizePermission =
       // =================================================
       // 2. SUPER ADMIN BYPASS
       // =================================================
-      if (user.role?.name === "ADMIN") {
+      // ⚠️ DEV-022/RV02-02: bypass này chạy TRƯỚC bước 3 (nơi
+      // `user.denyPermissions` được áp dụng, qua `getUserEffectivePermissions()`
+      // ở `permission.service.ts`) — nghĩa là `denyPermissions` KHÔNG có bất
+      // kỳ tác dụng nào với user đang giữ role ADMIN, dù field này tồn tại
+      // đầy đủ và có API quản lý. Xem thêm comment ở `user.model.ts`.
+      if (user.role?.isSystemRole === true) {
         auditAdminBypass(user._id, permissions);
         return next();
       }

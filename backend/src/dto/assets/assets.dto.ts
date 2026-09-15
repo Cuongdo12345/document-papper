@@ -25,6 +25,15 @@ export const QueryAssetCategoryDTO = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).default(10),
   keyword: z.string().trim().optional(),
+  // ⚠️ THÊM (Asset Categories UI, 2026-09-09): trước đây KHÔNG có field này —
+  // `getAllAssetCategoriesService` HARD-CODE `filter.isActive = true`, không
+  // có cách nào liệt kê lại danh mục đã xoá mềm để khôi phục — mất hẳn đường
+  // vào `PATCH /:id/restore` (endpoint có sẵn nhưng không ai gọi tới được qua
+  // UI). Cùng pattern CHÍNH XÁC với `QueryAssetDTO.isActive` (fix DEV-035).
+  isActive: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === "true")),
 });
 
 /* =====================================================================
@@ -57,6 +66,11 @@ export const CreateAssetDTO = z.object({
  * `AssetAssignmentHistory` và validate điều kiện chuyển trạng thái, thay vì
  * cho phép client tự PATCH thẳng field nhạy cảm này — cùng tinh thần
  * whitelist đã áp dụng ở `documents.constants.ts` / `rbac.constants.ts`.
+ *
+ * DEV-010/IMP-014: `isActive` cũng ĐÃ BỎ khỏi đây (cùng lý do với
+ * `status` — đây là field soft-delete, phải đi qua endpoint xoá/khôi phục
+ * riêng, không PATCH thẳng qua update thông thường). Xem
+ * `assets.constants.ts` (`ASSET_UPDATE_WHITELIST`).
  */
 export const UpdateAssetDTO = z.object({
   category: objectId("category không hợp lệ").optional(),
@@ -72,7 +86,6 @@ export const UpdateAssetDTO = z.object({
   supplier: z.string().trim().optional(),
 
   specs: z.record(z.string(), z.any()).optional(),
-  isActive: z.boolean().optional(),
 });
 
 export const QueryAssetDTO = z.object({
@@ -82,6 +95,17 @@ export const QueryAssetDTO = z.object({
   department: objectId("department không hợp lệ").optional(),
   category: objectId("category không hợp lệ").optional(),
   status: z.nativeEnum(AssetStatus).optional(),
+  // ⚠️ THÊM (FE-06 follow-up, 2026-09-07): trước đây KHÔNG có field này —
+  // `getAllAssetsService` HARD-CODE `filter.isActive = true`, không có cách
+  // nào (kể cả ADMIN) liệt kê lại tài sản đã xoá mềm để khôi phục — mất hẳn
+  // đường vào `PATCH /:id/restore` (endpoint có sẵn nhưng không ai gọi tới
+  // được qua UI). Cùng pattern CHÍNH XÁC với `QueryDocumentDTO.isActive`
+  // (`documents.dto.ts`): string "true"/"false" → boolean, hoặc `undefined`
+  // nếu client không truyền (để service tự quyết định mặc định).
+  isActive: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === "true")),
   sortBy: z.string().default("createdAt"),
   order: z.enum(["asc", "desc"]).default("desc"),
 });

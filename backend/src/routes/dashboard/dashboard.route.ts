@@ -11,7 +11,8 @@ import {
     getAssetWarrantyExpiring,
     getAssetMaintenanceOverdue,
     getMedicalDeviceDashboardSummary,
-    getMedicalDeviceCalibrationDue
+    getMedicalDeviceCalibrationDue,
+    getWorkflowOverdueApprovals
 } from "../../controllers/dashboard/dashboard.controller";
 import { authenticate } from "../../middlewares/auth.middleware";
 import { authorizePermission } from "../../middlewares/authorizePermission.middleware";
@@ -37,5 +38,9 @@ router.get("/assets/maintenance-overdue", authenticate, authorizePermission("DAS
 // MEDICAL_DEVICE_VIEW (vốn dùng cho xem CHI TIẾT 1 thiết bị qua :assetId).
 router.get("/medical-devices/summary", authenticate, authorizePermission("DASHBOARD_READ"), getMedicalDeviceDashboardSummary);
 router.get("/medical-devices/calibration-due", authenticate, authorizePermission("DASHBOARD_READ"), getMedicalDeviceCalibrationDue);
+
+// Roadmap B1 (SLA & nhắc việc Workflow, 2026-09-15) — "Đề xuất trễ hạn",
+// cùng permission DASHBOARD_READ với mọi widget dashboard khác.
+router.get("/workflow/overdue-approvals", authenticate, authorizePermission("DASHBOARD_READ"), getWorkflowOverdueApprovals);
 
 export default router;

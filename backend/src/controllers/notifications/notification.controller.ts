@@ -75,3 +75,50 @@ export const remove = catchAsync(async (req: Request, res: Response) => {
     data,
   });
 });
+
+/**
+ * POST /api/notifications/broadcast (ADMIN — `NOTIFICATION_BROADCAST`)
+ * Soạn + gửi thông báo hệ thống tới nhiều user cùng lúc, xem
+ * `notification.dto.ts`/`notification.service.ts` cho bối cảnh đầy đủ.
+ */
+export const broadcast = catchAsync(async (req: Request, res: Response) => {
+  const result = await service.broadcastNotificationService(
+    req.user!._id,
+    req.body,
+  );
+
+  res.status(201).json({
+    success: true,
+    message: "Đã gửi thông báo",
+    data: result,
+  });
+});
+
+/**
+ * GET /api/notifications/admin (ADMIN — `NOTIFICATION_VIEW_ALL`)
+ * Xem thông báo của BẤT KỲ user nào — KHÁC `list` ở trên (luôn tự khoá theo
+ * `req.user._id`).
+ */
+export const listAll = catchAsync(async (req: Request, res: Response) => {
+  const { page, limit, recipient, isRead, type } = req.query as unknown as {
+    page: number;
+    limit: number;
+    recipient?: string;
+    isRead?: boolean;
+    type?: string;
+  };
+
+  const data = await service.getAllNotificationsAdmin({
+    page,
+    limit,
+    recipient,
+    isRead,
+    type,
+  });
+
+  res.json({
+    success: true,
+    message: "Lấy toàn bộ thông báo thành công",
+    data,
+  });
+});

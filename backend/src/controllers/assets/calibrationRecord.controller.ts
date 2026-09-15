@@ -3,6 +3,8 @@ import { Request, Response } from "express";
 import {
   createCalibrationRecordService,
   getCalibrationHistoryService,
+  getCalibrationCertificateFileService,
+  updateCalibrationCertificateService,
 } from "../../services/assets/assetDevice/calibrationRecord.service";
 import { catchAsync } from "../../shared/utils/catchAsync";
 
@@ -38,6 +40,41 @@ export const getCalibrationHistory = catchAsync(
     res.json({
       message: "Lấy lịch sử kiểm định thành công",
       ...result,
+    });
+  },
+);
+
+/**
+ * DOWNLOAD — nội dung file giấy chứng nhận kiểm định thật. (A2, 2026-09-15)
+ */
+export const downloadCalibrationCertificate = catchAsync(
+  async (req: Request, res: Response) => {
+    const { filePath, fileName } = await getCalibrationCertificateFileService(
+      req.params.assetId,
+      req.params.recordId,
+    );
+
+    res.download(filePath, fileName);
+  },
+);
+
+/**
+ * UPDATE CERTIFICATE — thay thế file/link chứng nhận đã lưu (sửa lỗi upload
+ * nhầm file), theo yêu cầu user sau khi hoàn thành A2 gốc.
+ */
+export const updateCalibrationCertificate = catchAsync(
+  async (req: Request, res: Response) => {
+    const record = await updateCalibrationCertificateService(
+      req.params.assetId,
+      req.params.recordId,
+      req.body,
+      req.user?._id,
+      req.file,
+    );
+
+    res.json({
+      message: "Cập nhật giấy chứng nhận thành công",
+      data: record,
     });
   },
 );

@@ -36,9 +36,21 @@ const router = Router();
 router.post("/register", authRateLimiter, validateBody(RegisterDTO), register);
 router.post("/login", authRateLimiter, validateBody(LoginDTO), login);
 router.post("/refresh-token", authRateLimiter, validateBody(RefreshTokenDTO), refreshAccessToken);
-router.post("/logout", authenticate, logout);
+// ⚠️ FIX (2026-09-06): trước đây route này KHÔNG có `validateBody` — controller
+// đọc thẳng `req.body.refreshToken` không guard. Khi client gọi thiếu body
+// (đúng bug ở `frontend/src/api/auth.api.ts::logout()` trước bản vá), `req.body`
+// là `undefined` (không có Content-Type vì không gửi data) => truy cập
+// `.refreshToken` ném TypeError chưa được nhận diện => rơi vào nhánh 500 của
+// error.middleware.ts thay vì 400 rõ ràng. Tái dùng `RefreshTokenDTO` có sẵn
+// (cùng shape `{refreshToken}` như "/refresh-token") — không tạo DTO mới.
+router.post("/logout", authenticate, validateBody(RefreshTokenDTO), logout);
 router.post("/forgot-password", validateBody(ForgotPasswordDTO), forgotPassword);
-router.post("/reset-password", validateBody(ResetPasswordDTO), resetPassword);
+// DEV-023/ARCH-26: `authLimiter` chung (app.ts) đã bị gỡ (hợp nhất 2
+// rate-limiter trùng cấu hình) — route này trước đây CHỈ được bảo vệ NGẦM
+// qua limiter chung đó (không có limiter riêng nào ở đây, khác
+// register/login/refresh-token). Gắn tường minh `authRateLimiter` để không
+// mất bảo vệ IP-based khi bỏ mount rộng.
+router.post("/reset-password", authRateLimiter, validateBody(ResetPasswordDTO), resetPassword);
 
 export default router;
 

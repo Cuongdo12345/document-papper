@@ -13,6 +13,7 @@ import { CalibrationRecord } from "../../../models/assets/calibrationRecord.mode
 import ApiError from "../../../shared/errors/ApiError";
 import { Upload } from "../../../models/uploadFiles/upload.model";
 import { withTransaction } from "../../../shared/utils/withTransaction";
+import { resolveUploadedFilePath } from "../../../shared/utils/uploadStorage.util";
 
 const CALIBRATION_RECORD_POPULATE = {
   path: "recordedBy",
@@ -36,10 +37,16 @@ const CALIBRATION_RECORD_POPULATE = {
  * (`services/upload/upload.service.ts`) — hàm đó hiện chưa hỗ trợ
  * `uploadedBy`/`isUsed` và chưa nhận `session` cho transaction; viết trực
  * tiếp ở đây gọn hơn là sửa hàm dùng chung cho 1 nhu cầu đặc thù của module
- * này. `certificateFileUrl` VẪN LÀ STRING THUẦN TUÝ trên `CalibrationRecord`
- * (đúng quyết định §9.2 — không đổi schema khi chuyển S3 sau này), chỉ khác
- * là giá trị string đó giờ TRỎ TỚI 1 Upload record thật thay vì do người
- * dùng tự gõ tay.
+ * này.
+ *
+ * (A2, 2026-09-15 — SỬA bug đường dẫn chết): TRƯỚC ĐÂY khi có file thật,
+ * `Upload.fileUrl` (`/uploads/<filename>`) được gán thẳng vào
+ * `certificateFileUrl` — nhưng đó là ĐƯỜNG DẪN CHẾT, không `express.static`
+ * nào phục vụ (đúng lỗi đã tìm và vá cho domain Upload chung ở FE-15, xem
+ * `upload.controller.ts:downloadFile`), FE không tải được. Nay: `Upload._id`
+ * được lưu riêng vào `certificateFileId`, `certificateFileUrl` CHỈ còn dùng
+ * cho link nhập tay thật (`payload.certificateFileUrl`) — file thật tải qua
+ * `getCalibrationCertificateFileService` bên dưới.
  */
 export const createCalibrationRecordService = async (
   assetId: any,
@@ -141,7 +148,11 @@ export const createCalibrationRecordService = async (
       // đó gán file vào 1 resource khác — ở đây biết chắc chắn ngay lúc tạo
       // là file này CHỈ dùng cho đúng bản ghi kiểm định này, không cần bước
       // "đánh dấu used sau" riêng).
-      let certificateFileUrl: string | undefined = payload.certificateFileUrl;
+      // `certificateFileUrl` CHỈ còn dùng cho link nhập tay — KHÔNG bị ghi
+      // đè bởi nhánh upload file thật bên dưới nữa (xem comment A2 ở JSDoc
+      // trên hàm).
+      const certificateFileUrl: string | undefined = payload.certificateFileUrl;
+      let certificateFileId: mongoose.Types.ObjectId | undefined;
 
       if (certificateFile) {
         const [uploadDoc] = await Upload.create(
@@ -157,12 +168,7 @@ export const createCalibrationRecordService = async (
           ],
           { session },
         );
-        // `uploadDoc.fileUrl` được Mongoose tự suy luận kiểu `string | null |
-        // undefined` (field `fileUrl` trong `upload.model.ts` không khai
-        // `required: true`) — coalesce `null` về `undefined` cho khớp kiểu
-        // `certificateFileUrl` của `ICalibrationRecord`. Thực tế luôn có giá
-        // trị vì vừa tạo document với `fileUrl` tường minh ngay phía trên.
-        certificateFileUrl = uploadDoc.fileUrl ?? undefined;
+        certificateFileId = uploadDoc._id as mongoose.Types.ObjectId;
       }
 
       const [created] = await CalibrationRecord.create(
@@ -173,6 +179,7 @@ export const createCalibrationRecordService = async (
             calibratedBy: payload.calibratedBy,
             result: payload.result,
             certificateFileUrl,
+            certificateFileId,
             nextDueDate: payload.nextDueDate,
             recordedBy: userId,
           },
@@ -252,4 +259,187 @@ export const getCalibrationHistoryService = async (
       totalPages: Math.ceil(total / pageSize),
     },
   };
+};
+
+/**
+ * 📌 DOWNLOAD — trả về đường dẫn thật trên đĩa + tên file gốc của giấy chứng
+ * nhận kiểm định đã upload, để controller gọi `res.download()`. (A2,
+ * 2026-09-15)
+ *
+ * Dùng `certificateFileId` (KHÔNG dùng `certificateFileUrl` — field đó giờ
+ * chỉ chứa link nhập tay, xem comment ở `createCalibrationRecordService`).
+ * Quyền truy cập dựa trên PERMISSION (`MEDICAL_DEVICE_VIEW`, gắn ở route) —
+ * KHÁC pattern ownership-check của `upload.controller.ts:downloadFile`
+ * (chỉ chủ sở hữu/ADMIN) — vì giấy chứng nhận là hồ sơ của THIẾT BỊ/khoa
+ * phòng, không phải tài sản riêng của người đã upload nó; bất kỳ ai xem
+ * được lịch sử kiểm định của thiết bị đều hợp lý được tải chứng nhận đi kèm.
+ */
+export const getCalibrationCertificateFileService = async (
+  assetId: any,
+  recordId: any,
+) => {
+  if (
+    !mongoose.Types.ObjectId.isValid(assetId) ||
+    !mongoose.Types.ObjectId.isValid(recordId)
+  ) {
+    throw ApiError.badRequest("ID không hợp lệ");
+  }
+
+  const profile = await MedicalDeviceProfile.findOne({ asset: assetId });
+  if (!profile) {
+    throw ApiError.notFound("Tài sản này chưa có profile thiết bị y tế");
+  }
+
+  // Xác nhận record THUỘC ĐÚNG profile của :assetId — chặn trường hợp
+  // recordId đúng nhưng assetId khác (record thuộc thiết bị khác), tránh lộ
+  // nhầm chứng nhận của thiết bị khác nếu ai đó đoán/tự sửa URL.
+  const record = await CalibrationRecord.findOne({
+    _id: recordId,
+    deviceProfile: profile._id,
+  });
+  if (!record) {
+    throw ApiError.notFound("Không tìm thấy bản ghi kiểm định");
+  }
+
+  if (!record.certificateFileId) {
+    throw ApiError.notFound(
+      record.certificateFileUrl
+        ? "Bản ghi này dùng link chứng nhận nhập tay (không phải file upload) — mở trực tiếp link đã lưu, không tải qua endpoint này"
+        : "Bản ghi này chưa đính kèm giấy chứng nhận",
+    );
+  }
+
+  const upload = await Upload.findById(record.certificateFileId);
+  if (!upload || upload.isDeleted) {
+    throw ApiError.notFound("File chứng nhận không còn tồn tại");
+  }
+  if (!upload.fileUrl || !upload.fileName) {
+    throw ApiError.notFound("File thiếu dữ liệu, không thể tải");
+  }
+
+  const filePath = resolveUploadedFilePath(upload.fileUrl);
+  if (!fs.existsSync(filePath)) {
+    throw ApiError.notFound("File không còn tồn tại trên server");
+  }
+
+  return { filePath, fileName: upload.fileName as string };
+};
+
+/**
+ * 📌 UPDATE CERTIFICATE — thay thế file/link chứng nhận đã lưu trên 1 bản
+ * ghi kiểm định (KHÔNG đổi field nào khác — `calibratedAt`/`result`/
+ * `nextDueDate`/... giữ nguyên, và profile KHÔNG bị đụng tới vì các field
+ * đó đã được set đúng lúc CREATE). Bổ sung theo yêu cầu user SAU khi A2 gốc
+ * hoàn thành: "upload nhầm file thì sửa lại được" — hiện chưa có cách sửa
+ * TOÀN BỘ 1 bản ghi kiểm định (xem comment `calibratedAt` conflict ở
+ * `createCalibrationRecordService`), CHỦ Ý thu hẹp phạm vi chỉ đúng phần
+ * chứng nhận — tránh mở lại rủi ro đồng bộ `profile.lastCalibrationDate`/
+ * `nextCalibrationDueDate` (vốn chỉ nên đổi qua đúng 1 hành động nghiệp vụ
+ * "ghi nhận kiểm định MỚI").
+ *
+ * Giống `createCalibrationRecordService`, `certificateFile` (nếu có) đã
+ * được multer ghi ra đĩa TRƯỚC khi hàm này chạy — bọc try/catch dọn file mồ
+ * côi nếu lỗi xảy ra sau đó, cùng pattern.
+ */
+export const updateCalibrationCertificateService = async (
+  assetId: any,
+  recordId: any,
+  payload: any,
+  userId?: any,
+  certificateFile?: Express.Multer.File,
+) => {
+  let committed = false;
+
+  try {
+    if (
+      !mongoose.Types.ObjectId.isValid(assetId) ||
+      !mongoose.Types.ObjectId.isValid(recordId)
+    ) {
+      throw ApiError.badRequest("ID không hợp lệ");
+    }
+
+    if (certificateFile && payload.certificateFileUrl) {
+      throw ApiError.badRequest(
+        "Chỉ được cung cấp 1 trong 2: file upload mới (certificateFile) HOẶC certificateFileUrl mới, không cả hai.",
+      );
+    }
+    if (!certificateFile && !payload.certificateFileUrl) {
+      throw ApiError.badRequest(
+        "Phải cung cấp file mới (certificateFile) hoặc link mới (certificateFileUrl) để thay thế chứng nhận đã lưu.",
+      );
+    }
+
+    const profile = await MedicalDeviceProfile.findOne({ asset: assetId });
+    if (!profile) {
+      throw ApiError.notFound("Tài sản này chưa có profile thiết bị y tế");
+    }
+
+    // Cùng lý do IDOR-safety đã áp dụng ở `getCalibrationCertificateFileService`.
+    const record = await CalibrationRecord.findOne({
+      _id: recordId,
+      deviceProfile: profile._id,
+    });
+    if (!record) {
+      throw ApiError.notFound("Không tìm thấy bản ghi kiểm định");
+    }
+
+    // Lưu lại Upload CŨ (nếu có) để soft-delete SAU KHI bản ghi mới đã lưu
+    // thành công — tránh mất dấu file cũ giữa chừng nếu bước ghi mới thất bại.
+    const oldCertificateFileId = record.certificateFileId;
+
+    const updated = await withTransaction(async (session) => {
+      if (certificateFile) {
+        const [uploadDoc] = await Upload.create(
+          [
+            {
+              fileName: certificateFile.originalname,
+              fileUrl: `/uploads/${certificateFile.filename}`,
+              fileSize: certificateFile.size,
+              mimeType: certificateFile.mimetype,
+              uploadedBy: userId,
+              isUsed: true,
+            },
+          ],
+          { session },
+        );
+        record.certificateFileId = uploadDoc._id as mongoose.Types.ObjectId;
+        record.certificateFileUrl = undefined;
+      } else {
+        record.certificateFileUrl = payload.certificateFileUrl;
+        record.certificateFileId = undefined;
+      }
+
+      await record.save({ session });
+
+      // Soft-delete Upload CŨ — cùng semantics `deleteFile`
+      // (`upload.controller.ts`: `isDeleted = true`, KHÔNG xoá file vật lý
+      // trên đĩa). File mới đã lưu thành công (transaction), file cũ không
+      // còn được tham chiếu bởi bất kỳ CalibrationRecord nào nữa.
+      if (oldCertificateFileId) {
+        await Upload.updateOne(
+          { _id: oldCertificateFileId },
+          { isDeleted: true },
+          { session },
+        );
+      }
+
+      return record;
+    });
+
+    committed = true;
+
+    return await updated.populate(CALIBRATION_RECORD_POPULATE);
+  } catch (error) {
+    if (certificateFile && !committed) {
+      fs.unlink(certificateFile.path, (unlinkErr) => {
+        if (unlinkErr) {
+          console.error(
+            `[calibrationRecord] Không xoá được file mồ côi "${certificateFile.path}":`,
+            unlinkErr,
+          );
+        }
+      });
+    }
+    throw error;
+  }
 };

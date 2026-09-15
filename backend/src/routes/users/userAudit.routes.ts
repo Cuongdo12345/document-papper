@@ -31,21 +31,21 @@ router.get(
   "/",
   authenticate,
   authorizePermission("AUDIT_VIEW"),
-//   validateQuery(GetAuditLogsQueryDTO),
+  validateQuery(GetAuditLogsQueryDTO),
   getAuditLogs,
 );
 router.get(
   "/export",
   authenticate,
   authorizePermission("AUDIT_VIEW"),
-//   validateQuery(ExportAuditLogsQueryDTO),
+  validateQuery(ExportAuditLogsQueryDTO),
   exportAuditLogs,
 );
 router.get(
   "/dashboard",
   authenticate,
   authorizePermission("AUDIT_VIEW_DASHBOARD"),
-//   validateQuery(GetAuditDashboardQueryDTO),
+  validateQuery(GetAuditDashboardQueryDTO),
   getAuditDashboard,
 );
 

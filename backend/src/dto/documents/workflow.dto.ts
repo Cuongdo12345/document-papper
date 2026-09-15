@@ -34,6 +34,10 @@ export const CreateWorkflowTemplateDTO = z.object({
         // steps[].role sang ref Role”) — thuộc phạm vi Business Logic/Data Model,
         // không sửa ở đây.
         role: z.string().min(1),
+        // Roadmap B1 (SLA & nhắc việc, 2026-09-15) — OPTIONAL, không set thì
+        // dùng mặc định hệ thống (`DEFAULT_STEP_SLA_DAYS`,
+        // `workflowSlaAlerts.service.ts`).
+        slaDays: z.coerce.number().int().min(1).optional(),
       }),
     )
     .min(1, "Cần ít nhất 1 bước duyệt"),
@@ -68,4 +72,16 @@ export const CancelWorkflowBodyDTO = z.object({
  */
 export const CompleteWorkflowBodyDTO = z.object({
   comment: z.string().max(1000).optional(),
+});
+
+/**
+ * 🔗 MỚI (2026-09-10, user yêu cầu trực tiếp) — dùng cho GET /workflows/history
+ * ("lịch sử duyệt", khác GET /pending — xem giải thích đầy đủ ở
+ * `getWorkflowHistoryForUser`, workflow.service.ts). `status` filter optional,
+ * khớp đúng enum `WorkflowInstance.status` (model).
+ */
+export const QueryWorkflowHistoryDTO = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
+  status: z.enum(["pending", "approved", "rejected", "cancelled", "completed"]).optional(),
 });

@@ -30,6 +30,20 @@ export enum NotificationType {
   // giống cảnh báo bảo hành" — không phải kiểu nhắc lặp lại như
   // `ASSET_MAINTENANCE_OVERDUE`.
   MEDICAL_DEVICE_CALIBRATION_DUE = "MEDICAL_DEVICE_CALIBRATION_DUE",
+  // Roadmap B1 (SLA & nhắc việc Workflow, 2026-09-15) — bổ sung thêm, không
+  // đổi giá trị cũ. Xem trigger tại `workflowSlaAlerts.service.ts` (cron job
+  // hằng ngày). 2 type RIÊNG BIỆT (không dùng chung 1 type như
+  // `MEDICAL_DEVICE_CALIBRATION_DUE`) vì đây là 2 mức độ nghiêm trọng khác
+  // hẳn nhau về người nhận: REMINDER gửi cho ĐÚNG người duyệt bước đó,
+  // ESCALATED gửi cho ADMIN (người không liên quan tới bước gốc) — tách type
+  // giúp FE lọc/hiển thị icon khác nhau dễ hơn là chỉ dựa vào title/message.
+  WORKFLOW_SLA_REMINDER = "WORKFLOW_SLA_REMINDER",
+  WORKFLOW_SLA_ESCALATED = "WORKFLOW_SLA_ESCALATED",
+  // Roadmap B3 (Quản lý vật tư tiêu hao, 2026-09-15) — bổ sung thêm, không
+  // đổi giá trị cũ. Xem trigger tại `consumableAlerts.service.ts` (cron job
+  // hằng ngày). Gửi 1 LẦN khi tồn kho xuống ≤ ngưỡng, reset lại khi nhập
+  // hàng vượt ngưỡng — cùng pattern `ASSET_WARRANTY_EXPIRING`.
+  CONSUMABLE_LOW_STOCK = "CONSUMABLE_LOW_STOCK",
 }
 
 /**
@@ -45,6 +59,8 @@ export enum NotificationResourceType {
   IMPORT_HISTORY = "ImportHistory",
   // 🔗 Giai đoạn 4 (module Asset)
   ASSET = "Asset",
+  // 🔗 Roadmap B3 (module Quản lý vật tư tiêu hao)
+  CONSUMABLE_ITEM = "ConsumableItem",
 }
 
 export enum NotificationChannel {

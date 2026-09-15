@@ -188,4 +188,17 @@ DocumentSchema.index({
   createdAt: 1,
 });
 
+/**
+ * DASHBOARD INDEX (DEV-018/IMP-024, PERF-03/RV07-02)
+ *
+ * `services/dashboard/dashboard.service.ts` lọc `{ isActive: true,
+ * deletedAt: null }` ở 8+ vị trí `$match`/`find()` (kèm sort `createdAt`
+ * ở phần lớn), nhưng schema trước đây KHÔNG có index nào chứa `isActive`
+ * hay `deletedAt` — mọi truy vấn dashboard COLLSCAN toàn bộ collection dù
+ * `isActive`/`deletedAt` có selectivity thấp (đa số document `isActive:
+ * true`) nên vẫn cần `createdAt` trong cùng index để index-only phục vụ
+ * luôn phần sort, giảm bước `SORT` riêng sau `IXSCAN`.
+ */
+DocumentSchema.index({ isActive: 1, deletedAt: 1, createdAt: -1 });
+
 export const Document = model<IDocument>("Document", DocumentSchema);

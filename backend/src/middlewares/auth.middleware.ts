@@ -43,7 +43,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     // 3. Load user từ DB (KHÔNG load permission ở đây)
     const user = await User.findById(decoded.id)
       .select("_id role department isActive")
-      .populate("role", "name");
+      .populate("role", "name isSystemRole");
 
     if (!user || !user.isActive) {
       throw ApiError.unauthorized("User không hợp lệ");
