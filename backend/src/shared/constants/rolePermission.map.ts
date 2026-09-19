@@ -87,6 +87,30 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.CONSUMABLE_UPDATE,
     PERMISSIONS.CONSUMABLE_TRANSACTION_CREATE,
     PERMISSIONS.CONSUMABLE_ALERTS_TRIGGER,
+    // Roadmap B8 (DEV-067, 2026-09-18) — IT quản lý vật tư nói chung, mirror
+    // đúng bộ quyền CONSUMABLE_REQUEST_* đầy đủ (VIEW/CREATE/UPDATE/FULFILL).
+    PERMISSIONS.CONSUMABLE_REQUEST_VIEW,
+    PERMISSIONS.CONSUMABLE_REQUEST_CREATE,
+    PERMISSIONS.CONSUMABLE_REQUEST_UPDATE,
+    PERMISSIONS.CONSUMABLE_REQUEST_FULFILL,
+    // Nhóm vật tư (2026-09-16) — IT cũng quản lý danh mục nhóm vật tư, mirror
+    // đúng bộ quyền ASSET_CATEGORY_* ở dưới.
+    PERMISSIONS.CONSUMABLE_CATEGORY_VIEW,
+    PERMISSIONS.CONSUMABLE_CATEGORY_CREATE,
+    PERMISSIONS.CONSUMABLE_CATEGORY_UPDATE,
+    PERMISSIONS.CONSUMABLE_CATEGORY_DELETE,
+    // Roadmap B4 (2026-09-16) — IT cũng làm việc với NCC/hợp đồng bảo trì
+    // thiết bị CNTT, mirror đúng bộ quyền ASSET_*/CONSUMABLE_* ở trên.
+    PERMISSIONS.VENDOR_VIEW,
+    PERMISSIONS.VENDOR_CREATE,
+    PERMISSIONS.VENDOR_UPDATE,
+    PERMISSIONS.CONTRACT_VIEW,
+    PERMISSIONS.CONTRACT_CREATE,
+    PERMISSIONS.CONTRACT_UPDATE,
+    PERMISSIONS.CONTRACT_ALERTS_TRIGGER,
+    // Khôi phục hợp đồng đã huỷ (2026-09-16, DEV-058) — IT trực tiếp quản lý
+    // hợp đồng thiết bị CNTT nên cũng được khôi phục khi huỷ nhầm.
+    PERMISSIONS.CONTRACT_RESTORE,
     PERMISSIONS.ASSET_CATEGORY_VIEW,
     PERMISSIONS.ASSET_CATEGORY_CREATE,
     PERMISSIONS.ASSET_CATEGORY_UPDATE,
@@ -110,6 +134,9 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
 
     // Dashboard: IT trực tiếp quản lý Document/Asset nên cần xem KPI.
     PERMISSIONS.DASHBOARD_READ,
+    // Roadmap B7 (2026-09-18) — chạy tay gửi báo cáo tuần, cùng nguyên tắc
+    // ASSET_ALERTS_TRIGGER/WORKFLOW_SLA_ALERTS_TRIGGER (IT đã có cả 2).
+    PERMISSIONS.DASHBOARD_WEEKLY_REPORT_TRIGGER,
 
     // Workflow: IT là role thực hiện các bước duyệt/từ chối trong quy
     // trình (step.role khớp "IT" ở đa số template hiện có). Đây là
@@ -160,6 +187,22 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     // được tạo/sửa vật tư hay tự nhập/xuất kho — đó là việc của Phòng Vật
     // tư-TTB, cùng nguyên tắc phân quyền view-only đã áp dụng cho ASSET_VIEW.
     PERMISSIONS.CONSUMABLE_VIEW,
+    // Roadmap B8 (DEV-067, 2026-09-18) — CHÍNH user thường là người "xin cấp
+    // thêm" được nhắc ở comment trên — nay có đường THẬT để ghi nhận nhu cầu
+    // đó (đề xuất/dự trù), KHÔNG chỉ xem tồn kho suông. CHỦ Ý KHÔNG có
+    // CONSUMABLE_REQUEST_FULFILL (đánh dấu đã mua là việc của Phòng Vật
+    // tư-TTB sau khi mua thực tế, không phải người đề xuất tự xác nhận).
+    PERMISSIONS.CONSUMABLE_REQUEST_VIEW,
+    PERMISSIONS.CONSUMABLE_REQUEST_CREATE,
+    PERMISSIONS.CONSUMABLE_REQUEST_UPDATE,
+    // Nhóm vật tư (2026-09-16) — user thường được XEM danh mục nhóm vật tư
+    // (hiển thị đúng tên nhóm khi xem tồn kho khoa mình), không tạo/sửa/xoá.
+    PERMISSIONS.CONSUMABLE_CATEGORY_VIEW,
+    // Roadmap B4 (2026-09-16) — user thường được XEM hợp đồng bảo trì/NCC
+    // (vd kiểm tra thiết bị mình dùng còn bảo hành/hợp đồng hay không), KHÔNG
+    // được tạo/sửa NCC/hợp đồng — cùng nguyên tắc view-only ở trên.
+    PERMISSIONS.VENDOR_VIEW,
+    PERMISSIONS.CONTRACT_VIEW,
     // Kiểm kê (quét QR xác nhận còn thấy thiết bị) là hành động vật lý,
     // KHÔNG đổi status/dữ liệu quan trọng — cho phép cả user thường thực
     // hiện (không chỉ IT), vì nhân viên khoa/phòng mới là người trực tiếp
@@ -322,6 +365,33 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.CONSUMABLE_UPDATE,
     PERMISSIONS.CONSUMABLE_TRANSACTION_CREATE,
     PERMISSIONS.CONSUMABLE_ALERTS_TRIGGER,
+    // Roadmap B8 (DEV-067, 2026-09-18) — Phòng Vật tư-TTB là bộ phận trực
+    // tiếp xử lý đề xuất/dự trù vật tư của các khoa/phòng (xem + đánh dấu đã
+    // mua), mirror đúng bộ quyền CONSUMABLE_REQUEST_* đầy đủ.
+    PERMISSIONS.CONSUMABLE_REQUEST_VIEW,
+    PERMISSIONS.CONSUMABLE_REQUEST_CREATE,
+    PERMISSIONS.CONSUMABLE_REQUEST_UPDATE,
+    PERMISSIONS.CONSUMABLE_REQUEST_FULFILL,
+    // Nhóm vật tư (2026-09-16) — Phòng Vật tư-TTB là bộ phận trực tiếp quản
+    // lý danh mục nhóm vật tư, đúng theo nghiệp vụ.
+    PERMISSIONS.CONSUMABLE_CATEGORY_VIEW,
+    PERMISSIONS.CONSUMABLE_CATEGORY_CREATE,
+    PERMISSIONS.CONSUMABLE_CATEGORY_UPDATE,
+    PERMISSIONS.CONSUMABLE_CATEGORY_DELETE,
+    // Roadmap B4 (2026-09-16) — Phòng Vật tư-TTB là bộ phận trực tiếp làm
+    // việc với NCC, ký/theo dõi hợp đồng bảo trì, nhận cảnh báo hợp đồng sắp
+    // hết hạn, đúng theo nghiệp vụ roadmap mô tả.
+    PERMISSIONS.VENDOR_VIEW,
+    PERMISSIONS.VENDOR_CREATE,
+    PERMISSIONS.VENDOR_UPDATE,
+    PERMISSIONS.CONTRACT_VIEW,
+    PERMISSIONS.CONTRACT_CREATE,
+    PERMISSIONS.CONTRACT_UPDATE,
+    PERMISSIONS.CONTRACT_ALERTS_TRIGGER,
+    // Khôi phục hợp đồng đã huỷ (2026-09-16, DEV-058) — Phòng Vật tư-TTB là
+    // bộ phận trực tiếp ký/theo dõi hợp đồng nên cũng được khôi phục khi huỷ
+    // nhầm.
+    PERMISSIONS.CONTRACT_RESTORE,
     PERMISSIONS.ASSET_CATEGORY_VIEW,
     PERMISSIONS.ASSET_CATEGORY_CREATE,
     PERMISSIONS.ASSET_CATEGORY_UPDATE,

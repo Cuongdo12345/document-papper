@@ -5,8 +5,10 @@ import {
   getAssetCategoryByIdService,
   updateAssetCategoryService,
   deleteAssetCategoryService,
+  bulkDeleteAssetCategoryService,
   hardDeleteAssetCategoryService,
   restoreAssetCategoryService,
+  bulkRestoreAssetCategoryService,
 } from "../../services/assets/assetDevice/assetCategory.service";
 import { catchAsync } from "../../shared/utils/catchAsync";
 
@@ -83,6 +85,18 @@ export const deleteAssetCategory = catchAsync(
 );
 
 /**
+ * BULK DELETE (xoá mềm hàng loạt — DEV-060, 2026-09-16)
+ */
+export const bulkDeleteAssetCategories = catchAsync(async (req: Request, res: Response) => {
+  const result = await bulkDeleteAssetCategoryService(req.body.ids, req.user?._id);
+
+  res.json({
+    message: `Đã xoá ${result.deletedIds.length}/${req.body.ids.length} danh mục tài sản`,
+    data: result,
+  });
+});
+
+/**
  * HARD DELETE (xoá vĩnh viễn — chỉ áp dụng cho danh mục đã soft-delete trước đó)
  */
 export const hardDeleteAssetCategory = catchAsync(
@@ -108,3 +122,15 @@ export const restoreAssetCategory = catchAsync(
     });
   },
 );
+
+/**
+ * BULK RESTORE (khôi phục hàng loạt — DEV-062, 2026-09-17)
+ */
+export const bulkRestoreAssetCategories = catchAsync(async (req: Request, res: Response) => {
+  const result = await bulkRestoreAssetCategoryService(req.body.ids);
+
+  res.json({
+    message: `Đã khôi phục ${result.deletedIds.length}/${req.body.ids.length} danh mục tài sản`,
+    data: result,
+  });
+});

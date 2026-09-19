@@ -135,7 +135,47 @@ const DocumentSchema = new Schema<IDocument>(
  * SEARCH / LOOKUP
  */
 DocumentSchema.index({ documentCode: 1 }, { unique: true });
-DocumentSchema.index({ title: "text", documentCode: "text" });
+
+/**
+ * [MỚI 2026-09-18, DEV-063 — Roadmap B6 "Tìm kiếm toàn văn"] Thay index text
+ * cũ `{title:"text", documentCode:"text"}` (định nghĩa sẵn từ trước nhưng
+ * KHÔNG hề được dùng — `getAllDocumentsService` search bằng `$regex` thủ
+ * công, không phải `$text`) bằng index text MỚI mở rộng sang `meta` (nội
+ * dung/ghi chú tự do — mô tả sự cố, ghi chú hạng mục, kết quả kiểm tra; xem
+ * `documentMeta.ts` phía FE cho đủ các shape).
+ *
+ * `{"$**": "text"}` — WILDCARD text index (index MỌI field string trong
+ * toàn document, không riêng `meta`). Đã THỬ giới hạn wildcard chỉ trong
+ * subtree `{"meta.$**": "text"}` kết hợp thêm 2 field text tường minh
+ * (`title`/`documentCode`) — MongoDB từ chối spec đó ("Index key contains an
+ * illegal field name") vì KHÔNG hỗ trợ trộn wildcard subtree với field text
+ * tường minh khác trong CÙNG 1 index. Dùng wildcard toàn document + `weights`
+ * để bù lại (field không liệt kê trong `weights` mặc định weight 1) — hệ quả
+ * phụ CHẤP NHẬN ĐƯỢC: vài field string ngắn khác (`workflowStatus`,
+ * `signedBy.role`...) cũng bị index/search được, không gây hại (không rò rỉ
+ * thêm dữ liệu nhạy cảm nào ngoài field vốn đã trả về qua API list).
+ *
+ * MongoDB CHỈ cho phép 1 text index/collection — `weights` ưu tiên khớp ở
+ * `title`/`documentCode` cao hơn nội dung `meta` (thường dài, dễ khớp nhiều
+ * từ ngẫu nhiên hơn). `default_language: "none"` TẮT stemming/stopword
+ * tiếng Anh mặc định của MongoDB (không có stemmer tiếng Việt) — tránh biến
+ * dạng sai từ tiếng Việt, giữ so khớp theo token nguyên văn (vẫn không phân
+ * biệt hoa/thường và dấu nhờ Unicode case-folding mặc định của MongoDB).
+ *
+ * ⚠️ Đổi 1 text index đang tồn tại sang spec khác BẮT BUỘC migrate thủ công
+ * (MongoDB báo lỗi IndexOptionsConflict nếu chỉ sửa schema rồi khởi động lại
+ * app với `autoIndex`) — xem `scripts/migrate-document-fulltext-index.ts`
+ * (đã chạy 1 lần trên DB dev khi triển khai DEV-063, gọi `Document.
+ * syncIndexes()`).
+ */
+DocumentSchema.index(
+  { "$**": "text" },
+  {
+    name: "document_fulltext_search",
+    weights: { title: 10, documentCode: 5 },
+    default_language: "none",
+  },
+);
 
 /**
  * WORKFLOW INDEX

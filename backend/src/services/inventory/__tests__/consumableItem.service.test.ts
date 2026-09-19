@@ -15,6 +15,9 @@ jest.mock("../../../models/inventory/consumableItem.model", () => ({
     findById: jest.fn(),
   },
 }));
+jest.mock("../../../models/inventory/consumableCategory.model", () => ({
+  ConsumableCategory: { findOne: jest.fn() },
+}));
 jest.mock("../../../models/inventory/consumableTransaction.model", () => ({
   ConsumableTransaction: {
     create: jest.fn(),
@@ -26,6 +29,7 @@ jest.mock("../../../shared/utils/withTransaction");
 
 import Department from "../../../models/departments/department.model";
 import { ConsumableItem } from "../../../models/inventory/consumableItem.model";
+import { ConsumableCategory } from "../../../models/inventory/consumableCategory.model";
 import { ConsumableTransaction } from "../../../models/inventory/consumableTransaction.model";
 import { ConsumableTransactionType } from "../../../interfaces/inventory/consumableTransaction.interface";
 import { withTransaction } from "../../../shared/utils/withTransaction";
@@ -34,14 +38,19 @@ import {
   getAllConsumableItemsService,
   getConsumableItemByIdService,
   updateConsumableItemService,
+  bulkDeleteConsumableItemService,
+  bulkRestoreConsumableItemService,
   createConsumableTransactionService,
   getConsumableTransactionsService,
 } from "../consumableItem.service";
 
 const mockedDepartment = Department as any;
 const mockedItem = ConsumableItem as any;
+const mockedCategory = ConsumableCategory as any;
 const mockedTransaction = ConsumableTransaction as any;
 const mockedWithTransaction = withTransaction as unknown as jest.Mock;
+
+const CATEGORY_ID = "507f1f77bcf86cd799439099";
 
 const DEPT_ID = "507f1f77bcf86cd799439001";
 const ITEM_ID = "507f1f77bcf86cd799439011";
@@ -91,6 +100,16 @@ describe("createConsumableItemService (Roadmap B3)", () => {
     await expect(
       createConsumableItemService({ department: DEPT_ID, name: "Khẩu trang y tế", unit: "hộp" }),
     ).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("category không tồn tại/không active → 400, không tạo item", async () => {
+    mockedDepartment.findById.mockResolvedValue({ _id: DEPT_ID, name: "Khoa Nội" });
+    mockedCategory.findOne.mockResolvedValue(null);
+
+    await expect(
+      createConsumableItemService({ department: DEPT_ID, name: "A", unit: "cái", category: CATEGORY_ID }),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(mockedItem.create).not.toHaveBeenCalled();
   });
 
   it("thành công, KHÔNG có initialQuantity → tạo item, KHÔNG tạo giao dịch", async () => {
@@ -211,6 +230,16 @@ describe("updateConsumableItemService (Roadmap B3)", () => {
     expect(itemDoc.updatedBy).toBe("user-2");
   });
 
+  it("đổi category sang nhóm không tồn tại/không active → 400", async () => {
+    const itemDoc = makeItemDoc();
+    mockedItem.findById.mockResolvedValue(itemDoc);
+    mockedCategory.findOne.mockResolvedValue(null);
+
+    await expect(
+      updateConsumableItemService(ITEM_ID, { category: CATEGORY_ID }),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
   it("KHÔNG đổi minStockThreshold → KHÔNG đụng lowStockAlertSentAt", async () => {
     const sentAt = new Date();
     const itemDoc = makeItemDoc({ minStockThreshold: 5, lowStockAlertSentAt: sentAt });
@@ -219,6 +248,36 @@ describe("updateConsumableItemService (Roadmap B3)", () => {
     await updateConsumableItemService(ITEM_ID, { unit: "thùng" }, "user-2");
 
     expect(itemDoc.lowStockAlertSentAt).toBe(sentAt);
+  });
+});
+
+describe("bulkDeleteConsumableItemService (DEV-060)", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("gọi updateConsumableItemService({isActive:false}) cho từng id, 1 id không tồn tại → tách vào failed", async () => {
+    const itemDoc = makeItemDoc();
+    mockedItem.findById.mockImplementation((id: string) => (id === ITEM_ID ? Promise.resolve(itemDoc) : Promise.resolve(null)));
+
+    const result = await bulkDeleteConsumableItemService([ITEM_ID, "507f1f77bcf86cd799439098"], "user-3");
+
+    expect(itemDoc.isActive).toBe(false);
+    expect(result.deletedIds).toEqual([ITEM_ID]);
+    expect(result.failed).toEqual([{ id: "507f1f77bcf86cd799439098", message: "Không tìm thấy vật tư" }]);
+  });
+});
+
+describe("bulkRestoreConsumableItemService (DEV-062)", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("gọi updateConsumableItemService({isActive:true}) cho từng id, 1 id không tồn tại → tách vào failed", async () => {
+    const itemDoc = makeItemDoc({ isActive: false });
+    mockedItem.findById.mockImplementation((id: string) => (id === ITEM_ID ? Promise.resolve(itemDoc) : Promise.resolve(null)));
+
+    const result = await bulkRestoreConsumableItemService([ITEM_ID, "507f1f77bcf86cd799439098"], "user-3");
+
+    expect(itemDoc.isActive).toBe(true);
+    expect(result.deletedIds).toEqual([ITEM_ID]);
+    expect(result.failed).toEqual([{ id: "507f1f77bcf86cd799439098", message: "Không tìm thấy vật tư" }]);
   });
 });
 

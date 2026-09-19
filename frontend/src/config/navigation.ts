@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { LayoutDashboard, FileText, ClipboardCheck, Boxes, Users, Building2, ShieldCheck, ScrollText, Bell, Paperclip, Package } from "lucide-react";
+import { LayoutDashboard, FileText, ClipboardCheck, Boxes, Users, Building2, ShieldCheck, ScrollText, Bell, Paperclip, Package, Handshake, FileSignature, Laptop } from "lucide-react";
 import { PERMISSIONS, type Permission } from "@/constants/permissions";
 
 export interface NavItem {
@@ -39,7 +39,16 @@ export const NAV_ITEMS: NavItem[] = [
   // Roadmap B3 (Quản lý vật tư tiêu hao, 2026-09-15) — module MỚI, tách biệt
   // hoàn toàn với "Tài sản" (Asset) nên có mục sidebar riêng, không lồng con.
   { label: "Vật tư tiêu hao", path: "/app/inventory", icon: Package, permission: PERMISSIONS.CONSUMABLE_VIEW },
+  // Roadmap B4 (Quản lý nhà cung cấp & hợp đồng bảo trì, 2026-09-16) — 2 mục
+  // riêng (khác gate permission: VENDOR_VIEW vs CONTRACT_VIEW), dù liên quan
+  // chặt (1 Contract luôn thuộc 1 Vendor) — cùng cách "Tài sản"/"Vật tư tiêu
+  // hao" tách riêng dù cùng nhóm quản lý tài sản-vật tư.
+  { label: "Nhà cung cấp", path: "/app/vendors", icon: Handshake, permission: PERMISSIONS.VENDOR_VIEW },
+  { label: "Hợp đồng bảo trì", path: "/app/contracts", icon: FileSignature, permission: PERMISSIONS.CONTRACT_VIEW },
   { label: "Người dùng", path: "/app/users", icon: Users, permission: PERMISSIONS.USER_VIEW },
+  // Roadmap C3 (Giám sát phiên đăng nhập toàn hệ thống, DEV-070, 2026-09-19)
+  // — trang RIÊNG, dùng LẠI permission SESSION_VIEW_ALL (đã có từ C2).
+  { label: "Phiên đăng nhập", path: "/app/sessions", icon: Laptop, permission: PERMISSIONS.SESSION_VIEW_ALL },
   { label: "Khoa/Phòng", path: "/app/departments", icon: Building2, permission: PERMISSIONS.DEPARTMENT_VIEW },
   // FE-08 (roadmap Mục 16) — RBAC Admin UI. `path:"/app/rbac"` (KHÔNG phải
   // "/app/rbac/roles") để Sidebar NavLink (`end=false` mặc định) vẫn giữ

@@ -8,13 +8,17 @@ import {
   countReportsByProposal,
   softDeleteDocumentsByFilter,
   getActiveDocumentOrFail,
+  findDocumentIncludeDeleted,
 } from "../documents.query";
+import ApiError from "../../../shared/errors/ApiError";
 import {
   getReportsByProposalService,
   getAllDocumentsService,
   deleteDocumentsByMonthService,
   updateDocumentService,
   getDocumentVersionsService,
+  bulkDeleteDocumentService,
+  bulkRestoreDocumentService,
 } from "../document.service";
 
 // (Roadmap A4, 2026-09-15) — regression test cho version-snapshot mới thêm
@@ -64,6 +68,7 @@ const mockedCountDocuments = countDocuments as jest.Mock;
 const mockedFindDocumentIdsByFilter = findDocumentIdsByFilter as jest.Mock;
 const mockedCountReportsByProposal = countReportsByProposal as jest.Mock;
 const mockedSoftDeleteDocumentsByFilter = softDeleteDocumentsByFilter as jest.Mock;
+const mockedFindDocumentIncludeDeleted = findDocumentIncludeDeleted as jest.Mock;
 
 const PROPOSAL_ID = "6a0000000000000000000001";
 const OTHER_DEPARTMENT_ID = "6a0000000000000000000099";
@@ -188,6 +193,53 @@ describe("document.service — getAllDocumentsService (DEV-030 department-scopin
     });
     const filterArg = mockedFindDocuments.mock.calls[0][0];
     expect(filterArg.department).toBeUndefined();
+  });
+});
+
+// [MỚI 2026-09-18, DEV-063 — Roadmap B6] Tìm kiếm toàn văn — CHỈ test đúng
+// nhánh mới thêm (build filter `$text`, bỏ qua sortBy/order client truyền,
+// project/sort theo textScore), KHÔNG lặp lại coverage department-scoping đã
+// có ở describe block trên (không đổi bởi nhánh này).
+describe("document.service — getAllDocumentsService: fullTextSearch (DEV-063)", () => {
+  beforeEach(() => {
+    mockedFindDocuments.mockResolvedValue([]);
+    mockedCountDocuments.mockResolvedValue(0);
+  });
+
+  it("có fullTextSearch: filter dùng $text (KHÔNG dùng $regex/$or như keyword), KHÔNG gộp vào $or (MongoDB cấm)", async () => {
+    await getAllDocumentsService({ query: { fullTextSearch: "kẹt giấy" }, isAdmin: true });
+    const filterArg = mockedFindDocuments.mock.calls[0][0];
+    expect(filterArg.$text).toEqual({ $search: "kẹt giấy" });
+    expect(filterArg.$or).toBeUndefined();
+  });
+
+  it("có fullTextSearch: BỎ QUA sortBy/order client truyền, sort + project theo textScore", async () => {
+    await getAllDocumentsService({
+      query: { fullTextSearch: "kẹt giấy", sortBy: "title", order: "asc" },
+      isAdmin: true,
+    });
+    const optionsArg = mockedFindDocuments.mock.calls[0][1];
+    expect(optionsArg.sort).toEqual({ score: { $meta: "textScore" } });
+    expect(optionsArg.projection).toEqual({ score: { $meta: "textScore" } });
+  });
+
+  it("KHÔNG có fullTextSearch: giữ nguyên hành vi cũ — sort theo sortBy/order, KHÔNG có $text/projection", async () => {
+    await getAllDocumentsService({ query: { sortBy: "title", order: "asc" }, isAdmin: true });
+    const filterArg = mockedFindDocuments.mock.calls[0][0];
+    const optionsArg = mockedFindDocuments.mock.calls[0][1];
+    expect(filterArg.$text).toBeUndefined();
+    expect(optionsArg.sort).toEqual({ title: 1 });
+    expect(optionsArg.projection).toBeUndefined();
+  });
+
+  it("keyword (KHÔNG phải fullTextSearch) vẫn dùng $regex/$or như cũ, không bị nhánh mới ảnh hưởng", async () => {
+    await getAllDocumentsService({ query: { keyword: "abc" }, isAdmin: true });
+    const filterArg = mockedFindDocuments.mock.calls[0][0];
+    expect(filterArg.$or).toEqual([
+      { title: { $regex: "abc", $options: "i" } },
+      { documentCode: { $regex: "abc", $options: "i" } },
+    ]);
+    expect(filterArg.$text).toBeUndefined();
   });
 });
 
@@ -375,5 +427,101 @@ describe("document.service — getDocumentVersionsService (Roadmap A4)", () => {
     expect(sortMock).toHaveBeenCalledWith({ versionNumber: -1 });
     expect(populateMock).toHaveBeenCalledWith("editedBy", "fullName username");
     expect(result).toEqual([{ versionNumber: 2 }, { versionNumber: 1 }]);
+  });
+});
+
+// [MỚI 2026-09-17, DEV-061] Batch Action Bar danh sách Document — tái sử
+// dụng NGUYÊN VẸN `deleteDocumentService`/`restoreDocumentService` qua
+// `runBulkDelete`, chỉ test đúng phần mới (tách thành công/thất bại theo id,
+// guard vẫn áp dụng đúng), KHÔNG lặp lại coverage guard đã có ở nơi khác.
+describe("document.service — bulkDeleteDocumentService (DEV-061)", () => {
+  const DOC_ID = "6a0000000000000000000030";
+  const USER_ID = "6a0000000000000000000031";
+
+  const makeDoc = (overrides: any = {}) => ({
+    _id: DOC_ID,
+    category: "REPORT",
+    workflowStatus: "approved",
+    isActive: true,
+    save: jest.fn().mockResolvedValue(undefined),
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedWithTransaction.mockImplementation(async (fn: any) => fn("fake-session"));
+    mockedCountReportsByProposal.mockResolvedValue(0);
+  });
+
+  it("tái sử dụng deleteDocumentService cho từng id, tách đúng thành công/thất bại", async () => {
+    mockedGetActiveDocumentOrFail.mockImplementation((id: string) =>
+      id === DOC_ID ? Promise.resolve(makeDoc()) : Promise.reject(ApiError.notFound("Không tìm thấy document")),
+    );
+
+    const result = await bulkDeleteDocumentService(
+      [DOC_ID, "6a0000000000000000000099"],
+      USER_ID,
+      "ADMIN",
+      true,
+    );
+
+    expect(result.deletedIds).toEqual([DOC_ID]);
+    expect(result.failed).toEqual([{ id: "6a0000000000000000000099", message: "Không tìm thấy document" }]);
+  });
+
+  it("🔒 isSystemRole=false: guard ADMIN-only của deleteDocumentService vẫn áp dụng, mọi id thất bại", async () => {
+    mockedGetActiveDocumentOrFail.mockResolvedValue(makeDoc());
+
+    const result = await bulkDeleteDocumentService([DOC_ID], USER_ID, "USER", false);
+
+    expect(result.deletedIds).toEqual([]);
+    expect(result.failed).toEqual([{ id: DOC_ID, message: "Không có quyền" }]);
+  });
+});
+
+describe("document.service — bulkRestoreDocumentService (DEV-061)", () => {
+  const DOC_ID = "6a0000000000000000000040";
+  const OWNER_ID = "6a0000000000000000000041";
+
+  const makeDeletedDoc = (overrides: any = {}) => ({
+    _id: DOC_ID,
+    createdBy: OWNER_ID,
+    deletedAt: new Date(),
+    isActive: false,
+    save: jest.fn().mockResolvedValue(undefined),
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedWithTransaction.mockImplementation(async (fn: any) => fn("fake-session"));
+  });
+
+  it("ADMIN: khôi phục thành công id hợp lệ, báo lỗi cho id không tồn tại", async () => {
+    mockedFindDocumentIncludeDeleted.mockImplementation((id: string) =>
+      id === DOC_ID ? Promise.resolve(makeDeletedDoc()) : Promise.resolve(null),
+    );
+
+    const result = await bulkRestoreDocumentService([DOC_ID, "6a0000000000000000000099"], "nguoi-khac", true);
+
+    expect(result.deletedIds).toEqual([DOC_ID]);
+    expect(result.failed).toEqual([{ id: "6a0000000000000000000099", message: "Không tìm thấy document" }]);
+  });
+
+  it("🔒 KHÔNG phải ADMIN và KHÔNG phải chủ document: guard validateRestorePermission vẫn áp dụng, thất bại", async () => {
+    mockedFindDocumentIncludeDeleted.mockResolvedValue(makeDeletedDoc());
+
+    const result = await bulkRestoreDocumentService([DOC_ID], "nguoi-la", false);
+
+    expect(result.deletedIds).toEqual([]);
+    expect(result.failed).toEqual([{ id: DOC_ID, message: "Bạn không có quyền khôi phục document này" }]);
+  });
+
+  it("chủ document (không phải ADMIN): vẫn khôi phục được", async () => {
+    mockedFindDocumentIncludeDeleted.mockResolvedValue(makeDeletedDoc());
+
+    const result = await bulkRestoreDocumentService([DOC_ID], OWNER_ID, false);
+
+    expect(result.deletedIds).toEqual([DOC_ID]);
   });
 });

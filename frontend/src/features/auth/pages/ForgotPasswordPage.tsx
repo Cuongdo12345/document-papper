@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AuthLayout } from "@/features/auth/components/AuthLayout";
 import { useForgotPassword } from "@/features/auth/hooks/useForgotPassword";
 import { parseApiError } from "@/utils/parseApiError";
 
@@ -40,8 +41,8 @@ export function ForgotPasswordPage() {
 
   if (forgotPassword.isSuccess) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-6">
-        <div className="w-full max-w-sm space-y-4 text-center">
+      <AuthLayout>
+        <div className="space-y-4 text-center">
           <MailCheck className="mx-auto size-10 text-primary" aria-hidden="true" />
           <h1 className="text-xl font-semibold text-foreground">Kiểm tra email của bạn</h1>
           <p className="text-sm text-muted-foreground">{forgotPassword.data.message}</p>
@@ -49,56 +50,54 @@ export function ForgotPasswordPage() {
             Quay lại đăng nhập
           </Link>
         </div>
-      </div>
+      </AuthLayout>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-6">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="space-y-1">
-          <h1 className="text-xl font-semibold text-foreground">Quên mật khẩu</h1>
-          <p className="text-sm text-muted-foreground">
-            Nhập tên đăng nhập, chúng tôi sẽ gửi hướng dẫn đặt lại mật khẩu qua email nếu tài khoản tồn tại.
-          </p>
-        </div>
+    <AuthLayout>
+      <div className="space-y-1">
+        <h1 className="text-xl font-semibold text-foreground">Quên mật khẩu</h1>
+        <p className="text-sm text-muted-foreground">
+          Nhập tên đăng nhập, chúng tôi sẽ gửi hướng dẫn đặt lại mật khẩu qua email nếu tài khoản tồn tại.
+        </p>
+      </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
-          <div className="space-y-1.5">
-            <label htmlFor="username" className="text-sm font-medium text-foreground">
-              Tên đăng nhập
-            </label>
-            <input
-              id="username"
-              autoComplete="username"
-              autoFocus
-              aria-invalid={!!errors.username}
-              aria-describedby={errors.username ? "username-error" : undefined}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              {...register("username")}
-            />
-            {errors.username && (
-              <p id="username-error" className="text-xs text-destructive">
-                {errors.username.message}
-              </p>
-            )}
-          </div>
-
-          {apiError && (
-            <p role="alert" className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {apiError.message}
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
+        <div className="space-y-1.5">
+          <label htmlFor="username" className="text-sm font-medium text-foreground">
+            Tên đăng nhập
+          </label>
+          <input
+            id="username"
+            autoComplete="username"
+            autoFocus
+            aria-invalid={!!errors.username}
+            aria-describedby={errors.username ? "username-error" : undefined}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            {...register("username")}
+          />
+          {errors.username && (
+            <p id="username-error" className="text-xs text-destructive">
+              {errors.username.message}
             </p>
           )}
+        </div>
 
-          <Button type="submit" className="w-full" loading={forgotPassword.isPending}>
-            {forgotPassword.isPending ? "Đang gửi..." : "Gửi hướng dẫn đặt lại mật khẩu"}
-          </Button>
+        {apiError && (
+          <p role="alert" className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {apiError.message}
+          </p>
+        )}
 
-          <Link to="/login" className="block text-center text-sm font-medium text-primary hover:underline">
-            Quay lại đăng nhập
-          </Link>
-        </form>
-      </div>
-    </div>
+        <Button type="submit" className="w-full" loading={forgotPassword.isPending}>
+          {forgotPassword.isPending ? "Đang gửi..." : "Gửi hướng dẫn đặt lại mật khẩu"}
+        </Button>
+
+        <Link to="/login" className="block text-center text-sm font-medium text-primary hover:underline">
+          Quay lại đăng nhập
+        </Link>
+      </form>
+    </AuthLayout>
   );
 }

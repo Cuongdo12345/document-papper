@@ -4,6 +4,7 @@ import { z } from "zod";
 import { AppModal } from "@/components/shared/AppModal";
 import { Button } from "@/components/ui/button";
 import { useUpdateConsumableItem } from "@/features/inventory/hooks/useConsumableActions";
+import { useConsumableCategories } from "@/features/inventory/hooks/useConsumableCategories";
 import { parseApiError } from "@/utils/parseApiError";
 import type { ConsumableItem } from "@/types/consumable.types";
 
@@ -31,13 +32,14 @@ interface EditConsumableItemModalProps {
  */
 export function EditConsumableItemModal({ open, onClose, item }: EditConsumableItemModalProps) {
   const updateMutation = useUpdateConsumableItem();
+  const categoriesQuery = useConsumableCategories({ limit: 100 });
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       name: item.name,
       unit: item.unit,
-      category: item.category ?? "",
+      category: item.category?._id ?? "",
       minStockThreshold: String(item.minStockThreshold),
       isActive: item.isActive,
     },
@@ -96,11 +98,18 @@ export function EditConsumableItemModal({ open, onClose, item }: EditConsumableI
             <label htmlFor="ei-category" className="text-sm font-medium text-foreground">
               Nhóm (tuỳ chọn)
             </label>
-            <input
+            <select
               id="ei-category"
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
               {...register("category")}
-            />
+            >
+              <option value="">-- Chưa phân nhóm --</option>
+              {categoriesQuery.data?.data.map((c) => (
+                <option key={c._id} value={c._id}>
+                  {c.code} — {c.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 

@@ -58,8 +58,15 @@ export const countDocuments = (filter: any) => {
   return Document.countDocuments(filter);
 };
 
+/**
+ * `options.projection` MỚI (DEV-063, tuỳ chọn) — chỉ dùng khi search toàn
+ * văn (`$text`) cần project thêm field ảo `score: {$meta:"textScore"}` để
+ * `.sort()` theo mức độ liên quan (MongoDB yêu cầu field điểm phải nằm
+ * trong projection mới sort theo `$meta:"textScore"` được). Không truyền →
+ * `.find(filter)` giữ nguyên hành vi cũ (mọi field, không đổi so với trước).
+ */
 export const findDocuments = (filter: any, options: any) => {
-  return Document.find(filter)
+  return Document.find(filter, options.projection)
     .populate("department", "code name")
     .populate("createdBy", "username fullName")
     // Sửa Duplicate/Inconsistent Logic #3: giới hạn field populate

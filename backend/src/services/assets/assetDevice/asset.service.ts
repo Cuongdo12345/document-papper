@@ -7,6 +7,7 @@ import ApiError from "../../../shared/errors/ApiError";
 import { generateAssetCode } from "../../../shared/helpers/generateAssetCode";
 import { ASSET_UPDATE_WHITELIST, pickWhitelisted } from "../assets.constants";
 import { escapeRegex } from "../../../shared/utils/regex.util";
+import { runBulkDelete } from "../../../shared/utils/bulkDelete.util";
 
 const ASSET_POPULATE = [
   { path: "category", select: "code name" },
@@ -207,10 +208,20 @@ export const deleteAssetService = async (id: any, userId?: any) => {
   asset.deletedAt = new Date();
   asset.deletedBy = userId;
   await asset.save();
- 
+
   return true;
 };
- 
+
+/**
+ * 📌 BULK DELETE ASSET (xoá mềm hàng loạt — DEV-060, 2026-09-16)
+ * Gọi lại NGUYÊN VẸN `deleteAssetService` cho từng id — giữ đúng mọi
+ * validate hiện có (không cho xoá tài sản IN_USE/UNDER_MAINTENANCE), 1 item
+ * lỗi không chặn các item còn lại.
+ */
+export const bulkDeleteAssetService = async (ids: string[], userId?: any) => {
+  return runBulkDelete(ids, (id) => deleteAssetService(id, userId));
+};
+
 /**
  * 📌 HARD DELETE ASSET (xoá vĩnh viễn — KHÁC với DELETE ở trên)
  *
@@ -286,6 +297,15 @@ export const restoreAssetService = async (id: any, userId?: any) => {
   asset.deletedBy = undefined;
   asset.updatedBy = userId;
   await asset.save();
- 
+
   return asset;
+};
+
+/**
+ * 📌 BULK RESTORE ASSET (khôi phục hàng loạt — DEV-062, 2026-09-17)
+ * Gọi lại NGUYÊN VẸN `restoreAssetService` cho từng id, cùng pattern
+ * `bulkDeleteAssetService` ở trên.
+ */
+export const bulkRestoreAssetService = async (ids: string[], userId?: any) => {
+  return runBulkDelete(ids, (id) => restoreAssetService(id, userId), "Khôi phục thất bại");
 };

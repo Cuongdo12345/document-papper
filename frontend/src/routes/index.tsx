@@ -9,6 +9,7 @@ import { ForgotPasswordPage } from "@/features/auth/pages/ForgotPasswordPage";
 import { ResetPasswordPage } from "@/features/auth/pages/ResetPasswordPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { UsersListPage } from "@/features/users/pages/UsersListPage";
+import { SessionsMonitorPage } from "@/features/users/pages/SessionsMonitorPage";
 import { DepartmentsListPage } from "@/features/departments/pages/DepartmentsListPage";
 import { RolesListPage } from "@/features/rbac/pages/RolesListPage";
 import { RoleDetailPage } from "@/features/rbac/pages/RoleDetailPage";
@@ -26,6 +27,12 @@ import { AssetScanPage } from "@/features/assets/pages/AssetScanPage";
 import { MaintenanceCalendarPage } from "@/features/assets/pages/MaintenanceCalendarPage";
 import { ConsumablesListPage } from "@/features/inventory/pages/ConsumablesListPage";
 import { ConsumableDetailPage } from "@/features/inventory/pages/ConsumableDetailPage";
+import { ConsumableCategoriesListPage } from "@/features/inventory/pages/ConsumableCategoriesListPage";
+import { ConsumableRequestsListPage } from "@/features/inventory/pages/ConsumableRequestsListPage";
+import { VendorsListPage } from "@/features/vendors/pages/VendorsListPage";
+import { VendorDetailPage } from "@/features/vendors/pages/VendorDetailPage";
+import { ContractsListPage } from "@/features/vendors/pages/ContractsListPage";
+import { ContractDetailPage } from "@/features/vendors/pages/ContractDetailPage";
 import { AuditLogsPage } from "@/features/audit/pages/AuditLogsPage";
 import { NotificationsPage } from "@/features/notifications/pages/NotificationsPage";
 import { ProfilePage } from "@/features/profile/pages/ProfilePage";
@@ -177,7 +184,51 @@ export const router = createBrowserRouter([
                 path: "inventory",
                 children: [
                   { index: true, element: <ConsumablesListPage /> },
+                  {
+                    // Nhóm vật tư (2026-09-16) — resource RIÊNG
+                    // (`CONSUMABLE_CATEGORY_VIEW`, khác `CONSUMABLE_VIEW` của
+                    // nhóm cha ở trên) — gate tường minh thêm ở đây, cùng
+                    // nguyên tắc "categories" của Asset (`asset-categories`).
+                    // Đặt TRƯỚC ":id" để React Router không bị ":id" nuốt mất.
+                    element: <ProtectedRoute permission={PERMISSIONS.CONSUMABLE_CATEGORY_VIEW} />,
+                    children: [{ path: "categories", element: <ConsumableCategoriesListPage /> }],
+                  },
+                  {
+                    // Roadmap B8 (DEV-067, 2026-09-18) — resource RIÊNG
+                    // (`CONSUMABLE_REQUEST_VIEW`, khác `CONSUMABLE_VIEW` của
+                    // nhóm cha) — gate tường minh, cùng nguyên tắc "categories"
+                    // ở trên. Đặt TRƯỚC ":id" để React Router không nuốt mất.
+                    element: <ProtectedRoute permission={PERMISSIONS.CONSUMABLE_REQUEST_VIEW} />,
+                    children: [{ path: "requests", element: <ConsumableRequestsListPage /> }],
+                  },
                   { path: ":id", element: <ConsumableDetailPage /> },
+                ],
+              },
+            ],
+          },
+          {
+            // Roadmap B4 (2026-09-16) — Quản lý nhà cung cấp, module MỚI,
+            // 2 nhóm route riêng (Vendors/Contracts) vì gate permission khác
+            // nhau (VENDOR_VIEW vs CONTRACT_VIEW).
+            element: <ProtectedRoute permission={PERMISSIONS.VENDOR_VIEW} />,
+            children: [
+              {
+                path: "vendors",
+                children: [
+                  { index: true, element: <VendorsListPage /> },
+                  { path: ":id", element: <VendorDetailPage /> },
+                ],
+              },
+            ],
+          },
+          {
+            element: <ProtectedRoute permission={PERMISSIONS.CONTRACT_VIEW} />,
+            children: [
+              {
+                path: "contracts",
+                children: [
+                  { index: true, element: <ContractsListPage /> },
+                  { path: ":id", element: <ContractDetailPage /> },
                 ],
               },
             ],
@@ -188,6 +239,18 @@ export const router = createBrowserRouter([
               {
                 path: "users",
                 element: <UsersListPage />,
+              },
+            ],
+          },
+          {
+            // Roadmap C3 (Giám sát phiên đăng nhập toàn hệ thống, DEV-070,
+            // 2026-09-19) — trang RIÊNG, dùng LẠI permission SESSION_VIEW_ALL
+            // (đã có từ C2/DEV-069, KHÔNG tạo permission mới).
+            element: <ProtectedRoute permission={PERMISSIONS.SESSION_VIEW_ALL} />,
+            children: [
+              {
+                path: "sessions",
+                element: <SessionsMonitorPage />,
               },
             ],
           },

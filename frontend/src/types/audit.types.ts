@@ -20,6 +20,12 @@ export const AUDIT_ACTIONS = [
   "DELETE",
   "REGISTER",
   "ASSIGN_ROLE",
+  // Roadmap C1 (Xác thực 2 lớp qua email OTP, DEV-068, 2026-09-19).
+  "ENABLE_2FA",
+  "DISABLE_2FA",
+  "RESET_2FA",
+  // Roadmap C2 (Quản lý phiên đăng nhập, DEV-069, 2026-09-19).
+  "REVOKE_SESSION",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -40,11 +46,18 @@ export interface AuditLogItem {
   createdAt: string;
 }
 
-/** Khớp `GetAuditLogsQueryDTO`. `action` chỉ hỗ trợ chọn ĐƠN ở UI (dù backend nhận multi-value CSV) — không tự bịa multi-select UI khi chưa có nhu cầu thật (CLAUDE.md Mục 12). */
+/**
+ * Khớp `GetAuditLogsQueryDTO`. [MỞ RỘNG Roadmap C3, DEV-070, 2026-09-19]
+ * `action` giờ hỗ trợ CHỌN NHIỀU ở UI (`AuditLogsPage.tsx`) — backend đã hỗ
+ * trợ multi-value từ trước (comma-separated hoặc repeated key, xem
+ * `userAudit.dto.ts::actionSchema`) nhưng UI trước đây chỉ dùng được 1 giá
+ * trị (gap ghi nhận ở `docs/frontend/tasks/FE-11.md`). API layer LUÔN gửi
+ * dạng comma-separated (string) — tránh phụ thuộc cách axios serialize mảng.
+ */
 export interface GetAuditLogsParams {
   page?: number;
   limit?: number;
-  action?: AuditAction;
+  action?: AuditAction | AuditAction[];
   performedBy?: string;
   user?: string;
   fromDate?: string;

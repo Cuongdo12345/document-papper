@@ -9,6 +9,7 @@
 import mongoose from "mongoose";
 import Department from "../../models/departments/department.model";
 import { ConsumableItem } from "../../models/inventory/consumableItem.model";
+import { ConsumableCategory } from "../../models/inventory/consumableCategory.model";
 import {
   ConsumableTransaction,
 } from "../../models/inventory/consumableTransaction.model";
@@ -16,12 +17,22 @@ import { ConsumableTransactionType } from "../../interfaces/inventory/consumable
 import ApiError from "../../shared/errors/ApiError";
 import { escapeRegex } from "../../shared/utils/regex.util";
 import { withTransaction } from "../../shared/utils/withTransaction";
+import { runBulkDelete } from "../../shared/utils/bulkDelete.util";
 
 const ITEM_POPULATE = [
   { path: "department", select: "code name" },
+  { path: "category", select: "code name" },
   { path: "createdBy", select: "username fullName" },
   { path: "updatedBy", select: "username fullName" },
 ];
+
+/** Kiểm tra nhóm vật tư tồn tại + đang hoạt động — dùng cho create/update. */
+const validateCategoryActive = async (categoryId: any) => {
+  const category = await ConsumableCategory.findOne({ _id: categoryId, isActive: true });
+  if (!category) {
+    throw ApiError.badRequest("Nhóm vật tư không tồn tại hoặc đã bị xoá");
+  }
+};
 
 /** `isLowStock` — TÍNH THÊM (không lưu DB), cùng pattern `isOverdue` ở `assetMaintenancePlan.service.ts`. */
 const withIsLowStock = (item: any) => {
@@ -42,6 +53,10 @@ export const createConsumableItemService = async (payload: any, userId?: any) =>
   const department = await Department.findById(payload.department);
   if (!department) {
     throw ApiError.notFound("Không tìm thấy phòng ban");
+  }
+
+  if (payload.category) {
+    await validateCategoryActive(payload.category);
   }
 
   const duplicated = await ConsumableItem.findOne({
@@ -106,6 +121,7 @@ export const getAllConsumableItemsService = async (query: any) => {
     limit = 20,
     search,
     department,
+    category,
     isActive,
     lowStockOnly,
   } = query;
@@ -116,6 +132,7 @@ export const getAllConsumableItemsService = async (query: any) => {
 
   const filter: Record<string, unknown> = {};
   if (department) filter.department = department;
+  if (category) filter.category = category;
   filter.isActive = isActive !== undefined ? isActive : true;
 
   if (search) {
@@ -192,7 +209,10 @@ export const updateConsumableItemService = async (
     item.name = payload.name;
   }
   if (payload.unit !== undefined) item.unit = payload.unit;
-  if (payload.category !== undefined) item.category = payload.category;
+  if (payload.category !== undefined) {
+    if (payload.category) await validateCategoryActive(payload.category);
+    item.category = payload.category || undefined;
+  }
   if (payload.isActive !== undefined) item.isActive = payload.isActive;
 
   // Đổi ngưỡng cảnh báo → reset cờ "đã gửi cảnh báo", cùng pattern
@@ -211,6 +231,29 @@ export const updateConsumableItemService = async (
   await item.save();
 
   return withIsLowStock(await item.populate(ITEM_POPULATE));
+};
+
+/**
+ * 📌 BULK DELETE (xoá mềm hàng loạt — DEV-060, 2026-09-16). Vật tư tiêu hao
+ * KHÔNG có service delete riêng — "xoá mềm" từng dòng vốn đã là gọi
+ * `updateConsumableItemService(id, {isActive:false})` (xem `ConsumablesListPage`
+ * FE), nên bulk cũng gọi lại đúng hàm UPDATE này, KHÔNG viết logic mới.
+ */
+export const bulkDeleteConsumableItemService = async (ids: string[], userId?: any) => {
+  return runBulkDelete(ids, (id) => updateConsumableItemService(id, { isActive: false }, userId));
+};
+
+/**
+ * 📌 BULK RESTORE (khôi phục hàng loạt — DEV-062, 2026-09-17). Chưa có
+ * route/service restore ĐƠN LẺ nào cho ConsumableItem (khác Asset/
+ * AssetCategory/ConsumableCategory) — frontend hiện tại tự khôi phục qua
+ * `updateConsumableItemService(id, {isActive:true})` (permission
+ * CONSUMABLE_UPDATE, cùng permission với `bulkDeleteConsumableItemService`
+ * ở trên). Bulk restore tái dùng ĐÚNG cách đó, KHÔNG tạo service/route
+ * restore đơn lẻ mới ngoài phạm vi yêu cầu.
+ */
+export const bulkRestoreConsumableItemService = async (ids: string[], userId?: any) => {
+  return runBulkDelete(ids, (id) => updateConsumableItemService(id, { isActive: true }, userId), "Khôi phục thất bại");
 };
 
 /**

@@ -1,6 +1,6 @@
 import type { AxiosResponse } from "axios";
 import { axiosInstance } from "@/api/axios";
-import type { Pagination } from "@/types/shared.types";
+import type { Pagination, BulkDeleteResult } from "@/types/shared.types";
 import type {
   ConsumableItem,
   ConsumableTransaction,
@@ -9,6 +9,10 @@ import type {
   CreateConsumableTransactionRequest,
   GetConsumableItemsParams,
   GetConsumableTransactionsParams,
+  ConsumableRequest,
+  CreateConsumableRequestRequest,
+  UpdateConsumableRequestRequest,
+  GetConsumableRequestsParams,
 } from "@/types/consumable.types";
 
 /**
@@ -41,6 +45,16 @@ export function updateConsumableItem(
   return axiosInstance.put(`/inventory/items/${id}`, body);
 }
 
+/** [MỚI 2026-09-16, DEV-060] Xoá mềm hàng loạt — chọn nhiều dòng ở danh sách. */
+export function bulkDeleteConsumableItems(ids: string[]): Promise<AxiosResponse<{ message: string; data: BulkDeleteResult }>> {
+  return axiosInstance.post("/inventory/items/bulk-delete", { ids });
+}
+
+/** [MỚI 2026-09-17, DEV-062] Khôi phục hàng loạt — cùng permission CONSUMABLE_UPDATE với `updateConsumableItem`. */
+export function bulkRestoreConsumableItems(ids: string[]): Promise<AxiosResponse<{ message: string; data: BulkDeleteResult }>> {
+  return axiosInstance.post("/inventory/items/bulk-restore", { ids });
+}
+
 export function createConsumableTransaction(
   itemId: string,
   body: CreateConsumableTransactionRequest,
@@ -53,4 +67,45 @@ export function getConsumableTransactions(
   params: GetConsumableTransactionsParams,
 ): Promise<AxiosResponse<{ message: string; data: ConsumableTransaction[]; pagination: Pagination }>> {
   return axiosInstance.get(`/inventory/items/${itemId}/transactions`, { params });
+}
+
+/* =====================================================================
+   ĐỀ XUẤT/DỰ TRÙ VẬT TƯ (ConsumableRequest, Roadmap B8, DEV-067, 2026-09-18)
+===================================================================== */
+
+export function createConsumableRequest(
+  body: CreateConsumableRequestRequest,
+): Promise<AxiosResponse<{ message: string; data: ConsumableRequest }>> {
+  return axiosInstance.post("/inventory/requests", body);
+}
+
+export function getConsumableRequests(
+  params: GetConsumableRequestsParams,
+): Promise<AxiosResponse<{ message: string; data: ConsumableRequest[]; pagination: Pagination }>> {
+  return axiosInstance.get("/inventory/requests", { params });
+}
+
+export function getConsumableRequestById(
+  id: string,
+): Promise<AxiosResponse<{ message: string; data: ConsumableRequest }>> {
+  return axiosInstance.get(`/inventory/requests/${id}`);
+}
+
+export function updateConsumableRequest(
+  id: string,
+  body: UpdateConsumableRequestRequest,
+): Promise<AxiosResponse<{ message: string; data: ConsumableRequest }>> {
+  return axiosInstance.put(`/inventory/requests/${id}`, body);
+}
+
+export function fulfillConsumableRequest(
+  id: string,
+): Promise<AxiosResponse<{ message: string; data: ConsumableRequest }>> {
+  return axiosInstance.patch(`/inventory/requests/${id}/fulfill`);
+}
+
+export function cancelConsumableRequest(
+  id: string,
+): Promise<AxiosResponse<{ message: string; data: ConsumableRequest }>> {
+  return axiosInstance.patch(`/inventory/requests/${id}/cancel`);
 }

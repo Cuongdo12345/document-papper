@@ -16,7 +16,13 @@ export interface IUserAudit extends Document {
     | "AUDIT_DASHBOARD_VIEW"
     | "ADMIN_BYPASS"
     | "VIEW_DETAIL"
-    | "DELETE";
+    | "DELETE"
+    // Roadmap C1 (Xác thực 2 lớp qua email OTP, DEV-068, 2026-09-19).
+    | "ENABLE_2FA"
+    | "DISABLE_2FA"
+    | "RESET_2FA"
+    // Roadmap C2 (Quản lý phiên đăng nhập, DEV-069, 2026-09-19).
+    | "REVOKE_SESSION";
   performedBy?: mongoose.Types.ObjectId;
   note?: string;
   createdAt: Date;

@@ -12,7 +12,8 @@ import {
     getAssetMaintenanceOverdue,
     getMedicalDeviceDashboardSummary,
     getMedicalDeviceCalibrationDue,
-    getWorkflowOverdueApprovals
+    getWorkflowOverdueApprovals,
+    runWeeklyReport
 } from "../../controllers/dashboard/dashboard.controller";
 import { authenticate } from "../../middlewares/auth.middleware";
 import { authorizePermission } from "../../middlewares/authorizePermission.middleware";
@@ -42,5 +43,9 @@ router.get("/medical-devices/calibration-due", authenticate, authorizePermission
 // Roadmap B1 (SLA & nhắc việc Workflow, 2026-09-15) — "Đề xuất trễ hạn",
 // cùng permission DASHBOARD_READ với mọi widget dashboard khác.
 router.get("/workflow/overdue-approvals", authenticate, authorizePermission("DASHBOARD_READ"), getWorkflowOverdueApprovals);
+
+// Roadmap B7 (2026-09-18) — chạy tay gửi báo cáo tuần, mirror "/sla/run"
+// (workflow.routes.ts) — cùng nguyên tắc "cron hằng tuần + API trigger tay".
+router.post("/weekly-report/run", authenticate, authorizePermission("DASHBOARD_WEEKLY_REPORT_TRIGGER"), runWeeklyReport);
 
 export default router;

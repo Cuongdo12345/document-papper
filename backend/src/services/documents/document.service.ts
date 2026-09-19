@@ -33,6 +33,7 @@ import {
   findPendingRepairProposalForAsset,
 } from "./documents.query";
 import { DOCUMENT_UPDATE_WHITELIST } from "./documents.constants";
+import { runBulkDelete } from "../../shared/utils/bulkDelete.util";
 import { applyDepartmentFilter, canViewAcrossDepartments, isSameDepartment } from "./documents.scope";
 import type {
   CreateDocumentPayload,
@@ -252,6 +253,7 @@ export const getAllDocumentsService = async ({
     fromDate,
     toDate,
     keyword,
+    fullTextSearch,
     isActive,
     category,
     subType,
@@ -339,6 +341,16 @@ export const getAllDocumentsService = async ({
     ];
   }
 
+  // [MỚI 2026-09-18, DEV-063 — Roadmap B6] Tìm toàn văn (title +
+  // documentCode + nội dung/ghi chú trong `meta`) qua index text
+  // `document_fulltext_search` (`document.model.ts`). CỐ Ý tách riêng khỏi
+  // nhánh `keyword` ở trên (không gộp `$text` vào `$or`) — MongoDB CẤM đặt
+  // `$text` bên trong `$or`/`$nor` (lỗi runtime nếu cố làm vậy).
+  const isFullTextSearch = Boolean(fullTextSearch);
+  if (isFullTextSearch) {
+    filter.$text = { $search: fullTextSearch };
+  }
+
   // `page`/`limit` đã được `QueryDocumentDTO` coerce + validate thành number
   // hợp lệ (>=1, limit <=100, có default) trước khi tới service — không còn
   // cần `parseInt`/clamp thủ công (Logic Bug #5, tránh `NaN` lọt vào
@@ -349,10 +361,18 @@ export const getAllDocumentsService = async ({
     Number.isInteger(limit) && limit > 0 ? Math.min(limit, 100) : 10;
   const skip = (pageNum - 1) * limitNum;
 
-  const sort: Record<string, 1 | -1> = { [sortBy]: order === "asc" ? 1 : -1 };
+  // Khi đang tìm toàn văn, BỎ QUA `sortBy`/`order` client truyền — sắp xếp
+  // theo mức độ liên quan (`textScore`) mới có ý nghĩa cho kết quả search,
+  // sort theo `createdAt`/`title`... sẽ xáo trộn thứ hạng liên quan vô nghĩa.
+  // Cần project thêm field ảo `score` thì `$meta:"textScore"` mới sort được
+  // (yêu cầu của MongoDB, xem `findDocuments`).
+  const sort: Record<string, any> = isFullTextSearch
+    ? { score: { $meta: "textScore" } }
+    : { [sortBy]: order === "asc" ? 1 : -1 };
+  const projection = isFullTextSearch ? { score: { $meta: "textScore" } } : undefined;
 
   const [data, total] = await Promise.all([
-    findDocuments(filter, { skip, limit: limitNum, sort }),
+    findDocuments(filter, { skip, limit: limitNum, sort, projection }),
     countDocuments(filter),
   ]);
 
@@ -847,5 +867,34 @@ export const restoreDocumentService = async ({
     message: "Khôi phục document thành công",
     data: document,
   };
+};
+
+/* ===============================
+   Bulk delete / restore (DEV-061)
+=============================== */
+// [MỚI 2026-09-17, DEV-061] Tái sử dụng NGUYÊN VẸN `deleteDocumentService`
+// (giữ đúng guard `isSystemRole`, check biên bản tham chiếu, check
+// workflow pending) cho từng id qua `runBulkDelete` — không viết lại logic.
+export const bulkDeleteDocumentService = async (
+  ids: string[],
+  userId: any,
+  role: string,
+  isSystemRole: boolean,
+) => {
+  return runBulkDelete(ids, (id) => deleteDocumentService({ id, userId, role, isSystemRole }));
+};
+
+// Tái sử dụng NGUYÊN VẸN `restoreDocumentService` (giữ đúng
+// `validateRestorePermission` — ADMIN hoặc chính người tạo document).
+export const bulkRestoreDocumentService = async (
+  ids: string[],
+  userId: any,
+  isAdmin: boolean,
+) => {
+  return runBulkDelete(
+    ids,
+    (id) => restoreDocumentService({ documentId: id, userId, isAdmin }),
+    "Khôi phục thất bại",
+  );
 };
 

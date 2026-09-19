@@ -9,20 +9,46 @@ import {
   getAllConsumableItems,
   getConsumableItemById,
   updateConsumableItem,
+  bulkDeleteConsumableItems,
+  bulkRestoreConsumableItems,
   createConsumableTransaction,
   getConsumableTransactions,
   runConsumableAlerts,
 } from "../../controllers/inventory/consumableItem.controller";
+import {
+  createConsumableCategory,
+  getAllConsumableCategories,
+  getConsumableCategoryById,
+  updateConsumableCategory,
+  deleteConsumableCategory,
+  bulkDeleteConsumableCategories,
+  restoreConsumableCategory,
+  bulkRestoreConsumableCategories,
+} from "../../controllers/inventory/consumableCategory.controller";
+import {
+  createConsumableRequest,
+  getAllConsumableRequests,
+  getConsumableRequestById,
+  updateConsumableRequest,
+  fulfillConsumableRequest,
+  cancelConsumableRequest,
+} from "../../controllers/inventory/consumableRequest.controller";
 import { authenticate } from "../../middlewares/auth.middleware";
 import { authorizePermission } from "../../middlewares/authorizePermission.middleware";
 import { validateBody, validateParams, validateQuery } from "../../middlewares/validate.middleware";
-import { IdParamDTO } from "../../dto/common.dto";
+import { IdParamDTO, BulkIdsDTO } from "../../dto/common.dto";
 import {
   CreateConsumableItemDTO,
   UpdateConsumableItemDTO,
   CreateConsumableTransactionDTO,
   QueryConsumableItemsDTO,
   QueryConsumableTransactionsDTO,
+  CreateConsumableCategoryDTO,
+  UpdateConsumableCategoryDTO,
+  QueryConsumableCategoryDTO,
+  CreateConsumableRequestDTO,
+  UpdateConsumableRequestDTO,
+  QueryConsumableRequestsDTO,
 } from "../../dto/inventory/consumable.dto";
 
 const router = Router();
@@ -48,6 +74,24 @@ router.get(
   authorizePermission("CONSUMABLE_VIEW"),
   validateQuery(QueryConsumableItemsDTO),
   getAllConsumableItems,
+);
+
+/** [MỚI 2026-09-16, DEV-060] PHẢI đăng ký TRƯỚC "GET /items/:id" — static path. */
+router.post(
+  "/items/bulk-delete",
+  authenticate,
+  authorizePermission("CONSUMABLE_UPDATE"),
+  validateBody(BulkIdsDTO),
+  bulkDeleteConsumableItems,
+);
+
+/** [MỚI 2026-09-17, DEV-062] PHẢI đăng ký TRƯỚC "GET /items/:id" — static path. */
+router.post(
+  "/items/bulk-restore",
+  authenticate,
+  authorizePermission("CONSUMABLE_UPDATE"),
+  validateBody(BulkIdsDTO),
+  bulkRestoreConsumableItems,
 );
 
 router.get(
@@ -83,6 +127,130 @@ router.get(
   validateParams(IdParamDTO),
   validateQuery(QueryConsumableTransactionsDTO),
   getConsumableTransactions,
+);
+
+/* =====================================================================
+   NHÓM VẬT TƯ (ConsumableCategory, 2026-09-16) — mirror `/assets/asset-categories`.
+===================================================================== */
+
+router.post(
+  "/categories",
+  authenticate,
+  authorizePermission("CONSUMABLE_CATEGORY_CREATE"),
+  validateBody(CreateConsumableCategoryDTO),
+  createConsumableCategory,
+);
+
+router.get(
+  "/categories",
+  authenticate,
+  authorizePermission("CONSUMABLE_CATEGORY_VIEW"),
+  validateQuery(QueryConsumableCategoryDTO),
+  getAllConsumableCategories,
+);
+
+/** [MỚI 2026-09-16, DEV-060] PHẢI đăng ký TRƯỚC "GET /categories/:id" — static path. */
+router.post(
+  "/categories/bulk-delete",
+  authenticate,
+  authorizePermission("CONSUMABLE_CATEGORY_DELETE"),
+  validateBody(BulkIdsDTO),
+  bulkDeleteConsumableCategories,
+);
+
+/** [MỚI 2026-09-17, DEV-062] PHẢI đăng ký TRƯỚC "GET /categories/:id" — static path. */
+router.post(
+  "/categories/bulk-restore",
+  authenticate,
+  authorizePermission("CONSUMABLE_CATEGORY_UPDATE"),
+  validateBody(BulkIdsDTO),
+  bulkRestoreConsumableCategories,
+);
+
+router.get(
+  "/categories/:id",
+  authenticate,
+  authorizePermission("CONSUMABLE_CATEGORY_VIEW"),
+  validateParams(IdParamDTO),
+  getConsumableCategoryById,
+);
+
+router.put(
+  "/categories/:id",
+  authenticate,
+  authorizePermission("CONSUMABLE_CATEGORY_UPDATE"),
+  validateParams(IdParamDTO),
+  validateBody(UpdateConsumableCategoryDTO),
+  updateConsumableCategory,
+);
+
+router.delete(
+  "/categories/:id",
+  authenticate,
+  authorizePermission("CONSUMABLE_CATEGORY_DELETE"),
+  validateParams(IdParamDTO),
+  deleteConsumableCategory,
+);
+
+router.patch(
+  "/categories/:id/restore",
+  authenticate,
+  authorizePermission("CONSUMABLE_CATEGORY_UPDATE"),
+  validateParams(IdParamDTO),
+  restoreConsumableCategory,
+);
+
+/* =====================================================================
+   ĐỀ XUẤT/DỰ TRÙ VẬT TƯ (ConsumableRequest, Roadmap B8, DEV-067, 2026-09-18)
+===================================================================== */
+
+router.post(
+  "/requests",
+  authenticate,
+  authorizePermission("CONSUMABLE_REQUEST_CREATE"),
+  validateBody(CreateConsumableRequestDTO),
+  createConsumableRequest,
+);
+
+router.get(
+  "/requests",
+  authenticate,
+  authorizePermission("CONSUMABLE_REQUEST_VIEW"),
+  validateQuery(QueryConsumableRequestsDTO),
+  getAllConsumableRequests,
+);
+
+router.get(
+  "/requests/:id",
+  authenticate,
+  authorizePermission("CONSUMABLE_REQUEST_VIEW"),
+  validateParams(IdParamDTO),
+  getConsumableRequestById,
+);
+
+router.put(
+  "/requests/:id",
+  authenticate,
+  authorizePermission("CONSUMABLE_REQUEST_UPDATE"),
+  validateParams(IdParamDTO),
+  validateBody(UpdateConsumableRequestDTO),
+  updateConsumableRequest,
+);
+
+router.patch(
+  "/requests/:id/fulfill",
+  authenticate,
+  authorizePermission("CONSUMABLE_REQUEST_FULFILL"),
+  validateParams(IdParamDTO),
+  fulfillConsumableRequest,
+);
+
+router.patch(
+  "/requests/:id/cancel",
+  authenticate,
+  authorizePermission("CONSUMABLE_REQUEST_UPDATE"),
+  validateParams(IdParamDTO),
+  cancelConsumableRequest,
 );
 
 export default router;

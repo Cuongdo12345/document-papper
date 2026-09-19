@@ -9,6 +9,28 @@ export const PERMISSIONS = {
   USER_VIEW_DETAIL: "USER_VIEW_DETAIL",
   USER_CHANGE_PASSWORD: "USER_CHANGE_PASSWORD",
   USER_RESET_PASSWORD: "USER_RESET_PASSWORD",
+  // Roadmap C1 (Xác thực 2 lớp qua email OTP, DEV-068, 2026-09-19) — đường
+  // khôi phục DUY NHẤT khi user tự bật 2FA rồi mất quyền truy cập email
+  // (user xác nhận "chỉ ADMIN reset thủ công", không có backup codes). Mirror
+  // ĐÚNG `USER_RESET_PASSWORD` — CỐ TÌNH KHÔNG gán cho role nào trong
+  // `rolePermission.map.ts` (kể cả IT), chỉ ADMIN có qua wildcard
+  // `Object.values(PERMISSIONS)`, giống hệt USER_RESET_PASSWORD hiện tại.
+  USER_RESET_2FA: "USER_RESET_2FA",
+
+  // Roadmap C2 (Quản lý phiên đăng nhập, DEV-069, 2026-09-19) — CHỈ áp dụng
+  // cho hành động ADMIN xem/thu hồi phiên của NGƯỜI KHÁC; tự xem/thu hồi
+  // phiên của CHÍNH MÌNH không cần permission riêng (giống
+  // changePassword/2FA-self — action tự-scope qua `req.user!._id`). Tách
+  // VIEW/REVOKE riêng (mirror USER_RESET_PASSWORD/USER_RESET_2FA — KHÔNG gán
+  // cho role nào trong rolePermission.map.ts, chỉ ADMIN có qua wildcard) vì
+  // xem (giám sát) rủi ro thấp hơn thu hồi (buộc user khác đăng xuất).
+  // [MỞ RỘNG Roadmap C3, DEV-070, 2026-09-19] `SESSION_VIEW_ALL` dùng LẠI
+  // cho `GET /users/sessions` (trang giám sát TẤT CẢ phiên của MỌI user) —
+  // không tạo permission riêng, vì đây vẫn cùng 1 khả năng "xem phiên của
+  // người khác", chỉ khác cách hiển thị (danh sách tổng hợp thay vì
+  // drill-down từng user ở C2).
+  SESSION_VIEW_ALL: "SESSION_VIEW_ALL",
+  SESSION_REVOKE_ALL: "SESSION_REVOKE_ALL",
   // 🔒 MỚI (TASK-002, docs/tasks/TASK-002.md — Việc 2): permission RIÊNG cho
   // hành động "gán role cho 1 user" (khác USER_UPDATE — cập nhật thông tin
   // user thông thường). Tách riêng để có thể cấp hẹp hơn USER_UPDATE, tránh
@@ -112,6 +134,9 @@ export const PERMISSIONS = {
   // không phải ADMIN bị chặn 403 ở toàn bộ dashboard. Khớp đúng tên đã
   // dùng trong route.
   DASHBOARD_READ: "DASHBOARD_READ",
+  // Roadmap B7 (2026-09-18) — chạy tay gửi báo cáo tuần (bình thường chạy tự
+  // động qua cron), cùng nguyên tắc ASSET_ALERTS_TRIGGER/WORKFLOW_SLA_ALERTS_TRIGGER.
+  DASHBOARD_WEEKLY_REPORT_TRIGGER: "DASHBOARD_WEEKLY_REPORT_TRIGGER",
 
   // ASSET (Giai đoạn 1 — quản lý tài sản/thiết bị IT)
   ASSET_VIEW: "ASSET_VIEW",
@@ -187,6 +212,41 @@ export const PERMISSIONS = {
   CONSUMABLE_UPDATE: "CONSUMABLE_UPDATE", // sửa thông tin + bật/tắt isActive — KHÔNG gồm nhập/xuất kho (permission riêng bên dưới)
   CONSUMABLE_TRANSACTION_CREATE: "CONSUMABLE_TRANSACTION_CREATE", // nhập/xuất kho — tách riêng khỏi CONSUMABLE_UPDATE vì đây là hành động vận hành hàng ngày, tần suất/actor có thể khác việc sửa thông tin danh mục
   CONSUMABLE_ALERTS_TRIGGER: "CONSUMABLE_ALERTS_TRIGGER", // chạy tay cảnh báo tồn kho thấp, mirror ASSET_ALERTS_TRIGGER
+
+  // CONSUMABLE CATEGORY — Nhóm vật tư tiêu hao (2026-09-16, user yêu cầu sau
+  // khi B3 DONE — trước đó `category` là text tự do). Mirror ĐÚNG bộ quyền
+  // ASSET_CATEGORY_* — KHÔNG có DELETE_PERMANENT (xem
+  // `consumableCategory.service.ts` — 0 UI/consumer thật, không xây dead code).
+  CONSUMABLE_CATEGORY_VIEW: "CONSUMABLE_CATEGORY_VIEW",
+  CONSUMABLE_CATEGORY_CREATE: "CONSUMABLE_CATEGORY_CREATE",
+  CONSUMABLE_CATEGORY_UPDATE: "CONSUMABLE_CATEGORY_UPDATE",
+  CONSUMABLE_CATEGORY_DELETE: "CONSUMABLE_CATEGORY_DELETE",
+
+  // CONSUMABLE REQUEST — Dự trù/đề xuất mua vật tư tiêu hao hàng tháng
+  // (Roadmap B8, DEV-067, 2026-09-18). Module MỚI, ĐỘC LẬP với CONSUMABLE_*
+  // (item/tồn kho) — xem giải thích ở `consumableRequest.interface.ts`.
+  // KHÔNG có luồng duyệt (user xác nhận) nên KHÔNG có permission kiểu
+  // *_APPROVE — chỉ có CREATE/VIEW/UPDATE (sửa khi PENDING + huỷ) và
+  // FULFILL RIÊNG (đánh dấu đã mua — hành động của Phòng Vật tư-TTB/IT sau
+  // khi mua thực tế, khác việc khoa/phòng tự sửa đề xuất của mình).
+  CONSUMABLE_REQUEST_VIEW: "CONSUMABLE_REQUEST_VIEW",
+  CONSUMABLE_REQUEST_CREATE: "CONSUMABLE_REQUEST_CREATE",
+  CONSUMABLE_REQUEST_UPDATE: "CONSUMABLE_REQUEST_UPDATE",
+  CONSUMABLE_REQUEST_FULFILL: "CONSUMABLE_REQUEST_FULFILL",
+
+  // VENDOR & CONTRACT — Roadmap B4 (Quản lý nhà cung cấp & hợp đồng bảo trì,
+  // 2026-09-16). Module MỚI, ĐỘC LẬP với ASSET_*/CONSUMABLE_*.
+  VENDOR_VIEW: "VENDOR_VIEW",
+  VENDOR_CREATE: "VENDOR_CREATE",
+  VENDOR_UPDATE: "VENDOR_UPDATE", // gồm cả bật/tắt isActive (ngừng hợp tác) — không tách permission riêng
+  CONTRACT_VIEW: "CONTRACT_VIEW",
+  CONTRACT_CREATE: "CONTRACT_CREATE",
+  CONTRACT_UPDATE: "CONTRACT_UPDATE", // gồm cả huỷ hợp đồng — cùng nguyên tắc ASSET_MAINTENANCE_PLAN_UPDATE
+  CONTRACT_ALERTS_TRIGGER: "CONTRACT_ALERTS_TRIGGER", // chạy tay cảnh báo hợp đồng sắp hết hạn, mirror ASSET_ALERTS_TRIGGER
+  // [MỚI 2026-09-16, DEV-058] Khôi phục hợp đồng đã huỷ — TÁCH RIÊNG khỏi
+  // CONTRACT_UPDATE (khác "cancel", vốn gộp vào CONTRACT_UPDATE), theo yêu
+  // cầu user kiểm soát chặt hơn ai được khôi phục hợp đồng đã huỷ.
+  CONTRACT_RESTORE: "CONTRACT_RESTORE",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

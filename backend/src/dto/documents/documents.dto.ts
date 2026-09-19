@@ -81,6 +81,15 @@ export const QueryDocumentDTO = z.object({
 
   keyword: z.string().max(100).optional(),
 
+  // [MỚI 2026-09-18, DEV-063 — Roadmap B6] Tìm kiếm toàn văn (title +
+  // documentCode + nội dung/ghi chú trong `meta`) qua MongoDB `$text` —
+  // TÁCH RIÊNG khỏi `keyword` phía trên (khớp chuỗi con `$regex`, giữ
+  // nguyên hành vi cũ). MongoDB không cho phép gộp `$text` vào cùng 1 mệnh
+  // đề `$or` với field khác nên đây PHẢI là param riêng, không "vá" chung
+  // vào `keyword`. `min(2)` — tránh quét toàn bộ collection với truy vấn 1
+  // ký tự gần như vô nghĩa.
+  fullTextSearch: z.string().min(2).max(200).optional(),
+
   // "true"/"false" dạng string (query string luôn là string) → convert thành
   // boolean thật, hoặc `undefined` nếu client không truyền (để service tự quyết
   // định giá trị mặc định, KHÔNG áp default cứng ở DTO vì đây là 1 phần bug cần

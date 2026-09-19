@@ -9,6 +9,8 @@ import {
   restoreDocumentService,
   deleteDocumentsByMonthService,
   getDocumentVersionsService,
+  bulkDeleteDocumentService,
+  bulkRestoreDocumentService,
 } from "../../services/documents/document.service";
 
 import { catchAsync } from "../../shared/utils/catchAsync";
@@ -226,6 +228,43 @@ export const restoreDocuments = catchAsync(async (req: Request, res: Response) =
   res.json({
     success: true,
     ...result,
+  });
+});
+
+/* ===============================
+   BULK DELETE (DEV-061 — Batch Action Bar danh sách Document)
+=============================== */
+export const bulkDeleteDocuments = catchAsync(async (req: Request, res: Response) => {
+  const user = req.user!;
+
+  const result = await bulkDeleteDocumentService(
+    req.body.ids,
+    user._id,
+    user.role.name,
+    user.role.isSystemRole === true,
+  );
+
+  res.json({
+    success: true,
+    message: `Đã xoá ${result.deletedIds.length}/${req.body.ids.length} tài liệu`,
+    data: result,
+  });
+});
+
+/* ===============================
+   BULK RESTORE (DEV-061)
+=============================== */
+export const bulkRestoreDocuments = catchAsync(async (req: Request, res: Response) => {
+  const result = await bulkRestoreDocumentService(
+    req.body.ids,
+    req.user!._id,
+    req.user?.role.isSystemRole === true,
+  );
+
+  res.json({
+    success: true,
+    message: `Đã khôi phục ${result.deletedIds.length}/${req.body.ids.length} tài liệu`,
+    data: result,
   });
 });
 

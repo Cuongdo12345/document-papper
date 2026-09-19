@@ -5,6 +5,8 @@ description: Quy tắc làm việc với dự án Document Papper sau khi đã h
 
 # SKILL V3 — PROJECT KNOWLEDGE & DEVELOPMENT
 
+> **Rulebook đã rà soát khớp thực tế project đến: `DEV-056` / `FE-16` (2026-09-16).** Nếu task mới nhất chênh lệch lớn so với 2 mốc này, đối chiếu lại §3/§8/§20 trước khi tin tuyệt đối.
+
 ## 1. MỤC ĐÍCH
 
 Dự án đã hoàn thành Phase 01 → Phase 13.
@@ -63,7 +65,6 @@ Tài liệu chính:
 - `docs/03_BACKEND_ANALYSIS.md`
 - `docs/04_DATABASE_ANALYSIS.md`
 - `docs/05_API_ANALYSIS.md`
-- `docs/06_FRONTEND_ANALYSIS.md`
 - `docs/07_AUTH_RBAC_ANALYSIS.md`
 - `docs/08_BUSINESS_LOGIC.md`
 - `docs/09_SECURITY_ANALYSIS.md`
@@ -71,6 +72,8 @@ Tài liệu chính:
 - `docs/11_TECHNICAL_DEBT.md`
 - `docs/12_ISSUES_AND_RISKS.md`
 - `docs/13_FINAL_PROJECT_REPORT.md`
+
+**[CẬP NHẬT 2026-09-16]** `docs/06_FRONTEND_ANALYSIS.md` KHÔNG tồn tại — không phải thiếu sót, đã thay bằng hệ thống doc riêng `docs/frontend/` (xem bên dưới).
 
 Tài liệu bổ sung nếu tồn tại:
 
@@ -80,10 +83,27 @@ Tài liệu bổ sung nếu tồn tại:
 - `docs/17_SECURITY_HARDENING_PLAN.md`
 - `docs/18_TESTING_STRATEGY.md`
 - `docs/19_IMPROVEMENT_ROADMAP.md`
+- `docs/20_GLOBAL_SECURITY_REVIEW.md`
+- `docs/21_GLOBAL_ARCHITECTURE_REVIEW.md`
+- `docs/22_GLOBAL_TESTING_REVIEW.md`
+- `docs/23_CODE_REVIEW_ROADMAP.md`
+- `docs/30_DEVELOPMENT_COMPLETION_AUDIT.md`
+- `docs/module-reviews/` — review chi tiết theo domain, index tại `docs/review-index/`
+
+**[CẬP NHẬT 2026-09-16]** Tài liệu phát triển sau-phân-tích (điều phối task-based development, chưa từng được liệt kê ở đây):
+
+- `docs/development/00_DEVELOPMENT_ROADMAP.md` — nguồn sự thật Stage/P0→P3
+- `docs/development/FEATURE_DEVELOPMENT_ROADMAP.md` — đề xuất tính năng, xem `docs/00_PROJECT_MEMORY.md` để biết mục nào ĐÃ implement trước khi coi là "chưa làm"
+
+**[CẬP NHẬT 2026-09-16]** Tài liệu frontend (thay cho `06_FRONTEND_ANALYSIS.md`):
+
+- `docs/frontend/FRONTEND_MEMORY.md` — index kiến thức frontend, vai trò tương đương PROJECT_MEMORY
 
 Task:
 
-- `docs/tasks/`
+- `docs/development/tasks/DEV-XXX.md` — task backend (quy ước thật đang dùng)
+- `docs/frontend/tasks/FE-XX.md` — task frontend (quy ước thật đang dùng)
+- `docs/tasks/` — LEGACY, dừng ở `TASK-001`/`TASK-002`, không dùng tiếp
 
 Không đọc toàn bộ docs. Chỉ đọc tài liệu có liên quan.
 
@@ -233,9 +253,9 @@ Không tự chuyển sang task khác.
 
 ## 8. TASK WORKFLOW
 
-Task quan trọng lưu tại:
+Task quan trọng lưu tại (quy ước thật, **[CẬP NHẬT 2026-09-16]** thay cho `docs/tasks/TASK-XXX.md` cũ — LEGACY, dừng ở TASK-001/002, không dùng tiếp):
 
-`docs/tasks/TASK-XXX.md`
+`docs/development/tasks/DEV-XXX.md` (backend) hoặc `docs/frontend/tasks/FE-XX.md` (frontend)
 
 Trạng thái:
 
@@ -356,6 +376,13 @@ Không giả định:
 
 `Authenticated = Authorized`
 
+Tính năng MỚI (route/action mới có ý nghĩa bảo mật) — bắt buộc, không phải tuỳ chọn:
+
+- Phải có middleware permission/RBAC tương ứng, không kế thừa ngầm từ route lân cận.
+- Phải nêu rõ trong response: permission nào, gắn ở file:dòng nào.
+- Phải verify bằng user KHÔNG có quyền đó → xác nhận bị chặn (401/403).
+- "Security impact đã xét" ở §26 Quality Gate KHÔNG tính là đủ nếu thiếu 3 việc trên với tính năng mới.
+
 ---
 
 ## 13. BUSINESS LOGIC
@@ -419,9 +446,10 @@ Khi phù hợp:
 1. Test liên quan.
 2. Type check.
 3. Lint.
-4. Build.
-5. Kiểm tra runtime error.
-6. `git diff`.
+4. Build backend (nếu đổi backend/).
+5. Build frontend: cd frontend && npm run build — bắt buộc nếu đổi bất kỳ gì trong frontend/.
+6. Kiểm tra runtime error.
+7. `git diff`.
 
 Không tự tạo command không có trong project.
 
@@ -432,6 +460,8 @@ Nếu không test được, phải nói rõ:
 - Điều gì chưa được xác minh.
 
 Không nói "đã test" nếu chưa chạy test.
+
+Không skip/disable/comment-out test đang FAIL để né lỗi (kể cả .skip()/.only() che test fail). Test fail không rõ nguyên nhân → báo rõ test nào, lỗi gì, nghi ngờ do đâu. Chỉ skip/xoá khi user xác nhận test không còn hợp lệ.
 
 ---
 
@@ -537,6 +567,8 @@ Mapping:
 
 Không cập nhật tài liệu bằng assumption.
 
+Áp dụng cho chính CLAUDE.md/SKILL.md: phát hiện rule mô tả sai thực tế (file không tồn tại, quy ước khác thực tế) → PHẢI nêu ngay trong response, không im lặng bỏ qua, không tự sửa khi chưa được xác nhận.
+
 ---
 
 ## 20. SESSION HANDOFF
@@ -551,6 +583,7 @@ khi:
 - Cần tiếp tục session sau.
 - Context/session sắp kết thúc.
 - Có trạng thái quan trọng cần bàn giao.
+- Task VỪA DONE trọn vẹn trong cùng phiên** — đây là điều kiện quan trọng nhất trên thực tế nhưng dễ bị bỏ qua nhất, vì 4 điều kiện trên đều ngầm hiểu "task còn dở". Đã có bằng chứng SESSION_HANDOFF.md từng đứng yên 28+ task backend/12+ task frontend chỉ vì mỗi task đều DONE gọn trong 1 phiên. Chỉ cần cập nhật ngắn phần Current Task/Status/Next Action, không cần chép lại toàn bộ narrative.
 
 Tối thiểu:
 
@@ -707,6 +740,8 @@ Task không nhỏ chỉ hoàn thành khi:
 - [ ] Security impact đã xét.
 - [ ] Test đã chạy nếu có thể.
 - [ ] Type check/lint/build đã chạy nếu phù hợp.
+- [ ] Build frontend (npm run build trong frontend/) đã chạy nếu đổi bất kỳ gì frontend — không hedge.
+- [ ] Route/tính năng mới cần bảo vệ: đã thêm permission/RBAC VÀ verify chặn đúng bằng user thiếu quyền.
 - [ ] `git diff` đã review.
 - [ ] Documentation đã cập nhật nếu cần.
 - [ ] PROJECT_MEMORY đã cập nhật nếu cần.

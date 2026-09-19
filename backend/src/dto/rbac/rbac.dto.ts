@@ -19,6 +19,17 @@ const paginationBase = {
 
 export const GetPermissionsQueryDTO = z.object({
   ...paginationBase,
+  // [SỬA 2026-09-19] `paginationBase.limit` max(100) không đủ — Permission
+  // catalog THẬT trong DB đã vượt 100 bản ghi (108, sau khi seed đủ các
+  // permission mới của DEV-065/067/068 trước đó bị thiếu — phát hiện lúc
+  // user báo icon "Tắt xác thực 2 lớp" không hiện trên UI dù đăng nhập
+  // ADMIN). `useAllRbacPermissions()` (FE, RolePermissionMatrix) gọi
+  // `limit:100` KHÔNG phân trang để lấy TOÀN BỘ catalog cho checkbox matrix —
+  // với >100 bản ghi, sort theo `resource` ASC, toàn bộ nhóm "WORKFLOW_*"
+  // (WORKFLOW_APPROVE/REJECT/VIEW/...) bị CẮT MẤT khỏi UI "Phân quyền" (xếp
+  // cuối bảng chữ cái). Nâng lên 300 — dư nhiều so với ~107 permission hiện
+  // tại, tránh lặp lại sự cố khi thêm permission mới trong tương lai gần.
+  limit: z.coerce.number().int().min(1).max(300).default(10),
   sortBy: z
     .enum(["createdAt", "name", "resource", "action"])
     .default("createdAt"),

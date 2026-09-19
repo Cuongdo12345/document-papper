@@ -4,6 +4,7 @@ import { z } from "zod";
 import { AppModal } from "@/components/shared/AppModal";
 import { Button } from "@/components/ui/button";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
+import { useConsumableCategories } from "@/features/inventory/hooks/useConsumableCategories";
 import { useCreateConsumableItem } from "@/features/inventory/hooks/useConsumableActions";
 import { usePermission } from "@/hooks/usePermission";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
@@ -42,6 +43,7 @@ export function CreateConsumableItemModal({ open, onClose }: CreateConsumableIte
   const isAdmin = useIsAdmin();
   const canBrowseDepartments = isAdmin || hasPermission(PERMISSIONS.DEPARTMENT_VIEW);
   const departmentsQuery = useDepartments({ limit: 100 }, { enabled: canBrowseDepartments });
+  const categoriesQuery = useConsumableCategories({ limit: 100 });
   const createMutation = useCreateConsumableItem();
 
   const form = useForm<FormValues>({
@@ -109,12 +111,18 @@ export function CreateConsumableItemModal({ open, onClose }: CreateConsumableIte
             <label htmlFor="ci-category" className="text-sm font-medium text-foreground">
               Nhóm (tuỳ chọn)
             </label>
-            <input
+            <select
               id="ci-category"
-              placeholder="VD: Vật tư y tế"
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
               {...register("category")}
-            />
+            >
+              <option value="">-- Chưa phân nhóm --</option>
+              {categoriesQuery.data?.data.map((c) => (
+                <option key={c._id} value={c._id}>
+                  {c.code} — {c.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 

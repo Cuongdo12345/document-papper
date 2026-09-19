@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Eye, Download, ScrollText, BarChart3 } from "lucide-react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { Eye, Download, ScrollText, BarChart3, Check, ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { FilterBar } from "@/components/shared/FilterBar";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
@@ -39,7 +41,10 @@ export function AuditLogsPage() {
   const canBrowseUsers = hasPermission(PERMISSIONS.USER_VIEW);
 
   const [page, setPage] = useState(1);
-  const [action, setAction] = useState<AuditAction | "">("");
+  // [MỞ RỘNG Roadmap C3, DEV-070, 2026-09-19] Mảng rỗng = "Tất cả" (không
+  // filter) — khớp gap đã ghi nhận ở FE-11.md: backend hỗ trợ multi-action
+  // từ trước, UI trước đây chỉ chọn được 1.
+  const [action, setAction] = useState<AuditAction[]>([]);
   const [performedBy, setPerformedBy] = useState("");
   const [targetUser, setTargetUser] = useState("");
   const [fromDate, setFromDate] = useState("");
@@ -49,8 +54,13 @@ export function AuditLogsPage() {
 
   const [detailLog, setDetailLog] = useState<AuditLogItem | null>(null);
 
+  function toggleAction(a: AuditAction) {
+    setAction((prev) => (prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]));
+    setPage(1);
+  }
+
   function resetFilters() {
-    setAction("");
+    setAction([]);
     setPerformedBy("");
     setTargetUser("");
     setFromDate("");
@@ -62,7 +72,7 @@ export function AuditLogsPage() {
   const query = useAuditLogs({
     page,
     limit: LIMIT,
-    action: action || undefined,
+    action: action.length ? action : undefined,
     performedBy: performedBy || undefined,
     user: targetUser || undefined,
     fromDate: debouncedFromDate || undefined,
@@ -74,7 +84,7 @@ export function AuditLogsPage() {
   const pagination = query.data?.pagination;
 
   const exportParams = {
-    action: action || undefined,
+    action: action.length ? action : undefined,
     performedBy: performedBy || undefined,
     user: targetUser || undefined,
     fromDate: debouncedFromDate || undefined,
@@ -181,25 +191,64 @@ export function AuditLogsPage() {
             </div>
 
             <div className="min-w-44 space-y-1.5">
-              <label htmlFor="audit-action" className="text-xs font-medium text-muted-foreground">
-                Hành động
-              </label>
-              <select
-                id="audit-action"
-                value={action}
-                onChange={(e) => {
-                  setAction(e.target.value as AuditAction | "");
-                  setPage(1);
-                }}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="">Tất cả</option>
-                {AUDIT_ACTIONS.map((a) => (
-                  <option key={a} value={a}>
-                    {getAuditActionLabel(a)}
-                  </option>
-                ))}
-              </select>
+              <label className="text-xs font-medium text-muted-foreground">Hành động</label>
+              <DropdownMenu.Root>
+                <DropdownMenu.Trigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <span className="truncate">{action.length > 0 ? `${action.length} đã chọn` : "Tất cả"}</span>
+                    <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  </button>
+                </DropdownMenu.Trigger>
+
+                <DropdownMenu.Portal>
+                  <DropdownMenu.Content
+                    align="start"
+                    sideOffset={4}
+                    className={cn(
+                      "z-50 max-h-72 w-64 overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg",
+                      "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+                    )}
+                  >
+                    {action.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAction([]);
+                          setPage(1);
+                        }}
+                        className="mb-1 w-full rounded px-2 py-1.5 text-left text-xs text-primary hover:bg-muted"
+                      >
+                        Bỏ chọn tất cả
+                      </button>
+                    )}
+                    {AUDIT_ACTIONS.map((a) => {
+                      const checked = action.includes(a);
+                      return (
+                        <DropdownMenu.CheckboxItem
+                          key={a}
+                          checked={checked}
+                          onSelect={(e) => e.preventDefault()}
+                          onCheckedChange={() => toggleAction(a)}
+                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm outline-none hover:bg-muted focus:bg-muted"
+                        >
+                          <span
+                            className={cn(
+                              "flex size-4 shrink-0 items-center justify-center rounded border border-input",
+                              checked && "border-primary bg-primary text-primary-foreground",
+                            )}
+                          >
+                            {checked && <Check className="size-3" aria-hidden="true" />}
+                          </span>
+                          {getAuditActionLabel(a)}
+                        </DropdownMenu.CheckboxItem>
+                      );
+                    })}
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
             </div>
 
             {canBrowseUsers && (

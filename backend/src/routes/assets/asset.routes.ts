@@ -5,7 +5,9 @@ import {
   getAssetById,
   updateAsset,
   deleteAsset,
+  bulkDeleteAssets,
   restoreAsset,
+  bulkRestoreAssets,
   hardDeleteAsset,
   runAssetAlerts,
   downloadAssetImportTemplate,
@@ -24,7 +26,7 @@ import {
   validateQuery,
   validateParams,
 } from "../../middlewares/validate.middleware";
-import { IdParamDTO } from "../../dto/common.dto";
+import { IdParamDTO, BulkIdsDTO } from "../../dto/common.dto";
 import {
   CreateAssetDTO,
   UpdateAssetDTO,
@@ -58,6 +60,32 @@ router.get(
   authorizePermission("ASSET_VIEW"),
   validateQuery(QueryAssetDTO),
   getAllAssets,
+);
+
+/**
+ * [MỚI 2026-09-16, DEV-060] Xoá mềm hàng loạt — PHẢI đăng ký TRƯỚC "GET /:id"
+ * (cùng lý do "/export" ngay bên dưới), dùng lại permission ASSET_DELETE y
+ * hệt xoá từng dòng — không tạo permission mới.
+ */
+router.post(
+  "/bulk-delete",
+  authenticate,
+  authorizePermission("ASSET_DELETE"),
+  validateBody(BulkIdsDTO),
+  bulkDeleteAssets,
+);
+
+/**
+ * [MỚI 2026-09-17, DEV-062] Khôi phục hàng loạt — PHẢI đăng ký TRƯỚC "GET
+ * /:id" (static path), dùng lại permission ASSET_UPDATE y hệt khôi phục
+ * từng dòng (`PATCH /:id/restore` bên dưới) — không tạo permission mới.
+ */
+router.post(
+  "/bulk-restore",
+  authenticate,
+  authorizePermission("ASSET_UPDATE"),
+  validateBody(BulkIdsDTO),
+  bulkRestoreAssets,
 );
 
 /**

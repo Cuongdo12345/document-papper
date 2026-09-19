@@ -1,9 +1,13 @@
 /**
- * Format permission string kỹ thuật thành dạng dễ đọc hơn cho `PermissionBadge`
- * — CHỈ format chữ hoa/underscore, KHÔNG dịch nghĩa/bịa mô tả tiếng Việt.
- * Backend hiện KHÔNG có bảng mô tả (`description`) cho từng permission
- * (SHARED_COMPONENTS_LIBRARY.md) — tự bịa nghĩa cho ~75 permission là suy
- * diễn business copy không có evidence (CLAUDE.md Mục 19).
+ * [SỬA 2026-09-16] Comment gốc claim "Backend hiện KHÔNG có bảng mô tả
+ * (`description`) cho từng permission" — SAI/LỖI THỜI: `Permission.description`
+ * tồn tại và đã có dữ liệu tiếng Việt thật cho hầu hết permission (xem
+ * `backend/scripts/seed-rbac.ts` PERMISSION_DESCRIPTIONS, ~100+ entry).
+ * `RolePermissionMatrix` nay ưu tiên dùng `description` thật — hàm này CHỈ
+ * còn dùng làm FALLBACK khi permission hiếm gặp chưa có description (VD tạo
+ * tay qua form "Tạo permission" chưa điền mô tả), và cho `PermissionBadge`
+ * (hiện chưa được page nào dùng thật, nhận `permissionName: string` đơn
+ * thuần nên không có `description` để tham chiếu).
  *
  * "USER_CREATE" -> "User create", "DOCUMENT_EXCEL_EXPORT" -> "Document excel export".
  */

@@ -1,3 +1,13 @@
+1. Thói quen kết phiên (trước khi tắt VS Code) — gõ 1 câu:
+
+"Cập nhật SESSION_HANDOFF.md xong việc hôm nay trước khi kết thúc."
+
+Việc này giờ đã là rule bắt buộc (đã sửa tuần trước), nhưng gõ tay 1 câu vẫn là bảo hiểm rẻ nhất.
+
+2. Thói quen mở phiên (tin nhắn đầu tiên hôm sau) — gõ 1 câu:
+
+"Đọc CLAUDE.md + docs/00_PROJECT_MEMORY.md (hoặc FRONTEND_MEMORY.md nếu làm FE) + SESSION_HANDOFF.md, tóm tắt trạng thái hiện tại trước khi làm gì tiếp."
+
 project/
 │
 ├── CLAUDE.md                  ← LUẬT

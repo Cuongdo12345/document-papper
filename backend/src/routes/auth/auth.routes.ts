@@ -5,17 +5,27 @@ import {
   refreshAccessToken,
   logout,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  verifyLoginOtp,
+  enableTwoFactor,
+  confirmTwoFactor,
+  disableTwoFactor,
+  listMySessions,
+  revokeMySession
 } from "../../controllers/auth/auth.controller";
 import { authenticate } from "../../middlewares/auth.middleware";
-import { validateBody } from "../../middlewares/validate.middleware";
+import { validateBody, validateParams } from "../../middlewares/validate.middleware";
 import { authRateLimiter } from "../../middlewares/authRateLimiter.middleware";
+import { IdParamDTO } from "../../dto/common.dto";
 import {
   RegisterDTO,
   LoginDTO,
   RefreshTokenDTO,
   ForgotPasswordDTO,
-  ResetPasswordDTO
+  ResetPasswordDTO,
+  VerifyLoginOtpDTO,
+  ConfirmTwoFactorDTO,
+  DisableTwoFactorDTO
 } from "../../dto/auth/auths.dto";
 
 // ⚠️ SỬA (review Auth module):
@@ -51,6 +61,29 @@ router.post("/forgot-password", validateBody(ForgotPasswordDTO), forgotPassword)
 // register/login/refresh-token). Gắn tường minh `authRateLimiter` để không
 // mất bảo vệ IP-based khi bỏ mount rộng.
 router.post("/reset-password", authRateLimiter, validateBody(ResetPasswordDTO), resetPassword);
+
+/* =====================================================================
+   XÁC THỰC 2 LỚP (2FA qua email OTP, Roadmap C1, DEV-068, 2026-09-19)
+===================================================================== */
+
+// PUBLIC (chưa có access token — đang ở giữa luồng đăng nhập), cùng
+// `authRateLimiter` với "/login" (chống brute-force mã OTP theo IP, bổ sung
+// cho giới hạn 5-lần-sai theo OTP đã có ở tầng service).
+router.post("/login/verify-otp", authRateLimiter, validateBody(VerifyLoginOtpDTO), verifyLoginOtp);
+
+// Self-service — user đã đăng nhập, tự bật/tắt 2FA cho chính mình.
+router.post("/2fa/enable", authenticate, authRateLimiter, enableTwoFactor);
+router.post("/2fa/confirm", authenticate, authRateLimiter, validateBody(ConfirmTwoFactorDTO), confirmTwoFactor);
+router.post("/2fa/disable", authenticate, validateBody(DisableTwoFactorDTO), disableTwoFactor);
+
+/* =====================================================================
+   QUẢN LÝ PHIÊN ĐĂNG NHẬP (Roadmap C2, DEV-069, 2026-09-19) — self-service,
+   KHÔNG cần permission riêng (action tự-scope qua req.user!._id, giống
+   2fa/enable ở trên).
+===================================================================== */
+
+router.get("/sessions", authenticate, listMySessions);
+router.delete("/sessions/:id", authenticate, validateParams(IdParamDTO), revokeMySession);
 
 export default router;
 

@@ -1,20 +1,31 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, Eye } from "lucide-react";
+import { Plus, Eye, Pencil, Trash2, RotateCcw } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { FilterBar } from "@/components/shared/FilterBar";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { Pagination } from "@/components/shared/Pagination";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { BatchActionBar } from "@/components/shared/BatchActionBar";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { usePermission } from "@/hooks/usePermission";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useRowSelection } from "@/hooks/useRowSelection";
 import { PERMISSIONS } from "@/constants/permissions";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import { useConsumableItems } from "@/features/inventory/hooks/useConsumableItems";
+import { useConsumableCategories } from "@/features/inventory/hooks/useConsumableCategories";
+import {
+  useUpdateConsumableItem,
+  useBulkDeleteConsumableItems,
+  useBulkRestoreConsumableItems,
+} from "@/features/inventory/hooks/useConsumableActions";
+import { InventorySectionTabs } from "@/features/inventory/components/InventorySectionTabs";
 import { CreateConsumableItemModal } from "@/features/inventory/components/CreateConsumableItemModal";
+import { EditConsumableItemModal } from "@/features/inventory/components/EditConsumableItemModal";
 import { parseApiError } from "@/utils/parseApiError";
 import type { ConsumableItem } from "@/types/consumable.types";
 
@@ -37,31 +48,44 @@ export function ConsumablesListPage() {
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState("");
   const [department, setDepartment] = useState("");
+  const [category, setCategory] = useState("");
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [isActive, setIsActive] = useState<"true" | "false" | "">("true");
   const debouncedKeyword = useDebounce(keyword);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<ConsumableItem | null>(null);
+  const [deactivateTarget, setDeactivateTarget] = useState<ConsumableItem | null>(null);
+  const [restoreTarget, setRestoreTarget] = useState<ConsumableItem | null>(null);
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
+  const [batchRestoreOpen, setBatchRestoreOpen] = useState(false);
+  const updateMutation = useUpdateConsumableItem();
+  const bulkDeleteMutation = useBulkDeleteConsumableItems();
+  const bulkRestoreMutation = useBulkRestoreConsumableItems();
 
   function resetFilters() {
     setKeyword("");
     setDepartment("");
+    setCategory("");
     setLowStockOnly(false);
     setIsActive("true");
     setPage(1);
   }
 
   const departmentsQuery = useDepartments({ limit: 100 }, { enabled: canBrowseDepartments });
+  const categoriesQuery = useConsumableCategories({ limit: 100 });
   const query = useConsumableItems({
     page,
     limit: LIMIT,
     search: debouncedKeyword || undefined,
     department: department || undefined,
+    category: category || undefined,
     lowStockOnly: lowStockOnly || undefined,
     isActive: isActive === "" ? undefined : isActive === "true",
   });
 
   const items = query.data?.data ?? [];
   const pagination = query.data?.pagination;
+  const selection = useRowSelection(items.map((i) => i._id));
 
   const columns: DataTableColumn<ConsumableItem>[] = [
     {
@@ -74,7 +98,7 @@ export function ConsumablesListPage() {
       ),
     },
     { key: "unit", header: "Đơn vị" },
-    { key: "category", header: "Nhóm", render: (row) => row.category || "—" },
+    { key: "category", header: "Nhóm", render: (row) => row.category?.name ?? "—" },
     { key: "department", header: "Khoa/Phòng", render: departmentLabel },
     {
       key: "quantityOnHand",
@@ -111,6 +135,8 @@ export function ConsumablesListPage() {
           </PermissionGuard>
         }
       />
+
+      <InventorySectionTabs />
 
       <FilterBar onReset={resetFilters}>
         <div className="min-w-48 space-y-1.5">
@@ -150,6 +176,25 @@ export function ConsumablesListPage() {
           </div>
         )}
 
+        <div className="min-w-40 space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Nhóm vật tư</label>
+          <select
+            value={category}
+            onChange={(e) => {
+              setCategory(e.target.value);
+              setPage(1);
+            }}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="">Tất cả</option>
+            {categoriesQuery.data?.data.map((c) => (
+              <option key={c._id} value={c._id}>
+                {c.code} — {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="min-w-36 space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Hiển thị</label>
           <select
@@ -182,6 +227,16 @@ export function ConsumablesListPage() {
         </div>
       </FilterBar>
 
+      <PermissionGuard permission={PERMISSIONS.CONSUMABLE_UPDATE}>
+        <BatchActionBar
+          count={selection.selectedIds.size}
+          onClear={selection.clear}
+          onDelete={() => setBatchDeleteOpen(true)}
+          onRestore={() => setBatchRestoreOpen(true)}
+          isLoading={bulkDeleteMutation.isPending || bulkRestoreMutation.isPending}
+        />
+      </PermissionGuard>
+
       <DataTable
         columns={columns}
         data={items}
@@ -192,11 +247,28 @@ export function ConsumablesListPage() {
         onRetry={() => query.refetch()}
         emptyTitle="Chưa có vật tư nào"
         emptyMessage="Tạo vật tư đầu tiên để bắt đầu theo dõi tồn kho."
+        selection={{ selectedIds: selection.selectedIds, onToggleRow: selection.toggleRow, onToggleAll: selection.toggleAll }}
         rowActions={(row) => (
           <div className="flex justify-end gap-1">
             <Button variant="ghost" size="sm" aria-label="Xem chi tiết" onClick={() => navigate(`/app/inventory/${row._id}`)}>
               <Eye />
             </Button>
+            <PermissionGuard permission={PERMISSIONS.CONSUMABLE_UPDATE}>
+              <Button variant="ghost" size="sm" aria-label="Sửa" onClick={() => setEditTarget(row)}>
+                <Pencil />
+              </Button>
+            </PermissionGuard>
+            <PermissionGuard permission={PERMISSIONS.CONSUMABLE_UPDATE}>
+              {row.isActive ? (
+                <Button variant="ghost" size="sm" aria-label="Ngừng theo dõi" onClick={() => setDeactivateTarget(row)}>
+                  <Trash2 className="text-destructive" />
+                </Button>
+              ) : (
+                <Button variant="ghost" size="sm" aria-label="Khôi phục" onClick={() => setRestoreTarget(row)}>
+                  <RotateCcw />
+                </Button>
+              )}
+            </PermissionGuard>
           </div>
         )}
       />
@@ -206,6 +278,74 @@ export function ConsumablesListPage() {
       )}
 
       {createOpen && <CreateConsumableItemModal open={createOpen} onClose={() => setCreateOpen(false)} />}
+
+      {editTarget && (
+        <EditConsumableItemModal open={!!editTarget} onClose={() => setEditTarget(null)} item={editTarget} />
+      )}
+
+      <ConfirmDialog
+        open={!!deactivateTarget}
+        onClose={() => setDeactivateTarget(null)}
+        onConfirm={() => {
+          if (!deactivateTarget) return;
+          updateMutation.mutate(
+            { id: deactivateTarget._id, body: { isActive: false } },
+            { onSuccess: () => setDeactivateTarget(null) },
+          );
+        }}
+        title="Ngừng theo dõi vật tư"
+        message={`Ngừng theo dõi "${deactivateTarget?.name}"? Vật tư sẽ bị ẩn khỏi danh sách mặc định, lịch sử giao dịch vẫn được giữ nguyên. Có thể khôi phục lại sau bằng bộ lọc "Hiển thị: Đã ngừng".`}
+        danger
+        isLoading={updateMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={!!restoreTarget}
+        onClose={() => setRestoreTarget(null)}
+        onConfirm={() => {
+          if (!restoreTarget) return;
+          updateMutation.mutate(
+            { id: restoreTarget._id, body: { isActive: true } },
+            { onSuccess: () => setRestoreTarget(null) },
+          );
+        }}
+        title="Khôi phục vật tư"
+        message={`Khôi phục theo dõi "${restoreTarget?.name}"?`}
+        isLoading={updateMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={batchDeleteOpen}
+        onClose={() => setBatchDeleteOpen(false)}
+        onConfirm={() => {
+          bulkDeleteMutation.mutate([...selection.selectedIds], {
+            onSuccess: () => {
+              setBatchDeleteOpen(false);
+              selection.clear();
+            },
+          });
+        }}
+        title="Ngừng theo dõi vật tư đã chọn"
+        message={`Ngừng theo dõi ${selection.selectedIds.size} vật tư đã chọn? Có thể khôi phục lại sau bằng bộ lọc "Hiển thị: Đã ngừng".`}
+        danger
+        isLoading={bulkDeleteMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={batchRestoreOpen}
+        onClose={() => setBatchRestoreOpen(false)}
+        onConfirm={() => {
+          bulkRestoreMutation.mutate([...selection.selectedIds], {
+            onSuccess: () => {
+              setBatchRestoreOpen(false);
+              selection.clear();
+            },
+          });
+        }}
+        title="Khôi phục vật tư đã chọn"
+        message={`Khôi phục theo dõi ${selection.selectedIds.size} vật tư đã chọn?`}
+        isLoading={bulkRestoreMutation.isPending}
+      />
     </div>
   );
 }

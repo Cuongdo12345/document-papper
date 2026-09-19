@@ -31,6 +31,10 @@ export interface CurrentUser {
     name: string;
   };
   isActive: boolean;
+  /** [MỚI 2026-09-18, Roadmap B7] Xem `UpdateMeRequest`. */
+  subscribedToWeeklyReport?: boolean;
+  /** [MỚI 2026-09-19, Roadmap C1] CHỈ tự bật được qua `POST /auths/2fa/enable`+`/confirm` — xem `useTwoFactorActions.ts`. */
+  twoFactorEnabled?: boolean;
   /** Effective permission (đã tính sẵn ở backend) — NGUỒN DUY NHẤT cho `usePermission()`. */
   permissions: string[];
   /** ObjectId THÔ — KHÔNG dùng để tự tính permission ở FE (xem `permissions[]`). */
@@ -66,11 +70,41 @@ export interface LoginUser {
   department?: { _id: string; code: string; name: string };
 }
 
-/** Response THẬT của POST /auths/login — phẳng, bọc trong {message, data}, KHÔNG qua unwrapResponse chung. */
-export interface LoginResponseData {
+/** Nhánh đăng nhập THÀNH CÔNG (có token ngay) — user KHÔNG bật 2FA, hoặc đã qua bước 2 (`verifyLoginOtp`). */
+export interface LoginSuccessData {
   accessToken: string;
   refreshToken: string;
   user: LoginUser;
+}
+
+/**
+ * [MỚI 2026-09-19, Roadmap C1] Nhánh trả về khi tài khoản ĐÃ bật 2FA —
+ * `POST /auths/login` CHƯA cấp token, chỉ gửi OTP qua email. FE phải gọi
+ * tiếp `POST /auths/login/verify-otp` (`username` + mã 6 số) để nhận
+ * `LoginSuccessData` thật.
+ */
+export interface LoginPendingTwoFactorData {
+  requiresTwoFactor: true;
+  username: string;
+}
+
+/** Response THẬT của POST /auths/login — phẳng, bọc trong {message, data}, KHÔNG qua unwrapResponse chung. */
+export type LoginResponseData = LoginSuccessData | LoginPendingTwoFactorData;
+
+/** Khớp `VerifyLoginOtpDTO` (`POST /auths/login/verify-otp`) — bước 2 khi tài khoản đã bật 2FA. */
+export interface VerifyLoginOtpRequest {
+  username: string;
+  code: string;
+}
+
+/** Khớp `ConfirmTwoFactorDTO` (`POST /auths/2fa/confirm`). */
+export interface ConfirmTwoFactorRequest {
+  code: string;
+}
+
+/** Khớp `DisableTwoFactorDTO` (`POST /auths/2fa/disable`) — `password` HIỆN TẠI, không phải mật khẩu mới. */
+export interface DisableTwoFactorRequest {
+  password: string;
 }
 
 export interface RefreshTokenResponseData {
@@ -87,6 +121,8 @@ export interface RefreshTokenResponseData {
 export interface UpdateMeRequest {
   fullName?: string;
   username?: string;
+  /** [MỚI 2026-09-18, Roadmap B7] Bật/tắt nhận "Báo cáo tuần" qua email — chỉ có tác dụng thật với role BAN_GIAM_DOC/TRUONG_KHOA. */
+  subscribedToWeeklyReport?: boolean;
 }
 
 /** Khớp `ChangePasswordDTO` (`PATCH /users/change-password`) — tự đổi mật khẩu CỦA CHÍNH MÌNH (`req.user!._id`, không nhận id khác). */
@@ -107,4 +143,30 @@ export interface ForgotPasswordRequest {
 export interface ResetPasswordRequest {
   token: string;
   newPassword: string;
+}
+
+/**
+ * Roadmap C2 (Quản lý phiên đăng nhập, DEV-069, 2026-09-19) — khớp schema
+ * `Session` (`GET /auths/sessions` self-service, `GET /users/:id/sessions`
+ * ADMIN xem hộ). `isCurrent` CHỈ có ở response self-service.
+ */
+export interface Session {
+  _id: string;
+  browser: string;
+  os: string;
+  ip: string | null;
+  createdAt: string;
+  expiresAt: string;
+  isCurrent?: boolean;
+}
+
+/**
+ * Roadmap C3 (Giám sát phiên đăng nhập toàn hệ thống, DEV-070, 2026-09-19) —
+ * khớp response `GET /users/sessions` (ADMIN, danh sách TẤT CẢ user). CHỈ
+ * response này có field `user` (đã populate) — `GET /auths/sessions`/
+ * `GET /users/:id/sessions` đã biết trước user từ context/param nên không
+ * cần lặp lại.
+ */
+export interface SessionWithUser extends Session {
+  user: { _id: string; username: string; fullName: string } | null;
 }

@@ -1,21 +1,28 @@
 import { useState } from "react";
-import { Plus, Pencil, ShieldCheck, KeyRound, Ban, RotateCcw } from "lucide-react";
+import { Plus, Pencil, ShieldCheck, ShieldOff, KeyRound, Laptop, Ban, RotateCcw } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { FilterBar } from "@/components/shared/FilterBar";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { Pagination } from "@/components/shared/Pagination";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { BatchActionBar } from "@/components/shared/BatchActionBar";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
+import { usePermission } from "@/hooks/usePermission";
 import { PERMISSIONS } from "@/constants/permissions";
+import { useRowSelection } from "@/hooks/useRowSelection";
 import { useUsers } from "@/features/users/hooks/useUsers";
 import { useDisableUser } from "@/features/users/hooks/useDisableUser";
+import { useBulkDeleteUser } from "@/features/users/hooks/useBulkDeleteUser";
 import { useRestoreUser } from "@/features/users/hooks/useRestoreUser";
+import { useBulkRestoreUser } from "@/features/users/hooks/useBulkRestoreUser";
 import { useRoles } from "@/features/rbac/hooks/useRoles";
 import { UserFormDrawer } from "@/features/users/components/UserFormDrawer";
 import { AssignRoleModal } from "@/features/users/components/AssignRoleModal";
 import { ResetPasswordModal } from "@/features/users/components/ResetPasswordModal";
+import { useResetUserTwoFactor } from "@/features/users/hooks/useResetUserTwoFactor";
+import { UserSessionsModal } from "@/features/users/components/UserSessionsModal";
 import { useDebounce } from "@/hooks/useDebounce";
 import { parseApiError } from "@/utils/parseApiError";
 import type { GetUsersParams, UserListItem } from "@/types/user.types";
@@ -23,6 +30,14 @@ import type { GetUsersParams, UserListItem } from "@/types/user.types";
 const LIMIT = 10;
 
 export function UsersListPage() {
+  const { hasPermission } = usePermission();
+  // [MỞ RỘNG 2026-09-17, DEV-062] 2 permission khác nhau cho 2 nút hàng loạt,
+  // khớp đúng guard nút từng dòng (USER_DELETE cho vô hiệu hoá, USER_RESTORE
+  // riêng cho khôi phục — khác 5 domain kia đều dùng chung 1 *_UPDATE).
+  const canBulkDelete = hasPermission(PERMISSIONS.USER_DELETE);
+  const canBulkRestore = hasPermission(PERMISSIONS.USER_RESTORE);
+  const canBulkAct = canBulkDelete || canBulkRestore;
+
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
@@ -44,7 +59,11 @@ export function UsersListPage() {
   const [formState, setFormState] = useState<{ open: boolean; user?: UserListItem }>({ open: false });
   const [assignRoleTarget, setAssignRoleTarget] = useState<UserListItem | null>(null);
   const [resetPasswordTarget, setResetPasswordTarget] = useState<UserListItem | null>(null);
+  const [resetTwoFactorTarget, setResetTwoFactorTarget] = useState<UserListItem | null>(null);
+  const [sessionsTarget, setSessionsTarget] = useState<UserListItem | null>(null);
   const [disableTarget, setDisableTarget] = useState<UserListItem | null>(null);
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
+  const [batchRestoreOpen, setBatchRestoreOpen] = useState(false);
 
   const params: GetUsersParams = {
     page,
@@ -59,9 +78,13 @@ export function UsersListPage() {
   const rolesQuery = useRoles();
   const disableMutation = useDisableUser();
   const restoreMutation = useRestoreUser();
+  const resetTwoFactorMutation = useResetUserTwoFactor();
+  const bulkDeleteMutation = useBulkDeleteUser();
+  const bulkRestoreMutation = useBulkRestoreUser();
 
   const users = query.data?.data ?? [];
   const pagination = query.data?.pagination;
+  const selection = useRowSelection(users.map((u) => u._id));
   // `GET /users` KHÔNG populate `role` (chỉ ObjectId thô) — resolve tên qua
   // danh sách Role riêng (types/user.types.ts).
   const roleNameById = new Map((rolesQuery.data ?? []).map((r) => [r._id, r.name]));
@@ -69,6 +92,7 @@ export function UsersListPage() {
   const columns: DataTableColumn<UserListItem>[] = [
     { key: "username", header: "Tên đăng nhập", className: "font-mono", sortKey: "username" },
     { key: "fullName", header: "Họ tên", sortKey: "fullName" },
+    { key: "email", header: "Email", render: (row) => row.email ?? "—" },
     { key: "role", header: "Vai trò", render: (row) => roleNameById.get(row.role) ?? "—" },
     { key: "department", header: "Khoa/Phòng", render: (row) => row.department?.name ?? "—" },
     {
@@ -166,6 +190,16 @@ export function UsersListPage() {
         </div>
       </FilterBar>
 
+      {canBulkAct && (
+        <BatchActionBar
+          count={selection.selectedIds.size}
+          onClear={selection.clear}
+          onDelete={canBulkDelete ? () => setBatchDeleteOpen(true) : undefined}
+          onRestore={canBulkRestore ? () => setBatchRestoreOpen(true) : undefined}
+          isLoading={bulkDeleteMutation.isPending || bulkRestoreMutation.isPending}
+        />
+      )}
+
       <DataTable
         columns={columns}
         data={users}
@@ -179,6 +213,11 @@ export function UsersListPage() {
         sortBy={sortBy}
         order={order}
         onSortChange={handleSortChange}
+        selection={
+          canBulkAct
+            ? { selectedIds: selection.selectedIds, onToggleRow: selection.toggleRow, onToggleAll: selection.toggleAll }
+            : undefined
+        }
         rowActions={(row) => (
           <div className="flex justify-end gap-1">
             <PermissionGuard permission={PERMISSIONS.USER_UPDATE}>
@@ -194,6 +233,18 @@ export function UsersListPage() {
             <PermissionGuard permission={PERMISSIONS.USER_RESET_PASSWORD}>
               <Button variant="ghost" size="sm" onClick={() => setResetPasswordTarget(row)} aria-label="Đặt lại mật khẩu">
                 <KeyRound />
+              </Button>
+            </PermissionGuard>
+            {row.twoFactorEnabled && (
+              <PermissionGuard permission={PERMISSIONS.USER_RESET_2FA}>
+                <Button variant="ghost" size="sm" onClick={() => setResetTwoFactorTarget(row)} aria-label="Tắt xác thực 2 lớp">
+                  <ShieldOff />
+                </Button>
+              </PermissionGuard>
+            )}
+            <PermissionGuard permission={PERMISSIONS.SESSION_VIEW_ALL}>
+              <Button variant="ghost" size="sm" onClick={() => setSessionsTarget(row)} aria-label="Xem phiên đăng nhập">
+                <Laptop />
               </Button>
             </PermissionGuard>
             {row.isActive ? (
@@ -226,6 +277,20 @@ export function UsersListPage() {
       <UserFormDrawer open={formState.open} onClose={() => setFormState({ open: false })} user={formState.user} />
       <AssignRoleModal open={!!assignRoleTarget} onClose={() => setAssignRoleTarget(null)} user={assignRoleTarget} />
       <ResetPasswordModal open={!!resetPasswordTarget} onClose={() => setResetPasswordTarget(null)} user={resetPasswordTarget} />
+      <UserSessionsModal open={!!sessionsTarget} onClose={() => setSessionsTarget(null)} user={sessionsTarget} />
+
+      <ConfirmDialog
+        open={!!resetTwoFactorTarget}
+        onClose={() => setResetTwoFactorTarget(null)}
+        onConfirm={() => {
+          if (!resetTwoFactorTarget) return;
+          resetTwoFactorMutation.mutate(resetTwoFactorTarget._id, { onSuccess: () => setResetTwoFactorTarget(null) });
+        }}
+        title="Tắt xác thực 2 lớp"
+        message={`Tắt xác thực 2 lớp cho tài khoản "${resetTwoFactorTarget?.username}"? Dùng khi user mất quyền truy cập email nhận mã OTP.`}
+        danger
+        isLoading={resetTwoFactorMutation.isPending}
+      />
 
       <ConfirmDialog
         open={!!disableTarget}
@@ -238,6 +303,39 @@ export function UsersListPage() {
         message={`Vô hiệu hoá tài khoản "${disableTarget?.username}"? User sẽ bị đăng xuất khỏi mọi thiết bị ngay lập tức.`}
         danger
         isLoading={disableMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={batchDeleteOpen}
+        onClose={() => setBatchDeleteOpen(false)}
+        onConfirm={() => {
+          bulkDeleteMutation.mutate([...selection.selectedIds], {
+            onSuccess: () => {
+              setBatchDeleteOpen(false);
+              selection.clear();
+            },
+          });
+        }}
+        title="Vô hiệu hoá user đã chọn"
+        message={`Vô hiệu hoá ${selection.selectedIds.size} tài khoản đã chọn? Các user sẽ bị đăng xuất khỏi mọi thiết bị ngay lập tức. Tài khoản ADMIN sẽ không bị ảnh hưởng.`}
+        danger
+        isLoading={bulkDeleteMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={batchRestoreOpen}
+        onClose={() => setBatchRestoreOpen(false)}
+        onConfirm={() => {
+          bulkRestoreMutation.mutate([...selection.selectedIds], {
+            onSuccess: () => {
+              setBatchRestoreOpen(false);
+              selection.clear();
+            },
+          });
+        }}
+        title="Khôi phục user đã chọn"
+        message={`Khôi phục ${selection.selectedIds.size} tài khoản đã chọn?`}
+        isLoading={bulkRestoreMutation.isPending}
       />
     </div>
   );

@@ -13,8 +13,14 @@ import {
   update,
   updateMeService,
   disable,
+  bulkDisable,
   restore,
+  bulkRestore,
   resetPassword,
+  resetTwoFactor,
+  listUserSessions,
+  revokeUserSession,
+  listAllSessions,
   changePassword,
   assignRole,
 } from "../../services/users/users.service";
@@ -84,6 +90,26 @@ export const restoreUser = catchAsync(async (req: Request, res: Response) => {
   res.json({ message: "Khôi phục user thành công" });
 });
 
+// BULK DELETE (xoá mềm hàng loạt — DEV-060, 2026-09-16)
+export const bulkDeleteUsers = catchAsync(async (req: Request, res: Response) => {
+  const result = await bulkDisable(req.body.ids, req.user!._id);
+
+  res.json({
+    message: `Đã vô hiệu hoá ${result.deletedIds.length}/${req.body.ids.length} user`,
+    data: result,
+  });
+});
+
+// BULK RESTORE (khôi phục hàng loạt — DEV-062, 2026-09-17)
+export const bulkRestoreUsers = catchAsync(async (req: Request, res: Response) => {
+  const result = await bulkRestore(req.body.ids, req.user!._id);
+
+  res.json({
+    message: `Đã khôi phục ${result.deletedIds.length}/${req.body.ids.length} user`,
+    data: result,
+  });
+});
+
 // CHANGE PASSWORD
 export const changePasswordUser = catchAsync(
   async (req: Request, res: Response) => {
@@ -103,6 +129,41 @@ export const resetPasswordByAdmin = catchAsync(
     await resetPassword(req.params.id, req.body.newPassword, req.user!._id);
 
     res.json({ message: "Reset mật khẩu thành công" });
+  },
+);
+
+// ADMIN RESET 2FA — Roadmap C1 (DEV-068, 2026-09-19)
+export const resetTwoFactorByAdmin = catchAsync(
+  async (req: Request, res: Response) => {
+    await resetTwoFactor(req.params.id, req.user!._id);
+
+    res.json({ message: "Đã tắt xác thực 2 lớp cho user" });
+  },
+);
+
+// ADMIN — QUẢN LÝ PHIÊN ĐĂNG NHẬP CỦA USER KHÁC — Roadmap C2 (DEV-069, 2026-09-19)
+export const listUserSessionsByAdmin = catchAsync(
+  async (req: Request, res: Response) => {
+    const sessions = await listUserSessions(req.params.id);
+
+    res.json({ message: "Lấy danh sách phiên đăng nhập thành công", data: sessions });
+  },
+);
+
+export const revokeUserSessionByAdmin = catchAsync(
+  async (req: Request, res: Response) => {
+    await revokeUserSession(req.params.id, req.params.sessionId, req.user!._id);
+
+    res.json({ message: "Đã thu hồi phiên đăng nhập của user" });
+  },
+);
+
+// ADMIN — GIÁM SÁT TOÀN BỘ PHIÊN ĐĂNG NHẬP — Roadmap C3 (DEV-070, 2026-09-19)
+export const listAllSessionsByAdmin = catchAsync(
+  async (req: Request, res: Response) => {
+    const result = await listAllSessions(req.query as any);
+
+    res.json({ message: true, data: result.data, pagination: result.pagination });
   },
 );
 

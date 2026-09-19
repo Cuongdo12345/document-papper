@@ -5,15 +5,31 @@ import { Role } from "../../models/rbac/role.model";
 import RefreshToken from "../../models/auth/refreshToken.model";
 import UserAudit from "../../models/users/userAudit.model";
 import PasswordResetToken from "../../models/auth/passwordResetToken.model";
+import TwoFactorOtp from "../../models/auth/twoFactorOtp.model";
 import ApiError from "../../shared/errors/ApiError";
 import {
   generateAccessToken,
   generateRefreshToken,
   hashResetToken,
   generateResetToken,
+  generateOtpCode,
 } from "../../shared/helpers/auth.helper";
 import { sendMail } from "../../shared/utils/mailer";
 import { buildPasswordResetEmail } from "../../shared/helpers/passwordReset.template";
+import { buildTwoFactorOtpEmail } from "../../shared/helpers/twoFactorOtp.template";
+import { parseUserAgent } from "../../shared/helpers/userAgent.helper";
+
+/**
+ * Roadmap C1 (Xác thực 2 lớp qua email OTP, DEV-068, 2026-09-19) — CHỈ 4 role
+ * này mới bật được 2FA (đúng mô tả roadmap "ADMIN và các role duyệt cấp
+ * cao"), user xác nhận qua AskUserQuestion KHÔNG mở rộng thêm
+ * PHONG_VAT_TU_TTB dù role đó cũng có `WORKFLOW_APPROVE`.
+ */
+const TWO_FACTOR_ELIGIBLE_ROLE_NAMES = ["ADMIN", "TRUONG_KHOA", "DIEU_DUONG_TRUONG", "BAN_GIAM_DOC"] as const;
+
+const OTP_EXPIRES_MINUTES = 10;
+/** Chặn brute-force mã 6 số (1 triệu khả năng) — quá 5 lần sai phải đăng nhập/yêu cầu lại từ đầu. */
+const OTP_MAX_ATTEMPTS = 5;
 
 // ⚠️ ĐÃ XÁC NHẬN qua `role.model.ts`: `Role` là NAMED export
 // (`export const Role = model<IRole>(...)`), KHÔNG PHẢI default export — bản
@@ -160,24 +176,17 @@ export const register = async (payload: {
  *    "vô hại" cố định để thời gian phản hồi gần bằng nhánh sai mật khẩu thật
  *    — giảm timing side-channel.
  */
-export const login = async (username: string, password: string) => {
-  const user = await User.findOne({ username }).select("+password").populate("role", "name")
-  .populate("department", "code name");
+/**
+ * Roadmap C1 (DEV-068, 2026-09-19) — phần "cấp token thật" của `login()`
+ * TÁCH RIÊNG thành hàm dùng chung, vì giờ có 2 điểm cần cấp token sau khi đã
+ * xác thực xong: (a) `login()` khi user KHÔNG bật 2FA (như hành vi cũ), (b)
+ * `verifyLoginOtpService()` sau khi user bật 2FA nhập ĐÚNG mã OTP. Logic bên
+ * trong GIỮ NGUYÊN 100% hành vi gốc của `login()` trước khi có C1.
+ */
+/** Roadmap C2 (DEV-069, 2026-09-19) — metadata thiết bị, TUỲ CHỌN, đính kèm lúc cấp token. */
+type SessionMeta = { userAgent?: string; ip?: string };
 
-  if (!user || !user.isActive) {
-    // Vẫn tốn thời gian tương đương 1 lần bcrypt.compare thật, tránh việc
-    // nhánh "user không tồn tại" trả lời nhanh hơn hẳn nhánh "sai mật khẩu".
-    await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
-    throw ApiError.unauthorized("Tên đăng nhập hoặc mật khẩu không đúng");
-  }
-
-  const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) {
-    // Cùng 1 message + cùng statusCode (401) như nhánh user không hợp lệ ở
-    // trên — không còn phân biệt được 2 trường hợp qua response.
-    throw ApiError.unauthorized("Tên đăng nhập hoặc mật khẩu không đúng");
-  }
-
+const issueLoginTokens = async (user: any, meta: SessionMeta = {}) => {
   // DEV-021/SEC-04: trước đây truyền thêm `role`/`department` (object đã
   // populate) vào payload JWT dù `generateAccessToken`'s doc-comment khẳng
   // định "chỉ gồm {id}" — JWT chỉ ký, không mã hoá, lộ thông tin dư thừa cho
@@ -196,7 +205,11 @@ export const login = async (username: string, password: string) => {
   await RefreshToken.create({
     user: user._id,
     token: hashResetToken(refreshToken),
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    // Roadmap C2 (DEV-069) — ghi lại thiết bị/IP lúc đăng nhập cho tính năng
+    // "Quản lý phiên đăng nhập".
+    userAgent: meta.userAgent,
+    ip: meta.ip,
   });
 
   // Ghi log audit
@@ -218,6 +231,193 @@ export const login = async (username: string, password: string) => {
       department: user.department
       }
   };
+};
+
+/**
+ * Roadmap C1 (DEV-068, 2026-09-19) — tạo + gửi email 1 mã OTP mới cho user,
+ * dùng chung cho `login()` (context "login") và `enableTwoFactorService()`
+ * (context "enable"). Xoá OTP CŨ chưa dùng của user trước khi tạo mới (cùng
+ * pattern `forgotPassword()` xoá `PasswordResetToken` cũ) — luôn chỉ có TỐI
+ * ĐA 1 OTP hiệu lực tại 1 thời điểm.
+ */
+const issueTwoFactorOtp = async (user: any, context: "login" | "enable") => {
+  await TwoFactorOtp.deleteMany({ user: user._id });
+
+  const code = generateOtpCode();
+  await TwoFactorOtp.create({
+    user: user._id,
+    codeHash: await bcrypt.hash(code, 10),
+    expiresAt: new Date(Date.now() + OTP_EXPIRES_MINUTES * 60 * 1000),
+  });
+
+  const { subject, html, text } = buildTwoFactorOtpEmail({
+    fullName: user.fullName,
+    code,
+    expiresInMinutes: OTP_EXPIRES_MINUTES,
+    context,
+  });
+
+  // KHÁC `forgotPassword()` (im lặng để chống enumeration) — ở đây user ĐÃ
+  // xác thực xong username/password (hoặc đang tự thao tác lúc đăng nhập),
+  // không có rủi ro lộ thông tin nào khi báo lỗi rõ ràng nếu gửi mail thất
+  // bại, nên throw thẳng thay vì nuốt lỗi.
+  try {
+    await sendMail({ to: user.email, subject, html, text });
+  } catch (err) {
+    console.error("[twoFactor] Gửi email mã OTP thất bại:", err);
+    throw ApiError.internal("Không gửi được mã xác thực, vui lòng thử lại sau");
+  }
+};
+
+export const login = async (username: string, password: string, meta: SessionMeta = {}) => {
+  const user = await User.findOne({ username }).select("+password").populate("role", "name")
+  .populate("department", "code name");
+
+  if (!user || !user.isActive) {
+    // Vẫn tốn thời gian tương đương 1 lần bcrypt.compare thật, tránh việc
+    // nhánh "user không tồn tại" trả lời nhanh hơn hẳn nhánh "sai mật khẩu".
+    await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
+    throw ApiError.unauthorized("Tên đăng nhập hoặc mật khẩu không đúng");
+  }
+
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) {
+    // Cùng 1 message + cùng statusCode (401) như nhánh user không hợp lệ ở
+    // trên — không còn phân biệt được 2 trường hợp qua response.
+    throw ApiError.unauthorized("Tên đăng nhập hoặc mật khẩu không đúng");
+  }
+
+  // Roadmap C1 (DEV-068, 2026-09-19) — user ĐÃ bật 2FA (self-service, opt-in)
+  // → CHƯA cấp token ngay, gửi OTP qua email, trả marker để FE chuyển sang
+  // bước nhập mã (`verifyLoginOtpService`). Username/password đã đúng ở đây
+  // rồi nên bước 2 CHỈ cần `username` + `code`, không hỏi lại password.
+  if (user.twoFactorEnabled) {
+    await issueTwoFactorOtp(user, "login");
+    return { requiresTwoFactor: true, username: user.username };
+  }
+
+  return issueLoginTokens(user, meta);
+};
+
+/**
+ * Roadmap C1 (DEV-068, 2026-09-19) — bước 2 của đăng nhập khi user đã bật
+ * 2FA. KHÔNG hỏi lại password (đã xác thực đúng ở `login()` mới sinh ra OTP)
+ * — chỉ cần `username` để biết tra OTP của ai, giống tinh thần
+ * `resetPassword(token, ...)` không cần username vì token đã định danh user.
+ */
+export const verifyLoginOtp = async (username: string, code: string, meta: SessionMeta = {}) => {
+  const user = await User.findOne({ username }).populate("role", "name").populate("department", "code name");
+
+  if (!user || !user.isActive || !user.twoFactorEnabled) {
+    throw ApiError.unauthorized("Yêu cầu xác thực không hợp lệ");
+  }
+
+  const otp = await TwoFactorOtp.findOne({ user: user._id, used: false, expiresAt: { $gt: new Date() } }).sort({
+    createdAt: -1,
+  });
+
+  if (!otp) {
+    throw ApiError.unauthorized("Mã xác thực không hợp lệ hoặc đã hết hạn, vui lòng đăng nhập lại");
+  }
+
+  if (otp.attempts >= OTP_MAX_ATTEMPTS) {
+    throw ApiError.unauthorized("Đã nhập sai mã quá số lần cho phép, vui lòng đăng nhập lại");
+  }
+
+  const isMatch = await bcrypt.compare(code, otp.codeHash);
+  if (!isMatch) {
+    otp.attempts += 1;
+    await otp.save();
+    throw ApiError.unauthorized("Mã xác thực không đúng");
+  }
+
+  otp.used = true;
+  await otp.save();
+
+  return issueLoginTokens(user, meta);
+};
+
+/**
+ * Roadmap C1 (DEV-068, 2026-09-19) — BƯỚC 1 tự bật 2FA (self-service,
+ * opt-in — user xác nhận KHÔNG bắt buộc). Chỉ role "cấp cao" mới bật được
+ * (xem `TWO_FACTOR_ELIGIBLE_ROLE_NAMES`), và PHẢI có `email` (dùng để gửi
+ * OTP) — 2 điều kiện chặn TRƯỚC khi gửi mã, tránh sinh OTP vô dụng.
+ */
+export const enableTwoFactor = async (userId: any) => {
+  const user = await User.findById(userId).populate("role", "name");
+  if (!user || !user.isActive) throw ApiError.badRequest("Không tìm thấy hoặc không hoạt động");
+
+  if (user.twoFactorEnabled) throw ApiError.badRequest("Tài khoản đã bật xác thực 2 lớp");
+
+  const roleName = (user.role as any)?.name;
+  if (!TWO_FACTOR_ELIGIBLE_ROLE_NAMES.includes(roleName)) {
+    throw ApiError.forbidden("Vai trò của bạn không thuộc phạm vi áp dụng xác thực 2 lớp");
+  }
+
+  if (!user.email) {
+    throw ApiError.badRequest("Tài khoản chưa có email — liên hệ IT/Quản trị hệ thống để được bổ sung trước khi bật tính năng này");
+  }
+
+  await issueTwoFactorOtp(user, "enable");
+  return { silent: true };
+};
+
+/**
+ * Roadmap C1 (DEV-068, 2026-09-19) — BƯỚC 2 tự bật 2FA: xác nhận mã OTP vừa
+ * gửi ở `enableTwoFactor()`, chỉ khi đúng mới thực sự set `twoFactorEnabled
+ * = true`. Cùng pattern chống brute-force với `verifyLoginOtp()`.
+ */
+export const confirmEnableTwoFactor = async (userId: any, code: string) => {
+  const user = await User.findById(userId);
+  if (!user || !user.isActive) throw ApiError.badRequest("Không tìm thấy hoặc không hoạt động");
+
+  const otp = await TwoFactorOtp.findOne({ user: user._id, used: false, expiresAt: { $gt: new Date() } }).sort({
+    createdAt: -1,
+  });
+  if (!otp) throw ApiError.badRequest("Mã xác thực không hợp lệ hoặc đã hết hạn, vui lòng yêu cầu lại");
+
+  if (otp.attempts >= OTP_MAX_ATTEMPTS) {
+    throw ApiError.badRequest("Đã nhập sai mã quá số lần cho phép, vui lòng yêu cầu lại");
+  }
+
+  const isMatch = await bcrypt.compare(code, otp.codeHash);
+  if (!isMatch) {
+    otp.attempts += 1;
+    await otp.save();
+    throw ApiError.badRequest("Mã xác thực không đúng");
+  }
+
+  otp.used = true;
+  await otp.save();
+
+  user.twoFactorEnabled = true;
+  await user.save();
+
+  await UserAudit.create({ user: user._id, action: "ENABLE_2FA", performedBy: user._id, note: "Bật xác thực 2 lớp" });
+
+  return { twoFactorEnabled: true };
+};
+
+/**
+ * Roadmap C1 (DEV-068, 2026-09-19) — tự TẮT 2FA, yêu cầu nhập lại password
+ * hiện tại (KHÁC bật — không cần OTP) để chặn trường hợp phiên đăng nhập bị
+ * chiếm cũng đủ để âm thầm tắt lớp bảo vệ này, cùng mức xác thực lại đã dùng
+ * cho `changePassword()` (`oldPassword`).
+ */
+export const disableTwoFactor = async (userId: any, password: string) => {
+  const user = await User.findById(userId).select("+password");
+  if (!user || !user.isActive) throw ApiError.badRequest("Không tìm thấy hoặc không hoạt động");
+
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) throw ApiError.unauthorized("Mật khẩu không đúng");
+
+  user.twoFactorEnabled = false;
+  await user.save();
+  await TwoFactorOtp.deleteMany({ user: user._id });
+
+  await UserAudit.create({ user: user._id, action: "DISABLE_2FA", performedBy: user._id, note: "Tắt xác thực 2 lớp" });
+
+  return { twoFactorEnabled: false };
 };
 
 /**
@@ -322,6 +522,63 @@ export const logout = async (refreshToken: string, userId: any) => {
     note: "User đăng xuất"
   });
 
+  return true;
+};
+
+/**
+ * Roadmap C2 (Quản lý phiên đăng nhập, DEV-069, 2026-09-19) — chuẩn hoá 1
+ * `RefreshToken` document thành shape trả về cho FE (KHÔNG bao giờ trả
+ * `token` — dù đã hash, vẫn không cần thiết lộ ra ngoài).
+ */
+const toSessionDTO = (rt: any, isCurrent: boolean) => {
+  const { browser, os } = parseUserAgent(rt.userAgent);
+  return {
+    _id: rt._id,
+    browser,
+    os,
+    ip: rt.ip ?? null,
+    createdAt: rt.createdAt,
+    expiresAt: rt.expiresAt,
+    isCurrent,
+  };
+};
+
+/**
+ * LIST MY SESSIONS — self-service, KHÔNG cần permission riêng (giống
+ * `changePassword`/`getMe` — hành động tự-scope). Chỉ trả phiên CÒN hiệu
+ * lực (`revoked:false` VÀ chưa hết hạn — token đã hết hạn dù `revoked:false`
+ * cũng không dùng đăng nhập được nữa, không có ý nghĩa hiển thị/thu hồi).
+ *
+ * `isCurrent` xác định bằng HEURISTIC so khớp `userAgent`+`ip` của request
+ * HIỆN TẠI với từng phiên đã lưu — KHÔNG cần client gửi lại refreshToken
+ * (tránh phải truyền token nhạy cảm qua body của 1 API "chỉ xem"). Đánh đổi:
+ * lý thuyết có thể đánh dấu nhầm nếu 2 thiết bị THẬT SỰ trùng cả UA lẫn IP
+ * (hiếm — NAT dùng chung + cùng trình duyệt/phiên bản) — chấp nhận được cho
+ * mục đích hiển thị, không phải cơ chế bảo mật.
+ */
+export const listMySessions = async (userId: any, meta: SessionMeta = {}) => {
+  const sessions = await RefreshToken.find({
+    user: userId,
+    revoked: false,
+    expiresAt: { $gt: new Date() },
+  }).sort({ createdAt: -1 });
+
+  return sessions.map((rt: any) =>
+    toSessionDTO(rt, !!meta.userAgent && rt.userAgent === meta.userAgent && !!meta.ip && rt.ip === meta.ip),
+  );
+};
+
+/**
+ * REVOKE MY SESSION — self-service, thu hồi ĐÚNG 1 phiên của CHÍNH MÌNH
+ * (lọc `user: userId` — không cho revoke phiên của user khác dù biết đúng
+ * `_id`, trả 404 thay vì 403 để không lộ phiên đó có tồn tại hay không).
+ */
+export const revokeMySession = async (userId: any, sessionId: any) => {
+  const result = await RefreshToken.findOneAndUpdate(
+    { _id: sessionId, user: userId, revoked: false },
+    { revoked: true },
+  );
+  if (!result) throw ApiError.notFound("Không tìm thấy phiên đăng nhập");
   return true;
 };
 

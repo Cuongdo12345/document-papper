@@ -101,6 +101,8 @@ export interface GetDocumentsParams {
   sortBy?: "createdAt" | "updatedAt" | "title" | "documentCode" | "serviceDate" | "actualCost";
   order?: "asc" | "desc";
   keyword?: string;
+  /** [MỚI 2026-09-18, DEV-063] Tìm toàn văn (title+documentCode+nội dung/ghi chú trong `meta`) — tách riêng khỏi `keyword`, khi truyền field này backend BỎ QUA `sortBy`/`order` (sort theo mức độ liên quan). */
+  fullTextSearch?: string;
   isActive?: boolean;
   category?: DocumentCategory;
   subType?: DocumentSubType;

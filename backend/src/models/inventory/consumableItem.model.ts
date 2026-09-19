@@ -10,7 +10,7 @@ const ConsumableItemSchema = new Schema<IConsumableItem>(
   {
     name: { type: String, required: true, trim: true },
     unit: { type: String, required: true, trim: true },
-    category: { type: String, trim: true },
+    category: { type: Schema.Types.ObjectId, ref: "ConsumableCategory" },
     department: { type: Schema.Types.ObjectId, ref: "Department", required: true },
 
     quantityOnHand: { type: Number, required: true, default: 0, min: 0 },
@@ -31,6 +31,8 @@ const ConsumableItemSchema = new Schema<IConsumableItem>(
 // tự quản lý danh mục của mình).
 ConsumableItemSchema.index({ department: 1, name: 1 }, { unique: true });
 ConsumableItemSchema.index({ department: 1, isActive: 1 });
+// Lọc theo nhóm vật tư (`ConsumableCategoriesListPage`/filter danh sách vật tư, 2026-09-16).
+ConsumableItemSchema.index({ category: 1 });
 
 export const ConsumableItem = model<IConsumableItem>(
   "ConsumableItem",

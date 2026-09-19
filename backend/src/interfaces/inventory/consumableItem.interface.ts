@@ -23,7 +23,12 @@ import type { Types } from "mongoose";
 export interface IConsumableItem {
   name: string;
   unit: string; // đơn vị tính: cái, hộp, gói, chai, thùng...
-  category?: string; // nhóm phân loại tự do (VD "Vật tư y tế", "Văn phòng phẩm") — KHÔNG dùng model AssetCategory riêng, tránh over-engineer khi chưa có nhu cầu quản lý category độc lập
+  // ⚠️ SỬA (2026-09-16): TỪNG là text tự do (quyết định B3 gốc: "tránh
+  // over-engineer khi chưa có nhu cầu quản lý category độc lập"). User xác
+  // nhận nhu cầu đó ĐÃ CÓ (nhiều loại vật tư, cần nhóm có phân cấp cha/con)
+  // — đổi sang ref `ConsumableCategory` (xem `consumableCategory.interface.ts`),
+  // validate tồn tại/active ở service (mirror `department`).
+  category?: Types.ObjectId; // ref ConsumableCategory — tuỳ chọn (vật tư có thể chưa phân nhóm)
   department: Types.ObjectId; // ref Department — 1 item = tồn kho của 1 khoa/phòng ban cụ thể
 
   quantityOnHand: number; // running balance — luôn khớp SUM(transactions) của item này

@@ -129,6 +129,111 @@ CẬP NHẬT TÀI LIỆU
 
 ## 5. TASK HIỆN TẠI — CẬP NHẬT 2026-09-06 (file này trước đó ĐỨNG YÊN từ thời DEV-026, KHÔNG phản ánh FE-01→04/DEV-027/028/009A — xem `docs/00_PROJECT_MEMORY.md` và `docs/frontend/FRONTEND_MEMORY.md` làm nguồn chính, mục này chỉ tóm tắt lại đúng trạng thái mới nhất)
 
+> **⚠️ CẬP NHẬT THẬT — 2026-09-16**: toàn bộ nội dung Mục 5 bên dưới (từ "**Current Task:** DEV-009A..." cho tới hết các "Ghi chú DEV-XXX") **CHỈ ĐÚNG ĐẾN DEV-028 / FE-04 (2026-09-06)** — giữ nguyên bên dưới làm lịch sử, KHÔNG phản ánh các task đã DONE sau đó. Không chép lại narrative chi tiết ở đây (đã có sẵn, tránh trùng lặp) — chỉ tóm tắt đúng trạng thái mới nhất:
+>
+> - **Backend**: thêm **35 task** đã DONE sau DEV-028: `DEV-029`→`DEV-048` (bugfix/hardening/test, theo dõi trong `docs/00_PROJECT_MEMORY.md`), `DEV-049`→`DEV-056` (triển khai Feature Roadmap NHÓM A đầy đủ A1→A4, và NHÓM B1→B3, gồm cả "Nhóm vật tư"/ConsumableCategory phát sinh trong lúc làm B3), `DEV-057` (NHÓM B4 — Vendor & Contract, module mới hoàn toàn), `DEV-058` (bổ sung Cập nhật/Huỷ/Khôi phục ở `ContractsListPage`, thêm permission `CONTRACT_RESTORE` riêng), `DEV-059` (đồng bộ hiển thị permission sang tiếng Việt trong UI RBAC — KHÔNG đổi `Permission.name` kỹ thuật, chỉ bổ sung 16 mô tả tiếng Việt còn thiếu + sửa `RolePermissionMatrix` ưu tiên hiển thị `description`), `DEV-060` (chọn nhiều dòng + Batch Action Bar xoá mềm hàng loạt cho 6 trang: Asset/AssetCategory/ConsumableItem/ConsumableCategory/Vendor/User — dùng lại permission xoá/sửa single-item hiện có, KHÔNG tạo permission mới; Department CỐ TÌNH loại khỏi phạm vi vì dùng hard-delete thật), `DEV-061` (mở rộng chọn nhiều dòng sang `DocumentsListPage` — CẢ xoá mềm LẪN khôi phục hàng loạt, khác 6 trang trước chỉ có xoá; tái dùng nguyên vẹn `deleteDocumentService`/`restoreDocumentService` qua `runBulkDelete`, dùng lại permission `DOCUMENT_DELETE`/`DOCUMENT_UPDATE` hiện có), `DEV-062` (bổ sung khôi phục hàng loạt cho ĐÚNG 6 trang của DEV-060 — trước đó chỉ có xoá hàng loạt; phát hiện ConsumableItem/Vendor chưa từng có route restore đơn lẻ nào, tái dùng cách "giả lập qua update isActive:true" mà frontend đã dùng cho nút khôi phục từng dòng, KHÔNG tự xây route restore đơn lẻ mới; User dùng permission RIÊNG `USER_RESTORE` khác `USER_DELETE`) `DEV-063` (Roadmap B6 — Tìm kiếm toàn văn cho Document, qua MongoDB `$text` trên `title`/`documentCode`/`meta` (nội dung/ghi chú tự do); ô search MỚI RIÊNG "Tìm nội dung/ghi chú", KHÔNG đụng ô "Tìm kiếm (mã/tiêu đề)" cũ; index text cũ chưa từng được dùng được thay bằng `document_fulltext_search` — migration `scripts/migrate-document-fulltext-index.ts` đã chạy trên DB dev, PHẢI chạy lại thủ công nếu deploy DB khác) và `DEV-064` (Roadmap B5 — Xuất PDF chính thức cho Document, dependency mới `pdfmake`; "ký" là NỘI BỘ hệ thống — RSA khoá riêng, KHÔNG PHẢI chữ ký số CA hợp lệ pháp lý, user đã xác nhận rõ sau khi được cảnh báo rủi ro; bảng phê duyệt lấy từ `WorkflowInstance.steps`; route `GET /documents/:id/export-pdf` dùng ĐÚNG guard `GET /documents/:id/versions`, không tạo permission mới; khoá ký đọc từ `.env` — `PDF_SIGN_PRIVATE_KEY`/`PDF_SIGN_PUBLIC_KEY`, sinh bằng `scripts/generate-pdf-signing-keys.ts`, MỖI môi trường cần khoá riêng) và `DEV-065` (Roadmap B7 — Báo cáo tuần tự động gửi email cho BAN_GIAM_DOC/TRUONG_KHOA; KHÁC mọi cảnh báo tự động khác trong hệ thống — đây là opt-in THẬT (`User.subscribedToWeeklyReport`, tự bật qua `PATCH /users/me`, KHÔNG gửi mặc định cho cả role); cron đầu tiên chạy HÀNG TUẦN (thứ Hai 08:30, các cron khác đều hàng ngày); phát hiện gap NGOÀI phạm vi khi làm: hệ thống hiện KHÔNG có đường nào (kể cả ADMIN) để sửa `email` của user đã tồn tại — ghi nhận trong DEV-065.md Mục 4, chưa tự sửa). Không còn task backend TODO nào theo roadmap gốc lẫn Nhóm A/B1-7.
+> - **Frontend**: thêm **12 task** đã DONE sau FE-04: `FE-05`→`FE-16` (Workflow UI → Assets → Medical Devices → RBAC Admin → Dashboard → Asset Categories → Audit Logs → Notifications ×2 → Profile → Upload/Excel → Global UI Polish pass 1). Chi tiết đầy đủ: `docs/frontend/FRONTEND_MEMORY.md` Mục 11.
+> - **Không có task nào đang PAUSED/BLOCKED** tại 2026-09-18 (khác với bản ghi lịch sử bên dưới còn nhắc `DEV-009A` PAUSED — task đó đã RESUME và DONE, xem chi tiết ngay trong lịch sử Mục 5 phần dưới).
+> - **Còn lại CHƯA làm** (mới là đề xuất trong `docs/development/FEATURE_DEVELOPMENT_ROADMAP.md`, chưa task nào được duyệt): **C2** (Session Management UI), **C3** (Audit export mẫu thanh tra), NHÓM D (dài hạn). NHÓM A/B (B1→B8) ĐÃ LÀM XONG hết. **C1 (DEV-068, 2026-09-19)** cũng ĐÃ LÀM XONG — xem mục ngay dưới. Ngoài ra `FE-16.md` Mục 4 tự liệt kê phần UI polish chưa làm trong chính pass đầu tiên của nó.
+> - **`DEV-068`** (2026-09-19, Roadmap C1 — Xác thực 2 lớp qua email OTP): model mới `TwoFactorOtp`
+>   (mirror `PasswordResetToken` nhưng hash bằng bcrypt thay vì SHA-256 — mã OTP chỉ 6 số, entropy thấp
+>   hơn hẳn token 32-byte). `login()` refactor: nếu `user.twoFactorEnabled`, trả
+>   `{requiresTwoFactor, username}` thay vì token, FE gọi tiếp `POST /auths/login/verify-otp`. Self-service
+>   opt-in qua `POST /auths/2fa/enable`+`/confirm` (CHỈ role ADMIN/TRUONG_KHOA/DIEU_DUONG_TRUONG/
+>   BAN_GIAM_DOC bật được, PHẢI có email), tự tắt qua `/2fa/disable` (yêu cầu password, KHÔNG OTP). Không
+>   có backup codes — khôi phục DUY NHẤT qua ADMIN (`PATCH /users/reset-2fa/:id`, permission MỚI
+>   `USER_RESET_2FA`, KHÔNG gán role nào ngoài ADMIN — mirror `USER_RESET_PASSWORD`). FE: `LoginPage.tsx`
+>   thêm bước 2 (nhập OTP), `ProfilePage.tsx` thêm section "Xác thực 2 lớp"
+>   (`TwoFactorSection.tsx`), `UsersListPage.tsx` thêm nút "Tắt xác thực 2 lớp" cho ADMIN. **Phát hiện VÀ
+>   SỬA 1 bug thật qua smoke test dữ liệu dev** — `UserAudit.action` enum thiếu 3 giá trị mới
+>   (`ENABLE_2FA`/`DISABLE_2FA`/`RESET_2FA`), khiến `UserAudit.create()` throw `ValidationError` (chỉ lộ
+>   ra khi chạy thật trên DB, KHÔNG lộ qua unit test mock) — đã sửa `userAudit.model.ts`+`.interface.ts`.
+>   376/376 test backend PASS, đã verify bằng dữ liệu dev thật (script tạm, đã xoá, có khôi phục trạng
+>   thái gốc user fixture TRUONG_KHOA). Chưa tự verify UI qua trình duyệt thật (không có Playwright).
+> - **`DEV-067`** (2026-09-18, Roadmap B8 — Dự trù/đề xuất mua vật tư tiêu hao hàng tháng): domain MỚI
+>   `ConsumableRequest` (`/api/inventory/requests`), TÁCH BIỆT hoàn toàn ConsumableItem/ConsumableTransaction
+>   — KHÔNG có luồng duyệt (user xác nhận qua AskUserQuestion), trạng thái RIÊNG
+>   PENDING/FULFILLED/CANCELLED (không qua Workflow engine), CÓ theo dõi ngân sách (đơn giá/tổng tiền),
+>   đánh dấu "đã mua" là thao tác TAY, KHÔNG tự sinh `ConsumableTransaction`. Permission mới
+>   `CONSUMABLE_REQUEST_VIEW/CREATE/UPDATE/FULFILL` — `USER` có VIEW/CREATE/UPDATE (không FULFILL),
+>   `IT`/`PHONG_VAT_TU_TTB` có đủ cả 4; `TRUONG_KHOA`/`DIEU_DUONG_TRUONG`/`BAN_GIAM_DOC` KHÔNG đụng (giữ
+>   nguyên 3 role thuần phê duyệt, không có permission CONSUMABLE_* nào). **CẦN gán permission qua UI
+>   "Phân quyền" mới dùng được trên DB hiện tại** (cùng pattern DEV-058, `Role.permissions` không tự đồng
+>   bộ theo code — DEV-041). FE: tab mới "Đề xuất/Dự trù" trong Inventory
+>   (`/app/inventory/requests`), form Tạo/Sửa dùng `useFieldArray` (mirror `DocumentMetaFields.tsx`) — có
+>   1 lỗi build THẬT phát hiện khi `tsc -b` (không phải `tsc --noEmit` đơn thuần) do `z.coerce.number()`
+>   lệch type với `zodResolver`, đã sửa dùng `z.number()` + `valueAsNumber` (đúng pattern đã có ở
+>   `documentMeta.ts`). 358/358 test backend PASS, đã verify bằng dữ liệu dev thật (script tạm, đã xoá).
+>   Chưa tự verify UI qua trình duyệt thật (không có Playwright).
+> - **`DEV-066`** (2026-09-18, khắc phục gap phát hiện ở DEV-065 Mục 4): mở `email` cho `CreateUserDTO`
+>   VÀ `UpdateUserDTO` (trước đây CẢ HAI đều thiếu field này — gap rộng hơn mô tả ban đầu "chỉ thiếu ở
+>   update"), áp dụng cho `create()`/`update()` (ADMIN, `PUT /users/:id`) — CỐ TÌNH KHÔNG mở cho
+>   `updateMeService()` (self-service) vì chính docstring gốc của hàm đó đã liệt kê email là field nhạy
+>   cảm cố ý loại trừ (gắn với luồng `forgotPassword`). Frontend: `UserFormDrawer.tsx` thêm input Email,
+>   `UsersListPage.tsx` thêm cột Email. 345/345 test backend PASS, đã verify bằng dữ liệu dev thật (script
+>   tạm, đã xoá). Gap DEV-065 Mục 4 coi như ĐÃ GIẢI QUYẾT.
+> - **Việc CẦN LÀM THÊM sau DEV-058**: vào UI "Phân quyền", gán permission `CONTRACT_RESTORE` cho role IT và Phòng Vật tư-TTB (permission đã có trong DB qua `seed-rbac.ts`, nhưng Role.permissions KHÔNG tự động cập nhật theo thiết kế DEV-041 — cần thao tác tay qua UI, ADMIN không bị ảnh hưởng).
+> - **Việc CẦN LÀM THÊM sau DEV-061/DEV-062**: không có — cả 2 task đều dùng lại permission hiện có, không cần thao tác gì thêm qua UI "Phân quyền". Chưa tự verify được bằng trình duyệt thật (không có Playwright trong môi trường này) — cần user tự refresh và xác nhận hành vi UI trên cả 7 trang (Document + 6 trang DEV-060/062).
+> - **Việc CẦN LÀM THÊM sau DEV-063**: nếu deploy sang môi trường KHÁC (staging/prod, DB khác dev hiện tại), PHẢI chạy lại `npx ts-node scripts/migrate-document-fulltext-index.ts` trên DB đó trước khi tính năng search hoạt động đúng (index không tự đồng bộ qua deploy code). Chưa tự verify UI thật qua trình duyệt — cần user tự refresh và thử ô "Tìm nội dung/ghi chú" trên `DocumentsListPage`.
+> - **Việc CẦN LÀM THÊM sau DEV-064**: nếu deploy sang môi trường KHÁC (staging/prod), BẮT BUỘC chạy `npx ts-node scripts/generate-pdf-signing-keys.ts` TRÊN môi trường đó và dán khoá in ra vào `.env` của môi trường đó (KHÔNG copy khoá dev sang) — thiếu khoá thì nút "Xuất PDF" sẽ lỗi rõ ràng khi gọi (không crash app lúc khởi động). Chưa có logo/letterhead thật (đang dùng header text tạm, `ORG_DISPLAY_NAME` env) — thay sau nếu có file thật. Chưa tự verify UI thật qua trình duyệt — cần user tự refresh và thử nút "Xuất PDF" trên `DocumentDetailPage`.
+> - **Việc CẦN LÀM THÊM sau DEV-065**: ~~gap ngoài phạm vi phát hiện khi làm~~ — **ĐÃ GIẢI QUYẾT bằng
+>   `DEV-066` (2026-09-18)**, xem mục ngay trên. Vẫn còn: chưa tự verify UI thật qua trình duyệt — cần
+>   user tự refresh, đăng nhập tài khoản BAN_GIAM_DOC/TRUONG_KHOA (giờ có thể tự bổ sung email qua trang
+>   Người dùng → Sửa) để thấy section "Báo cáo tuần" ở trang Hồ sơ cá nhân.
+> - **Việc CẦN LÀM THÊM sau DEV-066**: không có thao tác migrate/vận hành nào thêm (chỉ mở field,
+>   không đổi schema/index). Chưa tự verify UI thật qua trình duyệt (không có Playwright) — cần user tự
+>   refresh, vào trang Người dùng → Sửa 1 user → nhập email → Lưu, kiểm tra cột Email cập nhật đúng.
+> - **⚠️ SỬA (2026-09-19)**: phát hiện qua báo cáo THẬT của user (icon "Tắt xác thực 2 lớp" không hiện
+>   dù đăng nhập ADMIN) rằng claim "USER_RESET_2FA chỉ ADMIN có, không cần gán qua UI" ở trên là SAI —
+>   `Permission` catalog trong DB dev THIẾU cả `USER_RESET_2FA` LẪN 4 `CONSUMABLE_REQUEST_*` (DEV-067)
+>   LẪN `DASHBOARD_WEEKLY_REPORT_TRIGGER` (DEV-065) — `scripts/seed-rbac.ts` (local, gitignored, đọc
+>   `Object.values(PERMISSIONS)` trực tiếp từ code nên tự nhận permission mới) chưa được chạy lại từ khi
+>   3 task đó thêm permission mới. Đã chạy script (mặc định, KHÔNG `--sync-roles` — chỉ tạo `Permission`
+>   catalog, KHÔNG đụng `Role.permissions` của role nào) để tạo đủ cả 6 permission thiếu. Việc seed này
+>   lại LỘ RA 1 bug thật THỨ 2: tổng Permission trong DB tăng lên 108, vượt `limit:100` hardcode ở
+>   `useAllRbacPermissions()` (FE) — sort theo `resource` ASC nên toàn bộ nhóm WORKFLOW_ (gồm cả
+>   `WORKFLOW_APPROVE`/`REJECT`) bị CẮT MẤT khỏi UI "Phân quyền". Đã sửa cả 2 phía
+>   (`GetPermissionsQueryDTO` max 100→300, FE limit 100→300) — verify lại DB thật xác nhận đủ 108/108.
+>   Xem `DEV-068.md` Mục 5 để có chi tiết đầy đủ + evidence cho cả 2 bug.
+> - **[XÁC NHẬN 2026-09-19]** User đã tự gán `USER_RESET_2FA` cho role ADMIN qua UI "Phân quyền" + verify
+>   THẬT qua trình duyệt: bật 2FA cho tài khoản `admin`, icon "Tắt xác thực 2 lớp" hiện đúng ở trang Người
+>   dùng. **C1 (DEV-068) giờ DONE hoàn toàn, kể cả verify UI trình duyệt thật.**
+> - **`DEV-069`** (2026-09-19, Roadmap C2 — Quản lý phiên đăng nhập): `RefreshToken` model thêm
+>   `userAgent`/`ip` (trước đây model này KHÔNG lưu bất kỳ metadata thiết bị nào) + index
+>   `{user,revoked,createdAt}` (trước đây KHÔNG có index nào). Self-service cho MỌI role
+>   (`GET/DELETE /auths/sessions*`, `SessionsSection.tsx` ở Hồ sơ cá nhân — KHÁC 2FA chỉ giới hạn role
+>   cấp cao) + ADMIN hỗ trợ xem/thu hồi phiên user khác (`GET/DELETE /users/:id/sessions*`, permission MỚI
+>   `SESSION_VIEW_ALL`/`SESSION_REVOKE_ALL`, mirror `USER_RESET_2FA` — KHÔNG gán role nào, chỉ ADMIN có).
+>   **Áp dụng NGAY bài học DEV-068**: (1) chủ động thêm `REVOKE_SESSION` vào `UserAudit.action` enum
+>   TRƯỚC khi chạy, không đợi bug lộ ra; (2) chủ động chạy `seed-rbac.ts` ngay sau khi code để tạo
+>   `Permission` catalog cho 2 permission mới trên DB dev — VẪN CẦN gán role qua UI "Phân quyền" (script
+>   không tự làm, xem DEV-069.md Mục 5). **MỚI — tuân thủ CLAUDE.md Mục 18 (cập nhật 2026-09-19)**: viết
+>   `session-management.e2e-test.ts` (supertest + MongoDB in-memory THẬT, 7 test) verify bằng HTTP thật
+>   route mới bị chặn đúng 403 cho user thiếu permission — không chỉ giả định middleware đã đủ. 391/391
+>   unit test + 17/17 E2E test PASS, build cả 2 phía thành công. Chưa tự verify UI qua trình duyệt thật.
+> - **`DEV-070`** (2026-09-19, Roadmap C3 — Giám sát phiên đăng nhập toàn hệ thống, GỘP với ý tưởng user
+>   đề xuất "trang admin xem phiên của toàn bộ user"): trang RIÊNG `/app/sessions`
+>   (`SessionsMonitorPage.tsx`, sidebar "Phiên đăng nhập") cho ADMIN xem + thu hồi phiên đăng nhập của
+>   TẤT CẢ user cùng lúc, có filter `search` theo username/fullName. Route mới `GET /users/sessions`
+>   (`user.routes.ts:95-101`) DÙNG LẠI permission `SESSION_VIEW_ALL`/`SESSION_REVOKE_ALL` (không tạo
+>   permission mới — ADMIN đã có sẵn từ DEV-069, KHÔNG cần thao tác "Phân quyền" gì thêm cho task này).
+>   Thu hồi từ trang mới dùng LẠI route `DELETE /users/:id/sessions/:sessionId` sẵn có (không tạo route
+>   revoke riêng). Thêm index MỚI `{revoked,expiresAt,createdAt}` cho `RefreshToken` (index cũ DEV-069 dẫn
+>   đầu bằng `user`, không hỗ trợ truy vấn cross-user). Phần còn lại của C3 gốc (audit export mẫu thanh
+>   tra) — user xác nhận CHƯA có mẫu cụ thể, nên chỉ cải thiện Audit Log hiện tại: filter "Hành động" ở
+>   `AuditLogsPage.tsx` đổi từ chọn 1 sang chọn NHIỀU (gap đã ghi nhận từ FE-11, backend hỗ trợ multi-value
+>   từ trước). **Tuân thủ CLAUDE.md Mục 18**: `session-management.e2e-test.ts` mở rộng thêm 3 test verify
+>   403 thật cho route mới. 393/393 unit test + 20/20 E2E test PASS, build cả 2 phía thành công. Chưa tự
+>   verify UI qua trình duyệt thật (không có Playwright/chromium-cli trong môi trường) — dev server backend
+>   (:3000)/frontend (:5173) đang chạy sẵn, cần user tự refresh kiểm tra.
+> - **Next Task**: chưa được user chỉ định cho phiên kế tiếp. Việc CẦN LÀM THÊM còn lại (KHÔNG bắt buộc,
+>   chỉ cần khi dùng tính năng tương ứng, thao tác tay qua UI "Phân quyền"): tick 4
+>   `CONSUMABLE_REQUEST_*` cho role USER/IT/PHONG_VAT_TU_TTB (DEV-067) — `Permission` catalog đã có sẵn để
+>   chọn. Ứng viên tiếp theo theo Roadmap: NHÓM D (dài hạn) — KHÔNG tự bắt đầu khi chưa có chỉ định rõ
+>   (CLAUDE.md §41). C3 giờ đã DONE (DEV-070) — không còn là ứng viên.
+>
+> Từ đây trở xuống là nội dung TRƯỚC 2026-09-16, giữ nguyên nội dung gốc để tra cứu lịch sử — không tự ý coi là trạng thái hiện tại.
+
 **Current Task:** DEV-009A (Kích hoạt ABAC domain Document — `GET /:id` department-scoping), resumed từ PAUSED (2026-09-01) theo yêu cầu user.
 
 **Status:** ✅ DONE (2026-09-06) — `npx jest` 16 suite/**97** test PASS, `npx tsc --noEmit` 0 lỗi. Code: wiring ABAC vào `GET /documents/:id` (`loadDocument`+`authorizePermission(enablePolicies)`), bỏ `DOCUMENT_VIEW_DETAIL` khỏi 5 role (IT/USER/TRUONG_KHOA/DIEU_DUONG_TRUONG/BAN_GIAM_DOC), thêm index `Policy`, thêm `seedPolicies()` vào `seed-rbac.ts`. DB dev: áp dụng qua API targeted (KHÔNG chạy seed-rbac.ts) — assign-permissions cho 5 role + tạo Policy mới. **HTTP verify THẬT lần đầu cho nhánh ABAC** (tài khoản `admin` + user thật `thuykhth`): cùng phòng ban→200, khác phòng ban→403, ADMIN bypass→200/200, ID sai format→400, ID không tồn tại→404 — đúng thiết kế. Chi tiết đầy đủ: `docs/development/tasks/DEV-009A.md` Mục 10.
@@ -355,7 +460,7 @@ Khi nhận task mới:
 16. Review thay đổi.
 17. Cập nhật tài liệu khi cần.
 18. Cập nhật PROJECT_MEMORY khi cần.
-19. Cập nhật SESSION_HANDOFF khi task vẫn đang thực hiện hoặc chưa hoàn thành.
+19. Cập nhật Mục 5 (trạng thái/Next Task) của SESSION_HANDOFF sau MỌI task — kể cả khi task đã DONE trọn vẹn trong cùng phiên, không chỉ khi task còn dở dang. Chỉ cần cập nhật ngắn gọn "trạng thái thật hiện tại + Next Task", không chép lại narrative chi tiết (đã có ở PROJECT_MEMORY/FRONTEND_MEMORY/task file riêng) — tránh để Mục 5 lệch khỏi thực tế như đã từng xảy ra (xem cảnh báo ⚠️ CẬP NHẬT THẬT ở đầu Mục 5).
 
 ---
 
@@ -630,6 +735,8 @@ Không tái dựng kiến thức project từ conversation history nếu tài li
 
 ## 16. TRẠNG THÁI BÀN GIAO HIỆN TẠI
 
+> **⚠️ CẬP NHẬT THẬT — 2026-09-16**: khối bên dưới (bao gồm câu "Chờ người dùng chỉ định TASK cụ thể... TASK-006") là trạng thái từ **TRƯỚC `DEV-001`** — cũ hơn cả nội dung Mục 5, giữ nguyên làm lịch sử. Trạng thái thật hiện tại: xem khối "⚠️ CẬP NHẬT THẬT — 2026-09-16" ở đầu Mục 5.
+
 **SẴN SÀNG BÀN GIAO — POST-ANALYSIS ROADMAP HOÀN TẤT**
 
 Dự án đã hoàn thành phân tích 13 phase ban đầu + Phase 14→19 (Audit/Architecture/Refactoring/Security/Testing/Roadmap). Toàn bộ finding đã CONFIRMED và tổng hợp thành `docs/19_IMPROVEMENT_ROADMAP.md` (24 refactor candidate, 19 test case, 6 task candidate P0). Chưa có task nào trong số này được implement.
@@ -645,6 +752,8 @@ Khi task mới bắt đầu, thay thế các section liên quan trong tài liệ
 ---
 
 ## 17. HÀNH ĐỘNG TIẾP THEO CHÍNH XÁC
+
+> **⚠️ CẬP NHẬT THẬT — 2026-09-16**: 2 khối bên dưới (patch 2026-09-06 và khối gốc DEV-025/DEV-009A PAUSED) đều đã lỗi thời, giữ nguyên làm lịch sử. Trạng thái thật + Next Task: xem khối "⚠️ CẬP NHẬT THẬT — 2026-09-16" ở đầu Mục 5.
 
 > ⚠️ Khối text dưới đây (giữ nguyên làm lịch sử) dừng ở thời điểm DEV-025/DEV-009A PAUSED.
 > **Cập nhật thật 2026-09-06**: DEV-009A đã RESUMED và DONE (xem Mục 5 ở trên +

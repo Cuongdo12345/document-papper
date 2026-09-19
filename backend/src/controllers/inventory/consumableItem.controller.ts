@@ -7,6 +7,8 @@ import {
   getAllConsumableItemsService,
   getConsumableItemByIdService,
   updateConsumableItemService,
+  bulkDeleteConsumableItemService,
+  bulkRestoreConsumableItemService,
   createConsumableTransactionService,
   getConsumableTransactionsService,
 } from "../../services/inventory/consumableItem.service";
@@ -46,6 +48,24 @@ export const updateConsumableItem = catchAsync(async (req: Request, res: Respons
   res.json({
     message: "Cập nhật vật tư thành công",
     data: item,
+  });
+});
+
+export const bulkDeleteConsumableItems = catchAsync(async (req: Request, res: Response) => {
+  const result = await bulkDeleteConsumableItemService(req.body.ids, req.user?._id);
+
+  res.json({
+    message: `Đã xoá ${result.deletedIds.length}/${req.body.ids.length} vật tư`,
+    data: result,
+  });
+});
+
+export const bulkRestoreConsumableItems = catchAsync(async (req: Request, res: Response) => {
+  const result = await bulkRestoreConsumableItemService(req.body.ids, req.user?._id);
+
+  res.json({
+    message: `Đã khôi phục ${result.deletedIds.length}/${req.body.ids.length} vật tư`,
+    data: result,
   });
 });
 

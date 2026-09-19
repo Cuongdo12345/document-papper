@@ -21,6 +21,8 @@ export interface UserListItem {
   isActive: boolean;
   extraPermissions?: string[];
   denyPermissions?: string[];
+  /** [MỚI 2026-09-19, Roadmap C1] Chỉ tự bật được qua `POST /auths/2fa/enable`+`/confirm` — xem `TwoFactorSection.tsx`. */
+  twoFactorEnabled?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -45,6 +47,8 @@ export interface CreateUserRequest {
   fullName: string;
   role: string;
   department?: string;
+  /** [MỚI 2026-09-18] Khắc phục gap DEV-065 Mục 4 — trước đây không có đường nào (kể cả lúc tạo) để gán email. */
+  email?: string;
 }
 
 /** Khớp `UpdateUserDTO` — KHÔNG có `password` (đổi mật khẩu là action riêng). */
@@ -54,6 +58,8 @@ export interface UpdateUserRequest {
   role?: string;
   department?: string;
   isActive?: boolean;
+  /** [MỚI 2026-09-18] Khắc phục gap DEV-065 Mục 4 — CHỈ có tác dụng qua `PUT /users/:id` (ADMIN), KHÔNG qua `PATCH /users/me`. */
+  email?: string;
 }
 
 /** Khớp `AssignRoleDTO` — endpoint RIÊNG (`PATCH /users/:id/role`), tách khỏi `UpdateUserRequest`. */

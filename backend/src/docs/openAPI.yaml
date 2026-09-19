@@ -59,6 +59,14 @@ tags:
       biệt hoàn toàn với Assets (tài sản cố định). Tồn kho theo từng khoa/
       phòng ban, đầy đủ lịch sử giao dịch nhập/xuất, cảnh báo tồn kho thấp
       tự động.
+  - name: Vendors
+    description: >
+      Roadmap B4 (2026-09-16) — Quản lý nhà cung cấp (Vendor). Module MỚI,
+      liên kết với Assets qua Contract.
+  - name: Contracts
+    description: >
+      Roadmap B4 (2026-09-16) — Hợp đồng bảo trì/bảo hành ký với 1 Vendor,
+      áp dụng cho nhiều Asset cùng lúc. Cảnh báo tự động khi sắp hết hạn.
 
 security:
   - bearerAuth: []
@@ -93,12 +101,50 @@ paths:
     post:
       tags: [Auth]
       summary: Đăng nhập
+      description: >
+        [SỬA 2026-09-19, Roadmap C1] Nếu tài khoản đã bật xác thực 2 lớp
+        (`twoFactorEnabled`), `data` trả về `AuthLoginPendingTwoFactor`
+        (KHÔNG có token) thay vì `AuthLoginResult` — FE phải gọi tiếp
+        `POST /api/auths/login/verify-otp` với mã OTP vừa gửi qua email để
+        hoàn tất đăng nhập và nhận token thật.
       security: []
       requestBody:
         required: true
         content:
           application/json:
             schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: Đăng nhập thành công, HOẶC yêu cầu xác thực 2 lớp bước 2 (xem `description`)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    oneOf:
+                      - $ref: "#/components/schemas/AuthLoginResult"
+                      - $ref: "#/components/schemas/AuthLoginPendingTwoFactor"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/auths/login/verify-otp:
+    post:
+      tags: [Auth]
+      summary: Bước 2 đăng nhập khi tài khoản đã bật 2FA — xác thực mã OTP gửi qua email
+      description: >
+        [MỚI 2026-09-19, Roadmap C1, DEV-068] KHÔNG cần gửi lại password —
+        `username`/`password` đã được xác thực đúng ở `POST /api/auths/login`
+        (bước đó mới sinh ra OTP). Mã OTP hết hạn sau 10 phút, tối đa 5 lần
+        nhập sai (sai quá số lần → phải đăng nhập lại từ đầu để nhận mã mới).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VerifyLoginOtpRequest" }
       responses:
         "200":
           description: Đăng nhập thành công
@@ -112,6 +158,136 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/auths/2fa/enable:
+    post:
+      tags: [Auth]
+      summary: Bắt đầu bật xác thực 2 lớp cho chính mình — gửi mã OTP xác nhận qua email
+      description: >
+        [MỚI 2026-09-19, Roadmap C1, DEV-068] Self-service, opt-in (KHÔNG bắt
+        buộc). CHỈ role ADMIN/TRUONG_KHOA/DIEU_DUONG_TRUONG/BAN_GIAM_DOC bật
+        được (403 nếu role khác), và PHẢI đã có `email` (400 nếu chưa có —
+        liên hệ IT/Quản trị để bổ sung trước, xem `DEV-066.md`). CHƯA bật cờ
+        `twoFactorEnabled` ngay — chỉ gửi OTP, phải gọi tiếp
+        `POST /api/auths/2fa/confirm` với mã đúng mới thực sự bật.
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Đã gửi mã OTP qua email
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/auths/2fa/confirm:
+    post:
+      tags: [Auth]
+      summary: Xác nhận mã OTP để hoàn tất bật xác thực 2 lớp
+      description: "[MỚI 2026-09-19, Roadmap C1, DEV-068]"
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConfirmTwoFactorRequest" }
+      responses:
+        "200":
+          description: Đã bật xác thực 2 lớp
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties: { twoFactorEnabled: { type: boolean, example: true } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/auths/2fa/disable:
+    post:
+      tags: [Auth]
+      summary: Tự tắt xác thực 2 lớp cho chính mình
+      description: >
+        [MỚI 2026-09-19, Roadmap C1, DEV-068] Yêu cầu nhập lại PASSWORD hiện
+        tại (KHÔNG cần OTP) — chặn trường hợp phiên đăng nhập bị chiếm cũng đủ
+        để âm thầm tắt lớp bảo vệ này.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DisableTwoFactorRequest" }
+      responses:
+        "200":
+          description: Đã tắt xác thực 2 lớp
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties: { twoFactorEnabled: { type: boolean, example: false } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/auths/sessions:
+    get:
+      tags: [Auth]
+      summary: Danh sách phiên đăng nhập CÒN HIỆU LỰC của chính mình
+      description: >
+        [MỚI 2026-09-19, Roadmap C2, DEV-069] Self-service, KHÔNG cần
+        permission riêng. `isCurrent` xác định bằng heuristic so khớp
+        User-Agent + IP của request hiện tại với từng phiên đã lưu (KHÔNG
+        cần gửi lại refreshToken).
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Danh sách phiên đăng nhập
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Session" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/auths/sessions/{id}:
+    delete:
+      tags: [Auth]
+      summary: Thu hồi 1 phiên đăng nhập của chính mình
+      description: >
+        [MỚI 2026-09-19, Roadmap C2, DEV-069] Chỉ thu hồi được phiên THUỘC
+        VỀ chính người gọi — trả 404 (không phải 403) nếu id không tồn tại
+        hoặc thuộc về user khác, tránh lộ thông tin phiên đó có tồn tại hay
+        không. Nếu thu hồi ĐÚNG phiên đang dùng để gọi API này, access token
+        hiện tại vẫn còn hiệu lực tới khi hết hạn tự nhiên (JWT stateless)
+        nhưng KHÔNG refresh được nữa — FE tự đăng xuất cục bộ ngay sau khi
+        gọi thành công.
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Đã thu hồi phiên đăng nhập
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /api/auths/refresh-token:
     post:
@@ -307,9 +483,10 @@ paths:
       description: >
         ⚠️ Route dùng chung DTO `UpdateUserDTO` ở tầng validate (chấp nhận cả
         role/department/isActive trong body mà không báo lỗi), nhưng tầng
-        service (`updateMeService`) chỉ thực sự áp dụng 2 field
-        `fullName`/`username` — mọi field khác bị whitelist âm thầm bỏ qua.
-        Schema request bên dưới phản ánh đúng field CÓ TÁC DỤNG thật.
+        service (`updateMeService`) chỉ thực sự áp dụng 3 field
+        `fullName`/`username`/`subscribedToWeeklyReport` (Roadmap B7, thêm
+        2026-09-18) — mọi field khác bị whitelist âm thầm bỏ qua. Schema
+        request bên dưới phản ánh đúng field CÓ TÁC DỤNG thật.
 
         Đổi `username` trùng với user khác trả 409 (Conflict) — trước đây
         (đến 2026-09-10) thiếu check này, ném thẳng lỗi driver MongoDB
@@ -337,6 +514,46 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409": { $ref: "#/components/responses/Conflict" }
+
+  # [MỚI 2026-09-16, DEV-060] Xoá mềm hàng loạt — permission USER_DELETE y hệt DELETE /:id.
+  /api/users/bulk-delete:
+    post:
+      tags: [Users]
+      summary: Vô hiệu hoá hàng loạt user - soft delete (permission USER_DELETE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
+      responses:
+        "200":
+          description: OK (có thể có phần tử `failed` nếu 1 vài user không xoá được)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/users/bulk-restore:
+    post:
+      tags: [Users]
+      summary: Khôi phục hàng loạt user (permission USER_RESTORE — dùng lại đúng permission của khôi phục từng dòng)
+      description: "[MỚI 2026-09-17, DEV-062]"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /api/users/{id}:
     get:
@@ -493,6 +710,124 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/users/reset-2fa/{id}:
+    patch:
+      tags: [Users]
+      summary: Admin tắt xác thực 2 lớp cho 1 user bị khoá (permission USER_RESET_2FA)
+      description: >
+        [MỚI 2026-09-19, Roadmap C1, DEV-068] Đường khôi phục DUY NHẤT khi
+        user tự bật 2FA (self-service) rồi mất quyền truy cập email nhận OTP
+        (không có backup codes). KHÔNG có body — chỉ tắt cờ + xoá OTP đang
+        chờ. Từ chối (400) nếu target là ADMIN thật (`isSystemRole`) hoặc
+        target chưa bật 2FA. `USER_RESET_2FA` mirror ĐÚNG `USER_RESET_PASSWORD`
+        — KHÔNG gán cho role nào trong `rolePermission.map.ts`, chỉ ADMIN có.
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Đã tắt xác thực 2 lớp cho user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/users/sessions:
+    get:
+      tags: [Users]
+      summary: Admin xem TẤT CẢ phiên đăng nhập còn hiệu lực của MỌI user (permission SESSION_VIEW_ALL)
+      description: >
+        [MỚI 2026-09-19, Roadmap C3, DEV-070] Danh sách tổng hợp cross-user
+        (khác `GET /users/{id}/sessions` chỉ scope 1 user) — dùng LẠI
+        permission `SESSION_VIEW_ALL` (không tạo permission mới). Mỗi phần tử
+        `Session` ở đây LUÔN có field `user` (đã populate `_id`/`username`/
+        `fullName`) để client gọi lại `DELETE /users/{id}/sessions/{sessionId}`
+        sẵn có khi cần thu hồi — route này KHÔNG có endpoint revoke riêng.
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: search
+          in: query
+          description: Lọc theo username/fullName của user sở hữu phiên (không phân biệt hoa thường).
+          schema: { type: string, maxLength: 100 }
+      responses:
+        "200":
+          description: Danh sách phiên đăng nhập của toàn hệ thống
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: boolean }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Session" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/users/{id}/sessions:
+    get:
+      tags: [Users]
+      summary: Admin xem danh sách phiên đăng nhập của 1 user khác (permission SESSION_VIEW_ALL)
+      description: >
+        [MỚI 2026-09-19, Roadmap C2, DEV-069] KHÔNG có field `isCurrent`
+        trong response (khác `GET /auths/sessions` self-service) — ADMIN xem
+        HỘ, không phải phiên của chính họ. `SESSION_VIEW_ALL` KHÔNG gán cho
+        role nào trong `rolePermission.map.ts`, chỉ ADMIN có (mirror
+        `USER_RESET_2FA`).
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Danh sách phiên đăng nhập
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Session" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/users/{id}/sessions/{sessionId}:
+    delete:
+      tags: [Users]
+      summary: Admin thu hồi 1 phiên đăng nhập của user khác (permission SESSION_REVOKE_ALL)
+      description: >
+        [MỚI 2026-09-19, Roadmap C2, DEV-069] TÁCH RIÊNG khỏi
+        `SESSION_VIEW_ALL` — thu hồi là hành động buộc user khác đăng xuất,
+        rủi ro cao hơn xem. Hữu ích khi tài khoản nghi bị lộ mà chính chủ
+        không tự đăng nhập được để tự thu hồi.
+      parameters:
+        - { $ref: "#/components/parameters/IdParam" }
+        - name: sessionId
+          in: path
+          required: true
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+      responses:
+        "200":
+          description: Đã thu hồi phiên đăng nhập của user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   # ================= RBAC — PERMISSIONS =================
   /api/rbac/permissions:
     post:
@@ -522,7 +857,15 @@ paths:
       summary: Danh sách permission (permission PERMISSION_VIEW)
       parameters:
         - $ref: "#/components/parameters/PageParam"
-        - $ref: "#/components/parameters/LimitParam"
+        - name: limit
+          in: query
+          description: >-
+            [SỬA 2026-09-19] max 300 (KHÁC `LimitParam` dùng chung, max 100) —
+            Permission catalog thật đã vượt 100 bản ghi, `RolePermissionMatrix`
+            (FE) cần lấy TOÀN BỘ catalog trong 1 lần gọi (`limit=300`) để
+            hiển thị đủ checkbox, không bị cắt mất nhóm permission xếp cuối
+            bảng chữ cái khi sort theo `resource`.
+          schema: { type: integer, minimum: 1, maximum: 300, default: 10 }
         - $ref: "#/components/parameters/OrderParam"
         - name: sortBy
           in: query
@@ -1037,6 +1380,16 @@ paths:
             }
         - $ref: "#/components/parameters/OrderParam"
         - $ref: "#/components/parameters/KeywordParam"
+        - name: fullTextSearch
+          in: query
+          description: >
+            [MỚI 2026-09-18, DEV-063, Roadmap B6] Tìm kiếm toàn văn qua MongoDB `$text`
+            — khớp cả `title`/`documentCode` LẪN nội dung/ghi chú tự do trong `meta`
+            (mô tả sự cố, ghi chú hạng mục, kết quả kiểm tra). TÁCH RIÊNG khỏi
+            `keyword` (khớp chuỗi con `$regex` trên title/documentCode, giữ nguyên).
+            Khi truyền field này, `sortBy`/`order` bị BỎ QUA — kết quả luôn sắp xếp
+            theo mức độ liên quan (textScore).
+          schema: { type: string, minLength: 2, maxLength: 200 }
         - name: isActive
           in: query
           schema: { type: string, enum: ["true", "false"] }
@@ -1092,6 +1445,52 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Document" }
                   pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/documents/bulk-delete:
+    post:
+      tags: [Documents]
+      summary: Xoá mềm hàng loạt (permission DOCUMENT_DELETE, chỉ ADMIN)
+      description: >
+        [MỚI 2026-09-17, DEV-061] Tái sử dụng nguyên vẹn `deleteDocumentService`
+        cho từng id (guard ADMIN-only qua `isSystemRole`, chặn nếu còn biên bản
+        tham chiếu hoặc workflow đang pending) — 1 item lỗi không chặn các item
+        còn lại, xem `BulkDeleteResponse.data.failed`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/documents/bulk-restore:
+    post:
+      tags: [Documents]
+      summary: Khôi phục hàng loạt (permission DOCUMENT_UPDATE, ADMIN hoặc người tạo)
+      description: >
+        [MỚI 2026-09-17, DEV-061] Tái sử dụng nguyên vẹn `restoreDocumentService`
+        cho từng id (guard ADMIN-hoặc-chính-người-tạo qua `validateRestorePermission`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
@@ -1212,6 +1611,76 @@ paths:
                   data:
                     type: array
                     items: { $ref: "#/components/schemas/DocumentVersion" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/documents/{id}/export-pdf:
+    get:
+      tags: [Documents]
+      summary: >-
+        Xuất PDF chính thức (Roadmap B5, 2026-09-18) — permission/Policy giống
+        hệt GET /documents/{id}
+      description: >
+        Trả về file PDF (kèm tiêu đề đơn vị, nội dung theo subType, bảng phê
+        duyệt lấy từ WorkflowInstance, và khối "xác thực nội bộ hệ thống").
+        Dùng ĐÚNG guard của `GET /documents/{id}` — PDF chỉ là bản render
+        khác của cùng dữ liệu chi tiết.
+
+
+        ⚠️ Khối "xác thực" ở cuối PDF là ký NỘI BỘ (RSA, khoá riêng của hệ
+        thống) nhằm đảm bảo tính toàn vẹn dữ liệu tại thời điểm xuất — KHÔNG
+        PHẢI chữ ký số theo quy định pháp luật Việt Nam (không do tổ chức
+        cung cấp dịch vụ chứng thực chữ ký số — CA — cấp). Mỗi lần gọi tạo 1
+        bản ghi `DocumentPdfExport` mới (audit), xác minh lại qua
+        `GET /documents/pdf-exports/{exportId}/verify`.
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: File PDF (application/pdf)
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/documents/pdf-exports/{exportId}/verify:
+    get:
+      tags: [Documents]
+      summary: Xác minh 1 bản ghi "đã xuất PDF" (Roadmap B5, permission DOCUMENT_VIEW)
+      description: >
+        KHÔNG trả nội dung Document (chỉ `documentId` tham chiếu) — không cần
+        ABAC department-scoping. Trả `valid=false` nếu bản ghi
+        `contentHash`/`signature` không khớp khoá ký hệ thống hiện tại (dữ
+        liệu bị chỉnh sửa trực tiếp trong DB sau khi xuất, hoặc khoá ký đã bị
+        đổi).
+      parameters:
+        - name: exportId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      valid: { type: boolean }
+                      documentId: { type: string }
+                      exportedBy: { type: string }
+                      exportedAt: { type: string, format: date-time }
+                      algorithm: { type: string }
+                      disclaimer: { type: string }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -1666,6 +2135,46 @@ paths:
           content:
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  # [MỚI 2026-09-16, DEV-060] Xoá mềm hàng loạt — permission ASSET_DELETE y hệt DELETE /:id.
+  /api/assets/bulk-delete:
+    post:
+      tags: [Assets]
+      summary: Xoá mềm hàng loạt tài sản (permission ASSET_DELETE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
+      responses:
+        "200":
+          description: OK (có thể có phần tử `failed` nếu 1 vài tài sản không xoá được, VD đang IN_USE)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/assets/bulk-restore:
+    post:
+      tags: [Assets]
+      summary: Khôi phục hàng loạt tài sản (permission ASSET_UPDATE — dùng lại đúng permission của khôi phục từng dòng)
+      description: "[MỚI 2026-09-17, DEV-062]"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -2742,7 +3251,7 @@ paths:
               properties:
                 name: { type: string, minLength: 1 }
                 unit: { type: string, minLength: 1, description: "Đơn vị tính: cái, hộp, gói..." }
-                category: { type: string }
+                category: { type: string, pattern: "^[0-9a-fA-F]{24}$", description: "ID nhóm vật tư (ConsumableCategory) — tuỳ chọn." }
                 department: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
                 minStockThreshold: { type: number, minimum: 0, default: 0 }
                 initialQuantity: { type: number, minimum: 0, default: 0 }
@@ -2789,6 +3298,10 @@ paths:
         - name: department
           in: query
           schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+        - name: category
+          in: query
+          description: Lọc theo nhóm vật tư (ConsumableCategory id).
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
         - name: isActive
           in: query
           schema: { type: boolean }
@@ -2808,6 +3321,48 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/ConsumableItem" }
                   pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  # [MỚI 2026-09-16, DEV-060] Xoá mềm hàng loạt — gọi lại PUT items/:id với
+  # isActive=false cho từng id (vật tư không có delete service riêng),
+  # permission CONSUMABLE_UPDATE y hệt PUT /items/:id.
+  /api/inventory/items/bulk-delete:
+    post:
+      tags: [Inventory]
+      summary: Xoá mềm hàng loạt vật tư tiêu hao (permission CONSUMABLE_UPDATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/inventory/items/bulk-restore:
+    post:
+      tags: [Inventory]
+      summary: Khôi phục hàng loạt vật tư tiêu hao (permission CONSUMABLE_UPDATE — chưa có route restore đơn lẻ, tái dùng update isActive:true)
+      description: "[MỚI 2026-09-17, DEV-062]"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
@@ -2846,7 +3401,7 @@ paths:
               properties:
                 name: { type: string, minLength: 1 }
                 unit: { type: string, minLength: 1 }
-                category: { type: string }
+                category: { type: string, pattern: "^[0-9a-fA-F]{24}$", description: "ID nhóm vật tư (ConsumableCategory)." }
                 minStockThreshold: { type: number, minimum: 0 }
                 isActive: { type: boolean }
       responses:
@@ -2935,6 +3490,749 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  # ============ NHÓM VẬT TƯ (ConsumableCategory, 2026-09-16) — mirror /api/assets/asset-categories ============
+  /api/inventory/categories:
+    post:
+      tags: [Inventory]
+      summary: Tạo nhóm vật tư (permission CONSUMABLE_CATEGORY_CREATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateConsumableCategoryRequest" }
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/ConsumableCategory" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    get:
+      tags: [Inventory]
+      summary: Danh sách nhóm vật tư (permission CONSUMABLE_CATEGORY_VIEW)
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, default: 10 }
+        - $ref: "#/components/parameters/KeywordParam"
+        - name: isActive
+          in: query
+          description: Mặc định `true` nếu không truyền. Truyền `false` để xem nhóm đã xoá mềm.
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Danh sách nhóm vật tư
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/ConsumableCategory" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  # [MỚI 2026-09-16, DEV-060] Xoá mềm hàng loạt — permission CONSUMABLE_CATEGORY_DELETE y hệt DELETE /:id.
+  /api/inventory/categories/bulk-delete:
+    post:
+      tags: [Inventory]
+      summary: Xoá mềm hàng loạt nhóm vật tư (permission CONSUMABLE_CATEGORY_DELETE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
+      responses:
+        "200":
+          description: OK (có thể có phần tử `failed` nếu 1 vài nhóm còn vật tư/nhóm con tham chiếu)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/inventory/categories/bulk-restore:
+    post:
+      tags: [Inventory]
+      summary: Khôi phục hàng loạt nhóm vật tư (permission CONSUMABLE_CATEGORY_UPDATE — dùng lại đúng permission của khôi phục từng dòng)
+      description: "[MỚI 2026-09-17, DEV-062]"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/inventory/categories/{id}:
+    get:
+      tags: [Inventory]
+      summary: Chi tiết nhóm vật tư (permission CONSUMABLE_CATEGORY_VIEW)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/ConsumableCategory" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Inventory]
+      summary: Cập nhật nhóm vật tư (permission CONSUMABLE_CATEGORY_UPDATE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateConsumableCategoryRequest" }
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/ConsumableCategory" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Inventory]
+      summary: Xoá mềm nhóm vật tư (permission CONSUMABLE_CATEGORY_DELETE)
+      description: Backend từ chối (400) nếu còn vật tư hoặc nhóm con thuộc nhóm này.
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Xoá thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/inventory/categories/{id}/restore:
+    patch:
+      tags: [Inventory]
+      summary: Khôi phục nhóm vật tư đã soft-delete (permission CONSUMABLE_CATEGORY_UPDATE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Khôi phục thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/ConsumableCategory" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ============ ĐỀ XUẤT/DỰ TRÙ VẬT TƯ (ConsumableRequest, Roadmap B8, DEV-067, 2026-09-18) ============
+  # KHÔNG có luồng duyệt (user xác nhận trước khi làm) — chỉ CREATE/VIEW/UPDATE
+  # (sửa khi PENDING + huỷ) và FULFILL riêng (đánh dấu đã mua thực tế).
+  /api/inventory/requests:
+    post:
+      tags: [Inventory]
+      summary: Ghi nhận đề xuất/dự trù vật tư mới (permission CONSUMABLE_REQUEST_CREATE)
+      description: >
+        Mỗi item PHẢI thuộc ĐÚNG `department` của request (validate ở service) —
+        không đề xuất được vật tư của khoa/phòng khác. `totalPrice`/`totalAmount`
+        được BACKEND tự tính, không nhận từ client.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateConsumableRequestRequest" }
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/ConsumableRequest" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    get:
+      tags: [Inventory]
+      summary: Danh sách đề xuất/dự trù vật tư (permission CONSUMABLE_REQUEST_VIEW)
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, default: 20 }
+        - name: department
+          in: query
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: status
+          in: query
+          schema: { type: string, enum: [PENDING, FULFILLED, CANCELLED] }
+        - name: requestMonth
+          in: query
+          schema: { type: string, pattern: "^\\d{4}-(0[1-9]|1[0-2])$" }
+      responses:
+        "200":
+          description: Danh sách đề xuất
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/ConsumableRequest" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/inventory/requests/{id}:
+    get:
+      tags: [Inventory]
+      summary: Chi tiết đề xuất/dự trù vật tư (permission CONSUMABLE_REQUEST_VIEW)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/ConsumableRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Inventory]
+      summary: Sửa đề xuất (permission CONSUMABLE_REQUEST_UPDATE)
+      description: Chỉ sửa được khi đề xuất đang ở trạng thái `PENDING` — 400 nếu đã `FULFILLED`/`CANCELLED`.
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateConsumableRequestRequest" }
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/ConsumableRequest" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/inventory/requests/{id}/fulfill:
+    patch:
+      tags: [Inventory]
+      summary: Đánh dấu đề xuất đã mua xong thực tế (permission CONSUMABLE_REQUEST_FULFILL)
+      description: >
+        Thao tác TAY của Phòng Vật tư-TTB/IT sau khi mua thực tế — KHÔNG tự động
+        tạo giao dịch nhập kho (`ConsumableTransaction`), vẫn phải nhập tay riêng
+        qua `POST /api/inventory/items/{id}/transactions` (số lượng/ngày mua thực
+        tế có thể khác đề xuất ban đầu). Chỉ áp dụng được khi đang `PENDING`.
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Đã đánh dấu FULFILLED
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/ConsumableRequest" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/inventory/requests/{id}/cancel:
+    patch:
+      tags: [Inventory]
+      summary: Huỷ đề xuất (permission CONSUMABLE_REQUEST_UPDATE)
+      description: Chỉ huỷ được khi đang `PENDING`. Giữ lại bản ghi (không xoá cứng).
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Đã huỷ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/ConsumableRequest" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ================= VENDORS (Roadmap B4, 2026-09-16) =================
+  /api/vendors:
+    post:
+      tags: [Vendors]
+      summary: Tạo nhà cung cấp mới (permission VENDOR_CREATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1 }
+                contactPerson: { type: string }
+                phone: { type: string }
+                email: { type: string, format: email }
+                address: { type: string }
+                taxCode: { type: string }
+                notes: { type: string }
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Vendor" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    get:
+      tags: [Vendors]
+      summary: Danh sách nhà cung cấp, phân trang (permission VENDOR_VIEW)
+      description: Mặc định chỉ trả `isActive=true`.
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, default: 20 }
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: isActive
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Vendor" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  # [MỚI 2026-09-16, DEV-060] Xoá mềm hàng loạt — gọi lại PUT /:id với
+  # isActive=false cho từng id (nhà cung cấp không có delete service riêng),
+  # permission VENDOR_UPDATE y hệt PUT /:id.
+  /api/vendors/bulk-delete:
+    post:
+      tags: [Vendors]
+      summary: Ngừng hợp tác hàng loạt (permission VENDOR_UPDATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/vendors/bulk-restore:
+    post:
+      tags: [Vendors]
+      summary: Khôi phục hợp tác hàng loạt (permission VENDOR_UPDATE — chưa có route restore đơn lẻ, tái dùng update isActive:true)
+      description: "[MỚI 2026-09-17, DEV-062]"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/vendors/{id}:
+    get:
+      tags: [Vendors]
+      summary: Chi tiết 1 nhà cung cấp (permission VENDOR_VIEW)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Vendor" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Vendors]
+      summary: Sửa thông tin nhà cung cấp (permission VENDOR_UPDATE)
+      description: Bao gồm bật/tắt `isActive` (ngừng hợp tác) — không tách permission riêng.
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, minLength: 1 }
+                contactPerson: { type: string }
+                phone: { type: string }
+                email: { type: string, format: email }
+                address: { type: string }
+                taxCode: { type: string }
+                notes: { type: string }
+                isActive: { type: boolean }
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Vendor" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ================= CONTRACTS (Roadmap B4, 2026-09-16) =================
+  /api/contracts:
+    post:
+      tags: [Contracts]
+      summary: Tạo hợp đồng mới, áp dụng cho 1 hoặc nhiều tài sản (permission CONTRACT_CREATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vendor, assets, title, startDate, endDate]
+              properties:
+                vendor: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+                assets:
+                  type: array
+                  minItems: 1
+                  items: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+                contractNumber: { type: string }
+                title: { type: string, minLength: 1 }
+                description: { type: string }
+                startDate: { type: string, format: date-time }
+                endDate: { type: string, format: date-time }
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Contract" }
+        "400":
+          description: Dữ liệu không hợp lệ (endDate ≤ startDate, hoặc có asset không tồn tại/không active)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: Không tìm thấy nhà cung cấp, hoặc nhà cung cấp đã ngừng hợp tác
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    get:
+      tags: [Contracts]
+      summary: Danh sách hợp đồng, phân trang (permission CONTRACT_VIEW)
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, default: 20 }
+        - name: vendor
+          in: query
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+        - name: asset
+          in: query
+          description: Lọc hợp đồng có chứa asset này trong `assets[]`.
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+        - name: status
+          in: query
+          description: >-
+            "active" = còn hiệu lực THẬT SỰ (status=active VÀ endDate chưa qua).
+            "expired" = đã hết hạn nhưng CHƯA gia hạn/huỷ (status=active VÀ endDate
+            đã qua — KHÔNG phải giá trị enum thật của `Contract.status`, chỉ dùng
+            để lọc). "cancelled" = đã huỷ.
+          schema: { type: string, enum: [active, expired, cancelled] }
+        - name: expiringWithinDays
+          in: query
+          description: Chỉ lấy hợp đồng còn "active" VÀ hết hạn trong N ngày tới.
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Contract" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/contracts/asset/{assetId}:
+    get:
+      tags: [Contracts]
+      summary: Mọi hợp đồng (mọi trạng thái) áp dụng cho 1 tài sản (permission CONTRACT_VIEW)
+      description: Dùng cho section "Hợp đồng bảo trì" trong trang chi tiết Asset.
+      parameters:
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Contract" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/contracts/alerts/run:
+    post:
+      tags: [Contracts]
+      summary: Chạy tay kiểm tra cảnh báo hợp đồng sắp hết hạn (permission CONTRACT_ALERTS_TRIGGER)
+      description: Dùng để test/chạy thủ công ngoài lịch cron (08:20 hằng ngày) — mirror POST /api/assets/alerts/run.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      expiring:
+                        type: object
+                        properties:
+                          checked: { type: integer }
+                          notified: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/contracts/{id}:
+    get:
+      tags: [Contracts]
+      summary: Chi tiết 1 hợp đồng (permission CONTRACT_VIEW)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Contract" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Contracts]
+      summary: Sửa hợp đồng CÒN "active" (permission CONTRACT_UPDATE)
+      description: >
+        Không cho sửa hợp đồng đã "cancelled" — giữ nguyên làm lịch sử. Không
+        có field `vendor`/`status` trong request — đổi NCC là ký hợp đồng
+        mới, đổi trạng thái chỉ qua `/cancel`.
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                assets:
+                  type: array
+                  minItems: 1
+                  items: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+                contractNumber: { type: string }
+                title: { type: string, minLength: 1 }
+                description: { type: string }
+                startDate: { type: string, format: date-time }
+                endDate: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Contract" }
+        "400":
+          description: ID không hợp lệ, hợp đồng đã cancelled, hoặc có asset không hợp lệ trong danh sách mới
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/contracts/{id}/cancel:
+    patch:
+      tags: [Contracts]
+      summary: Huỷ hợp đồng trước hạn (permission CONTRACT_UPDATE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cancelReason: { type: string, description: "Lý do huỷ (tuỳ chọn)." }
+      responses:
+        "200":
+          description: Huỷ thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Contract" }
+        "400":
+          description: ID không hợp lệ, hoặc hợp đồng đã ở trạng thái "cancelled"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # [MỚI 2026-09-16, DEV-058] Khôi phục hợp đồng đã huỷ — permission RIÊNG
+  # CONTRACT_RESTORE (không gộp vào CONTRACT_UPDATE như cancel).
+  /api/contracts/{id}/restore:
+    patch:
+      tags: [Contracts]
+      summary: Khôi phục hợp đồng đã huỷ về "active" (permission CONTRACT_RESTORE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Khôi phục thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Contract" }
+        "400":
+          description: ID không hợp lệ, hoặc hợp đồng đang ở trạng thái "active" (chưa huỷ)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   # ================= ASSET CATEGORIES =================
   /api/assets/asset-categories:
     post:
@@ -2988,6 +4286,46 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/AssetCategory" }
                   pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  # [MỚI 2026-09-16, DEV-060] Xoá mềm hàng loạt — permission ASSET_CATEGORY_DELETE y hệt DELETE /:id.
+  /api/assets/asset-categories/bulk-delete:
+    post:
+      tags: [Asset Categories]
+      summary: Xoá mềm hàng loạt danh mục tài sản (permission ASSET_CATEGORY_DELETE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
+      responses:
+        "200":
+          description: OK (có thể có phần tử `failed` nếu 1 vài danh mục còn tài sản/danh mục con tham chiếu)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/assets/asset-categories/bulk-restore:
+    post:
+      tags: [Asset Categories]
+      summary: Khôi phục hàng loạt danh mục tài sản (permission ASSET_CATEGORY_UPDATE — dùng lại đúng permission của khôi phục từng dòng)
+      description: "[MỚI 2026-09-17, DEV-062]"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
@@ -3440,6 +4778,39 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/OverdueApproval" }
                   pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/dashboard/weekly-report/run:
+    post:
+      tags: [Dashboard]
+      summary: >-
+        Chạy tay gửi "Báo cáo tuần" qua email (permission
+        DASHBOARD_WEEKLY_REPORT_TRIGGER) — Roadmap B7, 2026-09-18
+      description: >
+        Bình thường chạy tự động qua cron (thứ Hai 08:30 hàng tuần, giờ
+        Asia/Ho_Chi_Minh) — endpoint này cho phép chạy tay để kiểm tra/gửi
+        lại (mirror `POST /workflow/sla/run`). Gửi cho user active thuộc
+        role BAN_GIAM_DOC (báo cáo toàn viện) hoặc TRUONG_KHOA (báo cáo theo
+        khoa của chính họ) VÀ đã tự bật `subscribedToWeeklyReport`
+        (`PATCH /users/me`) — KHÁC các cảnh báo tự động khác trong hệ thống
+        (gửi cho TẤT CẢ user active theo role, không cần opt-in).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      sent: { type: integer }
+                      failed: { type: integer }
+                      skipped: { type: integer }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
@@ -4332,6 +5703,40 @@ components:
     ObjectIdRef:
       type: string
       pattern: "^[0-9a-fA-F]{24}$"
+
+    # [MỚI 2026-09-16, DEV-060] Body/response chung cho mọi endpoint
+    # "POST .../bulk-delete" (xoá mềm hàng loạt) — 6 domain: Asset,
+    # AssetCategory, ConsumableItem, ConsumableCategory, Vendor, User.
+    # [MỞ RỘNG 2026-09-17, DEV-061] Dùng chung luôn cho Document
+    # (`POST /api/documents/bulk-delete` VÀ `POST /api/documents/bulk-restore`
+    # — cùng 1 body `{ids}`, response field `deletedIds` mang nghĩa "id xử lý
+    # thành công" chung cho cả 2 hành động).
+    BulkDeleteRequest:
+      type: object
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { $ref: "#/components/schemas/ObjectIdRef" }
+    BulkDeleteResponse:
+      type: object
+      properties:
+        message: { type: string, example: "Đã xoá 2/3 mục" }
+        data:
+          type: object
+          properties:
+            deletedIds:
+              type: array
+              items: { $ref: "#/components/schemas/ObjectIdRef" }
+            failed:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { $ref: "#/components/schemas/ObjectIdRef" }
+                  message: { type: string, example: "Không thể xoá vì vẫn còn tham chiếu" }
       example: "665f1a2b8c9d3e4f5a6b7c8d"
 
     # ============================================================
@@ -4392,6 +5797,67 @@ components:
         refreshToken: { type: string }
         user: { $ref: "#/components/schemas/User" }
 
+    # Roadmap C1 (Xác thực 2 lớp qua email OTP, DEV-068, 2026-09-19)
+    AuthLoginPendingTwoFactor:
+      type: object
+      description: Trả về thay cho `AuthLoginResult` khi tài khoản đã bật 2FA — CHƯA có token.
+      properties:
+        requiresTwoFactor: { type: boolean, example: true }
+        username: { type: string }
+
+    VerifyLoginOtpRequest:
+      type: object
+      required: [username, code]
+      properties:
+        username: { type: string }
+        code: { type: string, pattern: "^\\d{6}$", example: "042817" }
+
+    ConfirmTwoFactorRequest:
+      type: object
+      required: [code]
+      properties:
+        code: { type: string, pattern: "^\\d{6}$", example: "042817" }
+
+    DisableTwoFactorRequest:
+      type: object
+      required: [password]
+      properties:
+        password: { type: string, description: "Mật khẩu HIỆN TẠI của chính user, không phải mật khẩu mới." }
+
+    # Roadmap C2 (Quản lý phiên đăng nhập, DEV-069, 2026-09-19)
+    Session:
+      type: object
+      description: >
+        1 `RefreshToken` còn hiệu lực, đã ẩn field `token` (hash) — KHÔNG bao
+        giờ trả ra ngoài. `browser`/`os` suy ra từ User-Agent lúc đăng nhập
+        (`shared/helpers/userAgent.helper.ts`) — "Không xác định" nếu phiên
+        được cấp TRƯỚC khi field này tồn tại.
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        browser: { type: string, example: "Chrome" }
+        os: { type: string, example: "Windows" }
+        ip: { type: string, nullable: true, example: "113.22.1.45" }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        isCurrent:
+          type: boolean
+          description: >-
+            CHỈ có ở `GET /auths/sessions` (self-service) — heuristic so
+            khớp User-Agent+IP của request hiện tại. KHÔNG có ở
+            `GET /users/{id}/sessions` (ADMIN xem hộ).
+        user:
+          description: >-
+            [MỚI Roadmap C3, DEV-070] CHỈ có ở `GET /users/sessions` (danh
+            sách tổng hợp toàn hệ thống) — user SỞ HỮU phiên, đã populate.
+            KHÔNG có ở `GET /auths/sessions`/`GET /users/{id}/sessions` (đã
+            biết trước user từ context/param).
+          type: object
+          nullable: true
+          properties:
+            _id: { $ref: "#/components/schemas/ObjectIdRef" }
+            username: { type: string }
+            fullName: { type: string }
+
     # ============================================================
     # USER
     # ============================================================
@@ -4417,6 +5883,15 @@ components:
           type: array
           items: { $ref: "#/components/schemas/ObjectIdRef" }
         isActive: { type: boolean }
+        subscribedToWeeklyReport:
+          type: boolean
+          description: Roadmap B7 (2026-09-18) — xem `UpdateMeRequest`.
+        twoFactorEnabled:
+          type: boolean
+          description: >-
+            Roadmap C1 (2026-09-19) — CHỈ tự bật được (self-service) qua
+            `POST /api/auths/2fa/enable` + `/confirm`, KHÔNG set trực tiếp qua
+            `UpdateUserDTO`/`UpdateMeRequest`.
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
@@ -4455,6 +5930,14 @@ components:
         fullName: { type: string, minLength: 1 }
         role: { $ref: "#/components/schemas/ObjectIdRef" }
         department: { $ref: "#/components/schemas/ObjectIdRef" }
+        email:
+          type: string
+          format: email
+          description: >-
+            [MỚI 2026-09-18] Khắc phục gap phát hiện ở DEV-065 (Roadmap B7 Mục
+            4) — trước đây KHÔNG có đường nào (kể cả ADMIN) để gán email cho
+            user, chỉ luồng tự đăng ký (`RegisterDTO`) mới thu thập email. Tuỳ
+            chọn — user vẫn tạo được nếu bỏ trống.
 
     UpdateUserRequest:
       type: object
@@ -4464,13 +5947,28 @@ components:
         role: { $ref: "#/components/schemas/ObjectIdRef" }
         department: { $ref: "#/components/schemas/ObjectIdRef" }
         isActive: { type: boolean }
+        email:
+          type: string
+          format: email
+          description: >-
+            [MỚI 2026-09-18] Khắc phục gap DEV-065 Mục 4 — CHỈ có tác dụng qua
+            `PUT /api/users/{id}` (ADMIN, permission USER_UPDATE). CỐ TÌNH
+            KHÔNG áp dụng qua `PATCH /users/me` (xem `UpdateMeRequest`) — email
+            là field nhạy cảm gắn với luồng quên mật khẩu, giữ nguyên chỉ ADMIN
+            mới sửa được, giống role/department/isActive.
 
     UpdateMeRequest:
       type: object
-      description: Chỉ 2 field này thực sự có tác dụng khi tự cập nhật (xem mô tả ở endpoint).
+      description: Chỉ 3 field này thực sự có tác dụng khi tự cập nhật (xem mô tả ở endpoint).
       properties:
         fullName: { type: string, minLength: 1 }
         username: { type: string, minLength: 5, pattern: "^[a-zA-Z0-9_]+$" }
+        subscribedToWeeklyReport:
+          type: boolean
+          description: >-
+            Roadmap B7 — bật/tắt nhận "Báo cáo tuần" qua email. Chỉ có tác
+            dụng THỰC SỰ nếu role của user là BAN_GIAM_DOC/TRUONG_KHOA (cron
+            gửi hàng tuần bỏ qua user thuộc role khác dù bật cờ này).
 
     ChangePasswordRequest:
       type: object
@@ -5210,7 +6708,20 @@ components:
         _id: { $ref: "#/components/schemas/ObjectIdRef" }
         name: { type: string }
         unit: { type: string, description: "Đơn vị tính: cái, hộp, gói, chai..." }
-        category: { type: string, nullable: true }
+        category:
+          nullable: true
+          description: >
+            [SỬA 2026-09-16 — trước là text tự do] Ref `ConsumableCategory`.
+            `GET /` và `GET /:id` LUÔN populate lite (`.populate("category",
+            "code name")`) — object, không phải string ID. Chỉ là ObjectId
+            thô khi gửi ở request body (tạo/sửa).
+          oneOf:
+            - $ref: "#/components/schemas/ObjectIdRef"
+            - type: object
+              properties:
+                _id: { $ref: "#/components/schemas/ObjectIdRef" }
+                code: { type: string }
+                name: { type: string }
         department:
           oneOf:
             - $ref: "#/components/schemas/ObjectIdRef"
@@ -5271,6 +6782,223 @@ components:
                 username: { type: string }
                 fullName: { type: string }
         createdAt: { type: string, format: date-time }
+
+    ConsumableCategory:
+      type: object
+      description: >
+        Nhóm vật tư tiêu hao (2026-09-16) — CÓ phân cấp cha/con
+        (`parentCategory`), mirror `AssetCategory`. KHÔNG có endpoint xoá
+        vĩnh viễn (khác AssetCategory) — xem `consumableCategory.service.ts`.
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        code: { type: string }
+        name: { type: string }
+        parentCategory:
+          nullable: true
+          description: >
+            `GET /` và `GET /:id` LUÔN populate lite (`.populate("parentCategory",
+            "code name")`) — object, không phải string ID. Chỉ là ObjectId
+            thô khi gửi ở request body.
+          oneOf:
+            - $ref: "#/components/schemas/ObjectIdRef"
+            - type: object
+              properties:
+                _id: { $ref: "#/components/schemas/ObjectIdRef" }
+                code: { type: string }
+                name: { type: string }
+        isActive: { type: boolean }
+        deletedAt: { type: string, format: date-time, nullable: true }
+        deletedBy: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateConsumableCategoryRequest:
+      type: object
+      required: [code, name]
+      properties:
+        code: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        parentCategory: { $ref: "#/components/schemas/ObjectIdRef" }
+
+    UpdateConsumableCategoryRequest:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        parentCategory: { $ref: "#/components/schemas/ObjectIdRef" }
+
+    ConsumableRequestItem:
+      type: object
+      description: 1 dòng vật tư trong đề xuất — `totalPrice` do BACKEND tự tính (`quantity * unitPrice`), không nhận từ client.
+      properties:
+        consumableItem:
+          description: "`GET /requests`/`GET /requests/:id` LUÔN populate lite (`.populate(\"items.consumableItem\", \"name unit\")`) — object, không phải string ID. Chỉ là ObjectId thô khi gửi ở request body."
+          oneOf:
+            - $ref: "#/components/schemas/ObjectIdRef"
+            - type: object
+              properties:
+                _id: { $ref: "#/components/schemas/ObjectIdRef" }
+                name: { type: string }
+                unit: { type: string }
+        quantity: { type: number, minimum: 0.01 }
+        unitPrice: { type: number, minimum: 0 }
+        totalPrice: { type: number, minimum: 0, description: "TÍNH SẴN ở backend = quantity * unitPrice." }
+
+    ConsumableRequest:
+      type: object
+      description: >
+        Roadmap B8 (Dự trù/đề xuất mua vật tư tiêu hao hàng tháng, DEV-067,
+        2026-09-18) — module MỚI, TÁCH BIỆT hoàn toàn với ConsumableItem/
+        ConsumableTransaction. KHÔNG có luồng duyệt — trạng thái RIÊNG
+        (PENDING/FULFILLED/CANCELLED), không đi qua Workflow engine.
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        department:
+          description: "LUÔN populate lite (`.populate(\"department\", \"code name\")`) khi đọc — object, không phải string ID. Chỉ là ObjectId thô khi gửi ở request body."
+          oneOf:
+            - $ref: "#/components/schemas/ObjectIdRef"
+            - type: object
+              properties:
+                _id: { $ref: "#/components/schemas/ObjectIdRef" }
+                code: { type: string }
+                name: { type: string }
+        requestMonth: { type: string, pattern: "^\\d{4}-(0[1-9]|1[0-2])$", description: "Tháng dự trù, định dạng YYYY-MM." }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ConsumableRequestItem" }
+        totalAmount: { type: number, minimum: 0, description: "TÍNH SẴN ở backend = SUM(items[].totalPrice)." }
+        status: { type: string, enum: [PENDING, FULFILLED, CANCELLED] }
+        note: { type: string, nullable: true }
+        createdBy:
+          oneOf:
+            - $ref: "#/components/schemas/ObjectIdRef"
+            - type: object
+              properties:
+                _id: { $ref: "#/components/schemas/ObjectIdRef" }
+                username: { type: string }
+                fullName: { type: string }
+        updatedBy:
+          nullable: true
+          oneOf:
+            - $ref: "#/components/schemas/ObjectIdRef"
+            - type: object
+              properties:
+                _id: { $ref: "#/components/schemas/ObjectIdRef" }
+                username: { type: string }
+                fullName: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ConsumableRequestItemInput:
+      type: object
+      required: [consumableItem, quantity, unitPrice]
+      properties:
+        consumableItem: { $ref: "#/components/schemas/ObjectIdRef" }
+        quantity: { type: number, minimum: 0.01 }
+        unitPrice: { type: number, minimum: 0 }
+
+    CreateConsumableRequestRequest:
+      type: object
+      required: [department, requestMonth, items]
+      properties:
+        department: { $ref: "#/components/schemas/ObjectIdRef" }
+        requestMonth: { type: string, pattern: "^\\d{4}-(0[1-9]|1[0-2])$" }
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/ConsumableRequestItemInput" }
+        note: { type: string }
+
+    UpdateConsumableRequestRequest:
+      type: object
+      description: CHỦ Ý KHÔNG có `department`/`requestMonth` (bất biến sau khi tạo) — chỉ sửa `items`/`note`, và CHỈ khi đề xuất đang `PENDING`.
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/ConsumableRequestItemInput" }
+        note: { type: string }
+
+    Vendor:
+      type: object
+      description: Roadmap B4 (2026-09-16) — nhà cung cấp/đơn vị ký hợp đồng bảo trì/bảo hành thiết bị.
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        name: { type: string }
+        contactPerson: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        email: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        taxCode: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        isActive: { type: boolean, description: "false = ngừng hợp tác, không xoá cứng." }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    Contract:
+      type: object
+      description: >
+        Roadmap B4 (2026-09-16) — hợp đồng bảo trì/bảo hành ký với 1 Vendor,
+        áp dụng cho nhiều Asset cùng lúc.
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        vendor:
+          oneOf:
+            - $ref: "#/components/schemas/ObjectIdRef"
+            - type: object
+              properties:
+                _id: { $ref: "#/components/schemas/ObjectIdRef" }
+                name: { type: string }
+                contactPerson: { type: string }
+                phone: { type: string }
+                email: { type: string }
+        assets:
+          type: array
+          items:
+            oneOf:
+              - $ref: "#/components/schemas/ObjectIdRef"
+              - type: object
+                properties:
+                  _id: { $ref: "#/components/schemas/ObjectIdRef" }
+                  assetCode: { type: string }
+                  name: { type: string }
+                  department:
+                    type: object
+                    properties:
+                      _id: { $ref: "#/components/schemas/ObjectIdRef" }
+                      code: { type: string }
+                      name: { type: string }
+        contractNumber: { type: string, nullable: true }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        startDate: { type: string, format: date-time }
+        endDate: { type: string, format: date-time }
+        status: { type: string, enum: [active, cancelled] }
+        isExpired:
+          type: boolean
+          description: TÍNH THÊM (không lưu DB) — status=active VÀ endDate đã qua.
+        cancelledAt: { type: string, format: date-time, nullable: true }
+        cancelledBy:
+          nullable: true
+          oneOf:
+            - $ref: "#/components/schemas/ObjectIdRef"
+            - type: object
+              properties:
+                _id: { $ref: "#/components/schemas/ObjectIdRef" }
+                username: { type: string }
+                fullName: { type: string }
+        cancelReason: { type: string, nullable: true }
+        expiryAlertSentAt: { type: string, format: date-time, nullable: true }
+        createdBy:
+          oneOf:
+            - $ref: "#/components/schemas/ObjectIdRef"
+            - type: object
+              properties:
+                _id: { $ref: "#/components/schemas/ObjectIdRef" }
+                username: { type: string }
+                fullName: { type: string }
+        updatedBy: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
 
     CalibrationResult:
       type: string

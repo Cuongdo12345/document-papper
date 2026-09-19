@@ -48,3 +48,24 @@ export const ResetPasswordDTO = z.object({
   // (`resetPassword`) hiện không tự kiểm tra độ dài, dựa hoàn toàn vào DTO.
   newPassword: z.string().min(8, "Mật khẩu mới tối thiểu 8 ký tự"),
 });
+
+/**
+ * Roadmap C1 (Xác thực 2 lớp qua email OTP, DEV-068, 2026-09-19).
+ */
+const OTP_CODE_REGEX = /^\d{6}$/;
+
+/** BƯỚC 2 khi đăng nhập (user đã bật 2FA) — `/auths/login/verify-otp`. */
+export const VerifyLoginOtpDTO = z.object({
+  username: z.string().trim().min(1, "Username không được để trống"),
+  code: z.string().regex(OTP_CODE_REGEX, "Mã xác thực phải gồm đúng 6 chữ số"),
+});
+
+/** Xác nhận BẬT 2FA (sau khi `enableTwoFactor` đã gửi OTP) — `/auths/2fa/confirm`. */
+export const ConfirmTwoFactorDTO = z.object({
+  code: z.string().regex(OTP_CODE_REGEX, "Mã xác thực phải gồm đúng 6 chữ số"),
+});
+
+/** TẮT 2FA — yêu cầu nhập lại password hiện tại — `/auths/2fa/disable`. */
+export const DisableTwoFactorDTO = z.object({
+  password: z.string().min(1, "Vui lòng nhập mật khẩu hiện tại"),
+});

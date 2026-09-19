@@ -1,6 +1,6 @@
 import type { AxiosResponse } from "axios";
 import { axiosInstance } from "@/api/axios";
-import type { Pagination } from "@/types/shared.types";
+import type { Pagination, BulkDeleteResult } from "@/types/shared.types";
 import type {
   AssetCategory,
   GetAssetCategoriesParams,
@@ -45,4 +45,14 @@ export function deleteAssetCategory(id: string): Promise<AxiosResponse<{ message
 
 export function restoreAssetCategory(id: string): Promise<AxiosResponse<{ message: string; data: AssetCategory }>> {
   return axiosInstance.patch(`/assets/asset-categories/${id}/restore`);
+}
+
+/** [MỚI 2026-09-16, DEV-060] Xoá mềm hàng loạt — chọn nhiều dòng ở danh sách. */
+export function bulkDeleteAssetCategories(ids: string[]): Promise<AxiosResponse<{ message: string; data: BulkDeleteResult }>> {
+  return axiosInstance.post("/assets/asset-categories/bulk-delete", { ids });
+}
+
+/** [MỚI 2026-09-17, DEV-062] Khôi phục hàng loạt — cùng permission ASSET_CATEGORY_UPDATE với `restoreAssetCategory`. */
+export function bulkRestoreAssetCategories(ids: string[]): Promise<AxiosResponse<{ message: string; data: BulkDeleteResult }>> {
+  return axiosInstance.post("/assets/asset-categories/bulk-restore", { ids });
 }

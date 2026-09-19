@@ -1,6 +1,6 @@
 import type { AxiosResponse } from "axios";
 import { axiosInstance } from "@/api/axios";
-import type { Pagination } from "@/types/shared.types";
+import type { Pagination, BulkDeleteResult } from "@/types/shared.types";
 import type {
   CreateDocumentRequest,
   Document,
@@ -48,6 +48,16 @@ export function restoreDocument(id: string): Promise<AxiosResponse<{ success: tr
   return axiosInstance.patch(`/documents/restore/${id}`);
 }
 
+/** [MỚI 2026-09-17, DEV-061] Xoá mềm hàng loạt — Batch Action Bar. Cùng guard ADMIN-only với `deleteDocument`. */
+export function bulkDeleteDocuments(ids: string[]): Promise<AxiosResponse<{ success: true; message: string; data: BulkDeleteResult }>> {
+  return axiosInstance.post("/documents/bulk-delete", { ids });
+}
+
+/** [MỚI 2026-09-17, DEV-061] Khôi phục hàng loạt — Batch Action Bar. Cùng guard ADMIN-hoặc-người-tạo với `restoreDocument`. */
+export function bulkRestoreDocuments(ids: string[]): Promise<AxiosResponse<{ success: true; message: string; data: BulkDeleteResult }>> {
+  return axiosInstance.post("/documents/bulk-restore", { ids });
+}
+
 /** Danh sách REPORT tham chiếu tới 1 PROPOSAL — dùng cho Document Detail (category=PROPOSAL). */
 export function getReportsByProposal(
   proposalId: string,
@@ -78,4 +88,15 @@ export function deleteDocumentsByMonth(
   body: DeleteDocumentsByMonthRequest,
 ): Promise<AxiosResponse<{ success: true; message: string; data: { deletedCount: number; skippedCount: number } }>> {
   return axiosInstance.delete("/documents/delete-by-month", { data: body });
+}
+
+/**
+ * [MỚI 2026-09-18, DEV-064 — Roadmap B5] Xuất PDF chính thức — cùng
+ * permission/Policy với `getDocumentById` (permission RỘNG hơn: ai xem được
+ * chi tiết thì xuất được PDF của chính nó). `responseType:"blob"` — backend
+ * trả file nhị phân trực tiếp (`Content-Type: application/pdf`), KHÔNG bọc
+ * `{success,data}` như các endpoint khác trong file này.
+ */
+export function exportDocumentPdf(id: string): Promise<AxiosResponse<Blob>> {
+  return axiosInstance.get(`/documents/${id}/export-pdf`, { responseType: "blob" });
 }

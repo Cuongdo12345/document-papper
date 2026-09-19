@@ -70,3 +70,15 @@ export const hashResetToken = (token: string) => {
 export const generateResetToken = () => {
   return crypto.randomBytes(32).toString("hex");
 };
+
+/**
+ * 🎯 Generate 6-digit OTP code (Roadmap C1, DEV-068, 2026-09-19)
+ *
+ * Dùng `crypto.randomInt` (CSPRNG, KHÔNG phải `Math.random()`) — mã OTP xác
+ * thực đăng nhập/bật 2FA, cùng mức yêu cầu ngẫu nhiên-an-toàn như
+ * `generateResetToken()`. `padStart(6, "0")` đảm bảo luôn đủ 6 ký tự kể cả
+ * khi số random nhỏ (VD "042817"), không rút ngắn còn 5 số.
+ */
+export const generateOtpCode = () => {
+  return crypto.randomInt(0, 1_000_000).toString().padStart(6, "0");
+};

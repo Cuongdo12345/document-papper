@@ -23,6 +23,8 @@ import medicalDeviceRoutes from "./routes/assets/medicalDevice.routes";
 import assetMaintenancePlanRoutes from "./routes/assets/assetMaintenancePlan.routes";
 import assetRoutes from "./routes/assets/asset.routes";
 import inventoryRoutes from "./routes/inventory/inventory.routes";
+import vendorRoutes from "./routes/vendors/vendor.routes";
+import contractRoutes from "./routes/vendors/contract.routes";
 
 import { performanceMiddleware } from "./middlewares/performance.middleware";
 import { errorHandler } from "./middlewares/error.middleware";
@@ -127,6 +129,10 @@ app.use("/api/assets", assetRoutes)
 // Roadmap B3 (2026-09-15) — module MỚI, không có prefix con nào khác cần
 // mount trước (không giống các nhánh /api/assets/* ở trên).
 app.use("/api/inventory", inventoryRoutes)
+// Roadmap B4 (2026-09-16) — 2 module MỚI, độc lập, không có prefix con nào
+// khác trùng/lồng nhau cần quan tâm thứ tự mount.
+app.use("/api/vendors", vendorRoutes)
+app.use("/api/contracts", contractRoutes)
 
 /* ===============================
    ❌ GLOBAL ERROR HANDLER

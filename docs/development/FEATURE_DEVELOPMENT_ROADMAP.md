@@ -99,6 +99,19 @@ nếu quy mô chưa quá lớn.
 Tận dụng Dashboard/KPI đã có: cho phép lãnh đạo (BAN_GIAM_DOC, TRUONG_KHOA) đăng ký nhận báo cáo
 tóm tắt định kỳ (tuần/tháng) qua email tự động, thay vì phải chủ động vào Dashboard xem.
 
+### 💡 B8. Dự trù/đề xuất mua vật tư tiêu hao hàng tháng, có duyệt (Monthly Consumable Procurement Request)
+
+**[THÊM 2026-09-16]** Phát sinh từ phản hồi user khi làm rõ phạm vi B3 (`DEV-056.md`, follow-up
+2026-09-16): B3 hiện tại (`ConsumableItem`/`ConsumableTransaction`) chỉ ghi nhận giao dịch nhập/xuất
+kho THỦ CÔNG, SAU KHI đã xảy ra (reactive) — không có khái niệm "mỗi khoa/phòng dự trù nhu cầu vật tư
+cho tháng tới, gửi đề xuất, chờ duyệt trước khi mua" (proactive, có chu kỳ tháng). Đây là nghiệp vụ
+khác hẳn B3, gần giống mô hình "Đề xuất → Duyệt" mà `Document`/`Workflow` engine đã có sẵn nhưng áp
+dụng cho vật tư tiêu hao thay vì tài liệu. User xác nhận MUỐN xây nhưng chưa ấn định thời điểm — cần
+hỏi lại phạm vi cụ thể trước khi code (theo đúng thông lệ B-series): có cần duyệt hay chỉ ghi nhận đề
+xuất; có theo dõi ngân sách/giá tiền hay chỉ số lượng; tái dùng `Workflow` engine sẵn có hay xây luồng
+trạng thái riêng cho `ConsumableRequest`; liên kết ra sao với `ConsumableTransaction` khi đề xuất được
+duyệt và mua thực tế (tự động tạo giao dịch NHẬP, hay vẫn phải nhập tay).
+
 ---
 
 ## NHÓM C — Bảo mật & vận hành nên bổ sung (không phải "tính năng nghiệp vụ" nhưng đáng đầu tư)

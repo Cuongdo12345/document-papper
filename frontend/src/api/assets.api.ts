@@ -1,6 +1,6 @@
 import type { AxiosResponse } from "axios";
 import { axiosInstance } from "@/api/axios";
-import type { Pagination } from "@/types/shared.types";
+import type { Pagination, BulkDeleteResult } from "@/types/shared.types";
 import type {
   AssetListItem,
   GetAssetsParams,
@@ -62,6 +62,16 @@ export function deleteAsset(id: string): Promise<AxiosResponse<{ message: string
 
 export function restoreAsset(id: string): Promise<AxiosResponse<{ message: string; data: Asset }>> {
   return axiosInstance.patch(`/assets/${id}/restore`);
+}
+
+/** [MỚI 2026-09-16, DEV-060] Xoá mềm hàng loạt — chọn nhiều dòng ở danh sách. */
+export function bulkDeleteAssets(ids: string[]): Promise<AxiosResponse<{ message: string; data: BulkDeleteResult }>> {
+  return axiosInstance.post("/assets/bulk-delete", { ids });
+}
+
+/** [MỚI 2026-09-17, DEV-062] Khôi phục hàng loạt — cùng permission ASSET_UPDATE với `restoreAsset`. */
+export function bulkRestoreAssets(ids: string[]): Promise<AxiosResponse<{ message: string; data: BulkDeleteResult }>> {
+  return axiosInstance.post("/assets/bulk-restore", { ids });
 }
 
 export function assignAsset(

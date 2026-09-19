@@ -170,7 +170,19 @@ Nếu cần tiếp tục làm việc trên project này ở phiên sau, các hư
   `/app/inventory/:id` chi tiết/nhập-xuất/lịch sử). Chi tiết: `docs/development/tasks/DEV-056.md`.
   **LƯU Ý ĐÃ XONG**: đã chạy `scripts/seed-rbac.ts` (user xác nhận) — 5 permission mới có trong DB
   (84 đã tồn tại, 0 role bị đồng bộ lại). Vẫn cần gán tay qua UI "Phân quyền" cho IT/PHONG_VAT_TU_TTB.
-  **Nhóm B4-B7 và Nhóm C/D VẪN CHƯA được duyệt/implement.**
+- **[CẬP NHẬT 2026-09-16] Mục B4 (Quản lý nhà cung cấp & hợp đồng bảo trì) đã DONE** — user chọn phương
+  án ĐẦY ĐỦ ở cả 3 câu hỏi scoping (2 domain riêng Vendor+Contract, 1 hợp đồng ↔ NHIỀU tài sản, CÓ cảnh
+  báo tự động). Module hoàn toàn mới — `Vendor` (NCC) + `Contract` (`assets: ObjectId[]` nhúng trực
+  tiếp, KHÔNG collection trung gian riêng). API mount tại `/api/vendors` + `/api/contracts`. Permission
+  mới `VENDOR_VIEW/CREATE/UPDATE` + `CONTRACT_VIEW/CREATE/UPDATE/ALERTS_TRIGGER` (IT + PHONG_VAT_TU_TTB
+  đủ cả 7; USER chỉ VIEW cả 2). Cảnh báo hợp đồng sắp hết hạn: cron 08:20 hằng ngày, CHỈ gửi tới role
+  PHONG_VAT_TU_TTB (không broadcast theo phòng ban asset, khác B3 — quản lý hợp đồng là việc tập trung).
+  UI: 2 mục sidebar riêng "Nhà cung cấp"/"Hợp đồng bảo trì" + section CHỈ ĐỌC mới trong `AssetDetailPage`.
+  Component mới `AssetMultiPicker` (chọn nhiều asset, KHÔNG sửa `AssetPicker` single-select có sẵn). Chi
+  tiết: `docs/development/tasks/DEV-057.md`. **LƯU Ý ĐÃ XONG**: đã chạy `scripts/seed-rbac.ts` (user xác
+  nhận) — 7 permission mới có trong DB (89 đã tồn tại, 0 role bị đồng bộ lại). Vẫn cần gán tay qua UI
+  "Phân quyền" cho IT/PHONG_VAT_TU_TTB.
+  **Nhóm B5-B7 và Nhóm C/D VẪN CHƯA được duyệt/implement.**
 
 ## Security fix — 2026-08-30: ISS-01/SEC-05/SEC-08 RESOLVED
 

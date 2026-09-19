@@ -13,6 +13,15 @@ import { parseApiError } from "@/utils/parseApiError";
 import { toast } from "@/stores/toastStore";
 import type { UserListItem } from "@/types/user.types";
 
+/** [MỚI 2026-09-18] Khớp `email` optional của `RegisterDTO`/`UpdateUserDTO` — cho phép rỗng (không bắt buộc). */
+const emailField = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .email("Email không hợp lệ")
+  .optional()
+  .or(z.literal(""));
+
 /** Khớp `CreateUserDTO`. */
 const createUserSchema = z.object({
   username: z
@@ -24,11 +33,14 @@ const createUserSchema = z.object({
   fullName: z.string().trim().min(1, "Họ tên không được để trống"),
   role: z.string().min(1, "Vui lòng chọn vai trò"),
   department: z.string().optional(),
+  email: emailField,
 });
 
 /** Khớp `UpdateUserDTO` — KHÔNG có `password` (đổi mật khẩu là action riêng ở bảng) và KHÔNG có `isActive`
  * (kích hoạt/vô hiệu hoá dùng đúng endpoint riêng `disable`/`restore` — có business rule an toàn riêng,
- * generic update KHÔNG được phép bypass các rule đó). */
+ * generic update KHÔNG được phép bypass các rule đó).
+ * `email` [MỚI 2026-09-18, khắc phục gap DEV-065 Mục 4] — CHỈ có tác dụng qua đường ADMIN sửa
+ * (`PUT /users/:id`, form này), KHÔNG áp dụng cho self-service (`ProfilePage` không có field này). */
 const editUserSchema = z.object({
   username: z
     .string()
@@ -38,6 +50,7 @@ const editUserSchema = z.object({
   fullName: z.string().trim().min(1, "Họ tên không được để trống"),
   role: z.string().min(1, "Vui lòng chọn vai trò"),
   department: z.string().optional(),
+  email: emailField,
 });
 
 type CreateFormValues = z.infer<typeof createUserSchema>;
@@ -79,6 +92,7 @@ export function UserFormDrawer({ open, onClose, user }: UserFormDrawerProps) {
         fullName: user?.fullName ?? "",
         role: user?.role ?? "",
         department: user?.department?._id ?? "",
+        email: user?.email ?? "",
         ...(isEdit ? {} : { password: "" }),
       } as CreateFormValues | EditFormValues);
     }
@@ -89,10 +103,11 @@ export function UserFormDrawer({ open, onClose, user }: UserFormDrawerProps) {
 
   function onSubmit(values: CreateFormValues | EditFormValues) {
     const department = values.department || undefined;
+    const email = values.email || undefined;
 
     if (isEdit) {
       updateMutation.mutate(
-        { id: user._id, body: { ...values, department } },
+        { id: user._id, body: { ...values, department, email } },
         {
           onSuccess: () => {
             toast.success("Đã cập nhật user");
@@ -102,7 +117,7 @@ export function UserFormDrawer({ open, onClose, user }: UserFormDrawerProps) {
       );
     } else {
       createMutation.mutate(
-        { ...(values as CreateFormValues), department },
+        { ...(values as CreateFormValues), department, email },
         {
           onSuccess: () => {
             toast.success("Đã tạo user mới");
@@ -164,6 +179,22 @@ export function UserFormDrawer({ open, onClose, user }: UserFormDrawerProps) {
               {...register("fullName")}
             />
             {errors.fullName && <p className="text-xs text-destructive">{errors.fullName.message}</p>}
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="user-email" className="text-sm font-medium text-foreground">
+              Email
+            </label>
+            <input
+              id="user-email"
+              type="email"
+              autoComplete="off"
+              aria-invalid={!!errors.email}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              {...register("email")}
+            />
+            {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+            <p className="text-xs text-muted-foreground">Tuỳ chọn — cần có để user nhận email (báo cáo tuần, quên mật khẩu...).</p>
           </div>
 
           <div className="space-y-1.5">

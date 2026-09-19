@@ -26,3 +26,15 @@ export const makeIdParamDTO = (paramName: string, message = "ID không hợp l�
 
 /** Schema mặc định cho route dùng đúng tên param ":id". */
 export const IdParamDTO = makeIdParamDTO("id");
+
+/**
+ * [MỚI 2026-09-16, DEV-060] Body chung cho mọi endpoint "xoá mềm hàng loạt"
+ * (`POST .../bulk-delete`) — dùng chung cho 6 domain đã có sẵn xoá mềm/toggle
+ * `isActive` từng dòng (Asset/AssetCategory/ConsumableItem/ConsumableCategory/
+ * Vendor/User). Giới hạn tối đa 100 phần tử/lần — khớp đúng ngữ nghĩa "chọn
+ * toàn bộ dữ liệu ĐANG HIỂN THỊ" (trang hiện tại, không phải toàn bộ kết quả
+ * lọc), page size UI hiện tại luôn ≤ 100 nên không cần phân trang cho batch.
+ */
+export const BulkIdsDTO = z.object({
+  ids: z.array(objectId("id trong danh sách không hợp lệ")).min(1, "Chọn ít nhất 1 mục").max(100, "Tối đa 100 mục mỗi lần"),
+});

@@ -7,9 +7,14 @@ import type {
   ForgotPasswordRequest,
   LoginRequest,
   LoginResponseData,
+  LoginSuccessData,
+  VerifyLoginOtpRequest,
+  ConfirmTwoFactorRequest,
+  DisableTwoFactorRequest,
   RefreshTokenResponseData,
   ResetPasswordRequest,
   UpdateMeRequest,
+  Session,
 } from "@/types/auth.types";
 
 /**
@@ -101,4 +106,44 @@ export function forgotPassword(body: ForgotPasswordRequest): Promise<AxiosRespon
  */
 export function resetPassword(body: ResetPasswordRequest): Promise<AxiosResponse<{ message: string }>> {
   return axiosInstance.post("/auths/reset-password", body);
+}
+
+/* =====================================================================
+   XÁC THỰC 2 LỚP (2FA qua email OTP, Roadmap C1, DEV-068, 2026-09-19)
+===================================================================== */
+
+/** Bước 2 đăng nhập khi tài khoản đã bật 2FA — luôn trả `LoginSuccessData` thật (khác `login()` có thể trả nhánh pending). */
+export function verifyLoginOtp(
+  body: VerifyLoginOtpRequest,
+): Promise<AxiosResponse<{ message: string; data: LoginSuccessData }>> {
+  return axiosInstance.post("/auths/login/verify-otp", body);
+}
+
+/** Tự bật 2FA bước 1 — gửi OTP qua email, CHƯA bật cờ (phải gọi `confirmTwoFactor` để hoàn tất). */
+export function enableTwoFactor(): Promise<AxiosResponse<{ message: string }>> {
+  return axiosInstance.post("/auths/2fa/enable");
+}
+
+export function confirmTwoFactor(
+  body: ConfirmTwoFactorRequest,
+): Promise<AxiosResponse<{ message: string; data: { twoFactorEnabled: boolean } }>> {
+  return axiosInstance.post("/auths/2fa/confirm", body);
+}
+
+export function disableTwoFactor(
+  body: DisableTwoFactorRequest,
+): Promise<AxiosResponse<{ message: string; data: { twoFactorEnabled: boolean } }>> {
+  return axiosInstance.post("/auths/2fa/disable", body);
+}
+
+/* =====================================================================
+   QUẢN LÝ PHIÊN ĐĂNG NHẬP (Roadmap C2, DEV-069, 2026-09-19)
+===================================================================== */
+
+export function getMySessions(): Promise<AxiosResponse<{ message: string; data: Session[] }>> {
+  return axiosInstance.get("/auths/sessions");
+}
+
+export function revokeMySession(id: string): Promise<AxiosResponse<{ message: string }>> {
+  return axiosInstance.delete(`/auths/sessions/${id}`);
 }

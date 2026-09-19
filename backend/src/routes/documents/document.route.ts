@@ -8,8 +8,11 @@ import {
   deleteDocuments,
   restoreDocuments,
   deleteDocumentsByMonth,
-  getDocumentVersions
+  getDocumentVersions,
+  bulkDeleteDocuments,
+  bulkRestoreDocuments
 } from "../../controllers/documents/document.controller";
+import { exportDocumentPdf, verifyDocumentPdfExport } from "../../controllers/documents/documentPdf.controller";
 import { authenticate } from "../../middlewares/auth.middleware";
 import { authorizePermission } from "../../middlewares/authorizePermission.middleware";
 import { loadDocument } from "../../middlewares/loadDocument.middleware";
@@ -18,7 +21,7 @@ import { loadDocument } from "../../middlewares/loadDocument.middleware";
 // KHÔNG sửa file middleware này trong task hiện tại — chỉ dùng lại.
 import { validateBody, validateQuery, validateParams } from "../../middlewares/validate.middleware";
 import { CreateDocumentDTO, UpdateDocumentDTO, QueryDocumentDTO, DeleteDocumentsByMonthDTO } from "../../dto/documents/documents.dto";
-import { IdParamDTO, makeIdParamDTO } from "../../dto/common.dto";
+import { IdParamDTO, makeIdParamDTO, BulkIdsDTO } from "../../dto/common.dto";
 // import {performanceMiddleware} from "../middlewares/performance.middleware";
 // import {exportDocumentsExcel,exportDocumentsPDF} from "../controllers/document.export.controller";
 
@@ -44,6 +47,28 @@ router.get(
   authorizePermission("DOCUMENT_VIEW"),
   validateQuery(QueryDocumentDTO),
   getAllDocuments,
+);
+
+// [MỚI 2026-09-17, DEV-061] Batch Action Bar danh sách Document — PHẢI đăng
+// ký TRƯỚC "GET/DELETE /:id" (static path). Permission khớp đúng single-item
+// tương ứng (DOCUMENT_DELETE cho xoá, DOCUMENT_UPDATE cho khôi phục) — guard
+// ADMIN-only của xoá (isSystemRole) và ADMIN-hoặc-owner của khôi phục vẫn áp
+// dụng bên trong `deleteDocumentService`/`restoreDocumentService` (tái dùng
+// nguyên vẹn qua `bulkDeleteDocumentService`/`bulkRestoreDocumentService`).
+router.post(
+  "/bulk-delete",
+  authenticate,
+  authorizePermission("DOCUMENT_DELETE"),
+  validateBody(BulkIdsDTO),
+  bulkDeleteDocuments,
+);
+
+router.post(
+  "/bulk-restore",
+  authenticate,
+  authorizePermission("DOCUMENT_UPDATE"),
+  validateBody(BulkIdsDTO),
+  bulkRestoreDocuments,
 );
 
 // [P1-5/P1.11] Thêm validateParams(IdParamDTO) — trước đây route :id không có
@@ -113,6 +138,35 @@ router.get(
     action: "view_detail",
   }),
   getDocumentVersions,
+);
+
+// Roadmap B5 (2026-09-18) — xuất PDF chính thức (kèm bảng phê duyệt + "ký
+// nội bộ", xem documentPdf.service.ts). Dùng ĐÚNG guard của "GET /:id/versions"
+// ở trên — PDF chỉ là bản render khác của CÙNG dữ liệu chi tiết, không có lý
+// do phân quyền khác đi (ai xem được chi tiết thì xuất được PDF của chính nó).
+router.get(
+  "/:id/export-pdf",
+  authenticate,
+  validateParams(IdParamDTO),
+  loadDocument,
+  authorizePermission(["DOCUMENT_VIEW_DETAIL", "DOCUMENT_VIEW_ALL_DEPARTMENTS"], {
+    enablePolicies: true,
+    resource: "document",
+    action: "view_detail",
+  }),
+  exportDocumentPdf,
+);
+
+// Roadmap B5 — xác minh 1 bản ghi "đã xuất PDF" (KHÔNG lộ nội dung Document,
+// chỉ valid/exportedBy/exportedAt) — gate bằng DOCUMENT_VIEW (permission RỘNG
+// nhất, mọi role thao tác Document đều có), không cần ABAC department-scoping
+// vì không trả nội dung tài liệu.
+router.get(
+  "/pdf-exports/:exportId/verify",
+  authenticate,
+  authorizePermission("DOCUMENT_VIEW"),
+  validateParams(makeIdParamDTO("exportId", "Mã xác thực không hợp lệ")),
+  verifyDocumentPdfExport,
 );
 
 // Route này KHÔNG có :id, không cần IdParamDTO.

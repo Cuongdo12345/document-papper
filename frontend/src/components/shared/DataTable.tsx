@@ -14,6 +14,19 @@ export interface DataTableColumn<T> {
   sortKey?: string;
 }
 
+/**
+ * [MỚI 2026-09-16, DEV-060] Bật cột checkbox chọn nhiều dòng — TUỲ CHỌN,
+ * không truyền thì `DataTable` render y hệt trước đây (backward-compatible
+ * với 13 trang danh sách hiện có, đa số KHÔNG dùng tính năng này).
+ * `selectedIds`/`onToggleRow`/`onToggleAll` do CALLER quản lý state (component
+ * này thuần hiển thị, cùng triết lý `rowActions`) — xem `useRowSelection`.
+ */
+export interface DataTableSelection {
+  selectedIds: Set<string>;
+  onToggleRow: (id: string) => void;
+  onToggleAll: (checked: boolean) => void;
+}
+
 interface DataTableProps<T> {
   columns: DataTableColumn<T>[];
   data: T[];
@@ -30,6 +43,8 @@ interface DataTableProps<T> {
   order?: "asc" | "desc";
   onSortChange?: (sortBy: string) => void;
   className?: string;
+  /** Cột checkbox đầu bảng — xem `DataTableSelection`. */
+  selection?: DataTableSelection;
 }
 
 /**
@@ -55,6 +70,7 @@ export function DataTable<T>({
   order,
   onSortChange,
   className,
+  selection,
 }: DataTableProps<T>) {
   if (isError) {
     return <ErrorState message={errorMessage} onRetry={onRetry} />;
@@ -73,6 +89,23 @@ export function DataTable<T>({
       <table className="w-full min-w-max text-sm">
         <thead className="border-b border-border bg-muted/50 text-left text-xs font-medium text-muted-foreground">
           <tr>
+            {selection && (
+              <th className="w-10 whitespace-nowrap px-4 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={data.length > 0 && data.every((row) => selection.selectedIds.has(keyExtractor(row)))}
+                  ref={(el) => {
+                    if (el) {
+                      const checkedCount = data.filter((row) => selection.selectedIds.has(keyExtractor(row))).length;
+                      el.indeterminate = checkedCount > 0 && checkedCount < data.length;
+                    }
+                  }}
+                  onChange={(e) => selection.onToggleAll(e.target.checked)}
+                  className="size-4 rounded border-input"
+                  aria-label="Chọn tất cả dòng đang hiển thị"
+                />
+              </th>
+            )}
             {columns.map((col) => {
               const key = col.sortKey ?? col.key;
               const isSortable = !!onSortChange;
@@ -105,6 +138,17 @@ export function DataTable<T>({
         <tbody className="divide-y divide-border">
           {data.map((row) => (
             <tr key={keyExtractor(row)} className="hover:bg-muted/30">
+              {selection && (
+                <td className="whitespace-nowrap px-4 py-2.5">
+                  <input
+                    type="checkbox"
+                    checked={selection.selectedIds.has(keyExtractor(row))}
+                    onChange={() => selection.onToggleRow(keyExtractor(row))}
+                    className="size-4 rounded border-input"
+                    aria-label="Chọn dòng này"
+                  />
+                </td>
+              )}
               {columns.map((col) => (
                 <td key={col.key} className={cn("whitespace-nowrap px-4 py-2.5", col.className)}>
                   {col.render ? col.render(row) : String((row as Record<string, unknown>)[col.key] ?? "—")}

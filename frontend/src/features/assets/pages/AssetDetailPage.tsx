@@ -20,6 +20,7 @@ import { AssetAssignmentHistorySection } from "@/features/assets/components/Asse
 import { MedicalDeviceSection } from "@/features/assets/components/MedicalDeviceSection";
 import { AssetQRCodeSection } from "@/features/assets/components/AssetQRCodeSection";
 import { MaintenancePlanHistorySection } from "@/features/assets/components/MaintenancePlanHistorySection";
+import { ContractHistorySection } from "@/features/vendors/components/ContractHistorySection";
 import { parseApiError } from "@/utils/parseApiError";
 
 const SECTION_CLASS = "space-y-3 rounded-lg border border-border bg-card p-4";
@@ -179,6 +180,9 @@ export function AssetDetailPage() {
 
       {/* Roadmap B2 — Lịch bảo trì chủ động (tự ẩn nếu không có ASSET_MAINTENANCE_PLAN_VIEW) */}
       <MaintenancePlanHistorySection assetId={asset._id} />
+
+      {/* Roadmap B4 — Hợp đồng bảo trì/bảo hành (tự ẩn nếu không có CONTRACT_VIEW) */}
+      <ContractHistorySection assetId={asset._id} />
 
       {editOpen && <AssetEditModal key={asset._id} open={editOpen} onClose={() => setEditOpen(false)} asset={asset} />}
       {assignOpen && <AssetAssignModal key={`assign-${asset._id}`} open={assignOpen} onClose={() => setAssignOpen(false)} asset={asset} />}

@@ -98,6 +98,18 @@ const UserSchema = new Schema<IUser>(
       default: true,
     },
 
+    // Roadmap B7 (2026-09-18) — xem giải thích đầy đủ ở `user.interface.ts`.
+    subscribedToWeeklyReport: {
+      type: Boolean,
+      default: false,
+    },
+
+    // Roadmap C1 (2026-09-19) — xem giải thích đầy đủ ở `user.interface.ts`.
+    twoFactorEnabled: {
+      type: Boolean,
+      default: false,
+    },
+
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
   },

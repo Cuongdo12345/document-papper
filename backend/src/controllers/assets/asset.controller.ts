@@ -5,8 +5,10 @@ import {
   getAssetByIdService,
   updateAssetService,
   deleteAssetService,
+  bulkDeleteAssetService,
   hardDeleteAssetService,
   restoreAssetService,
+  bulkRestoreAssetService,
 } from "../../services/assets/assetDevice/asset.service";
 import {
   generateAssetQRCodeService,
@@ -87,6 +89,18 @@ export const deleteAsset = catchAsync(async (req: Request, res: Response) => {
 });
 
 /**
+ * BULK DELETE (xoá mềm hàng loạt — DEV-060, 2026-09-16)
+ */
+export const bulkDeleteAssets = catchAsync(async (req: Request, res: Response) => {
+  const result = await bulkDeleteAssetService(req.body.ids, req.user?._id);
+
+  res.json({
+    message: `Đã xoá ${result.deletedIds.length}/${req.body.ids.length} tài sản`,
+    data: result,
+  });
+});
+
+/**
  * HARD DELETE (xoá vĩnh viễn — chỉ áp dụng cho asset đã soft-delete trước đó)
  */
 export const hardDeleteAsset = catchAsync(
@@ -108,6 +122,18 @@ export const restoreAsset = catchAsync(async (req: Request, res: Response) => {
   res.json({
     message: "Khôi phục tài sản thành công",
     data: asset,
+  });
+});
+
+/**
+ * BULK RESTORE (khôi phục hàng loạt — DEV-062, 2026-09-17)
+ */
+export const bulkRestoreAssets = catchAsync(async (req: Request, res: Response) => {
+  const result = await bulkRestoreAssetService(req.body.ids, req.user?._id);
+
+  res.json({
+    message: `Đã khôi phục ${result.deletedIds.length}/${req.body.ids.length} tài sản`,
+    data: result,
   });
 });
 

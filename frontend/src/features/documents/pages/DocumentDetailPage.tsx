@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Pencil, Trash2, RotateCcw, Send, Check, X, Ban, FlagOff } from "lucide-react";
+import { Pencil, Trash2, RotateCcw, Send, Check, X, Ban, FlagOff, FileDown } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
@@ -16,6 +16,7 @@ import { useDeleteDocument } from "@/features/documents/hooks/useDeleteDocument"
 import { useRestoreDocument } from "@/features/documents/hooks/useRestoreDocument";
 import { useDocumentWorkflow } from "@/features/documents/hooks/useDocumentWorkflow";
 import { useReportsByProposal } from "@/features/documents/hooks/useReportsByProposal";
+import { useExportDocumentPdf } from "@/features/documents/hooks/useExportDocumentPdf";
 import { useAsset } from "@/features/assets/hooks/useAsset";
 import { WorkflowStatusBadge } from "@/features/documents/components/WorkflowStatusBadge";
 import { DocumentMetaView } from "@/features/documents/components/DocumentMetaView";
@@ -58,6 +59,7 @@ export function DocumentDetailPage() {
 
   const deleteMutation = useDeleteDocument();
   const restoreMutation = useRestoreDocument();
+  const exportPdfMutation = useExportDocumentPdf();
   const approveMutation = useApproveWorkflow();
   const rejectMutation = useRejectWorkflow();
   const cancelWfMutation = useCancelWorkflow();
@@ -131,6 +133,14 @@ export function DocumentDetailPage() {
           <div className="flex gap-2">
             {document.isActive ? (
               <>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => exportPdfMutation.mutate({ id: document._id, documentCode: document.documentCode })}
+                  disabled={exportPdfMutation.isPending}
+                >
+                  <FileDown /> Xuất PDF
+                </Button>
                 {document.category === "PROPOSAL" && canSubmitWorkflow && (
                   <PermissionGuard permission={PERMISSIONS.WORKFLOW_SUBMIT}>
                     <Button variant="secondary" size="sm" onClick={() => setSubmitOpen(true)}>

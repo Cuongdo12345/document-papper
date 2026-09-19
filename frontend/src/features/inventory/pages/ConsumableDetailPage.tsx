@@ -34,7 +34,7 @@ export function ConsumableDetailPage() {
     <div className="space-y-4">
       <PageHeader
         title={item.name}
-        description={`${departmentLabel} · ${item.category || "Chưa phân nhóm"}`}
+        description={`${departmentLabel} · ${item.category?.name ?? "Chưa phân nhóm"}`}
         breadcrumb={[{ label: "Vật tư tiêu hao", to: "/app/inventory" }, { label: item.name }]}
         actions={
           <div className="flex gap-2">

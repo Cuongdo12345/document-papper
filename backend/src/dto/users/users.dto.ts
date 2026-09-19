@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { objectId } from "../common.dto";
 
 // Nếu bạn có role enum → nên convert sang const array
 // export const UserRoles = ["ADMIN", "IT", "USER"] as const;
@@ -22,6 +23,11 @@ export const CreateUserDTO = z.object({
   // nhưng input của client chỉ cần gửi roleId — validate roleId ở đây.
   role: ObjectIdSchema,
   department: ObjectIdSchema.optional(),
+  // [MỚI 2026-09-18] Khắc phục gap phát hiện ở DEV-065 (Roadmap B7 Mục 4):
+  // trước đây KHÔNG có đường nào (kể cả lúc tạo mới) để ADMIN gán email cho
+  // user — chỉ `RegisterDTO` (tự đăng ký) mới thu thập email. Validation
+  // giống hệt `RegisterDTO.email` (auths.dto.ts) để nhất quán thông báo lỗi.
+  email: z.string().trim().toLowerCase().email("Email không hợp lệ").optional(),
 });
 
 export const UpdateUserDTO = z.object({
@@ -34,6 +40,16 @@ export const UpdateUserDTO = z.object({
   role: ObjectIdSchema.optional(),
   department: ObjectIdSchema.optional(),
   isActive: z.boolean().optional(),
+  // Roadmap B7 (2026-09-18) — chỉ THỰC SỰ áp dụng qua `PATCH /users/me`
+  // (`updateMeService` tự whitelist field cho phép tự-cập-nhật riêng, KHÔNG
+  // đọc thẳng từ DTO này — xem `users.service.ts`).
+  subscribedToWeeklyReport: z.boolean().optional(),
+  // [MỚI 2026-09-18] Khắc phục gap DEV-065 Mục 4 — chỉ THỰC SỰ áp dụng qua
+  // `PUT /users/:id` (ADMIN, `update()`). CỐ TÌNH KHÔNG thêm vào whitelist
+  // của `updateMeService` — email là field "nhạy cảm" đã được ghi nhận rõ
+  // trong docstring gốc của `updateMeService` (gắn với luồng quên mật khẩu),
+  // giữ nguyên chỉ ADMIN mới sửa được, giống role/department/isActive.
+  email: z.string().trim().toLowerCase().email("Email không hợp lệ").optional(),
 });
 
 /**
@@ -151,3 +167,27 @@ export const GetUsersQueryDTO = z
   );
 
 export type GetUsersQuery = z.infer<typeof GetUsersQueryDTO>;
+
+/**
+ * Roadmap C2 (Quản lý phiên đăng nhập, DEV-069, 2026-09-19) — param cho
+ * `DELETE /users/:id/sessions/:sessionId` (ADMIN thu hồi phiên của user
+ * khác) — route ĐẦU TIÊN trong codebase có 2 ObjectId param lồng nhau, nên
+ * chưa dùng lại được `makeIdParamDTO` (chỉ hỗ trợ đúng 1 param).
+ */
+export const UserSessionParamDTO = z.object({
+  id: objectId("User id không hợp lệ"),
+  sessionId: objectId("Session id không hợp lệ"),
+});
+
+/**
+ * Roadmap C3 (Giám sát phiên đăng nhập toàn hệ thống, DEV-070, 2026-09-19) —
+ * query cho `GET /users/sessions` (list TẤT CẢ phiên, ADMIN). `limit`
+ * max(100) đủ vì đây là danh sách phiên ĐANG hoạt động (không tích luỹ vô
+ * hạn như audit log) — khác lý do `GetPermissionsQueryDTO` phải nâng lên 300
+ * (DEV-068 Mục 5).
+ */
+export const GetAllSessionsQueryDTO = z.object({
+  page: z.coerce.number().int().min(1, "page phải >= 1").default(1),
+  limit: z.coerce.number().int().min(1, "limit phải >= 1").max(100, "limit tối đa 100").default(20),
+  search: z.string().trim().min(1, "search không được rỗng").max(100, "search tối đa 100 ký tự").optional(),
+});

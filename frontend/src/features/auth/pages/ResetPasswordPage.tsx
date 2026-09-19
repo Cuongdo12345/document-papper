@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Eye, EyeOff, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AuthLayout } from "@/features/auth/components/AuthLayout";
 import { useResetPassword } from "@/features/auth/hooks/useResetPassword";
 import { parseApiError } from "@/utils/parseApiError";
 import { toast } from "@/stores/toastStore";
@@ -64,8 +65,8 @@ export function ResetPasswordPage() {
   // Link email thiếu/hỏng token — báo ngay, không hiển thị form vô nghĩa.
   if (!token) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-6">
-        <div className="w-full max-w-sm space-y-4 text-center">
+      <AuthLayout>
+        <div className="space-y-4 text-center">
           <ShieldAlert className="mx-auto size-10 text-destructive" aria-hidden="true" />
           <h1 className="text-xl font-semibold text-foreground">Đường dẫn không hợp lệ</h1>
           <p className="text-sm text-muted-foreground">
@@ -75,91 +76,89 @@ export function ResetPasswordPage() {
             Yêu cầu gửi lại email
           </Link>
         </div>
-      </div>
+      </AuthLayout>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-6">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="space-y-1">
-          <h1 className="text-xl font-semibold text-foreground">Đặt lại mật khẩu</h1>
-          <p className="text-sm text-muted-foreground">Nhập mật khẩu mới cho tài khoản của bạn.</p>
-        </div>
+    <AuthLayout>
+      <div className="space-y-1">
+        <h1 className="text-xl font-semibold text-foreground">Đặt lại mật khẩu</h1>
+        <p className="text-sm text-muted-foreground">Nhập mật khẩu mới cho tài khoản của bạn.</p>
+      </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
-          <div className="space-y-1.5">
-            <label htmlFor="newPassword" className="text-sm font-medium text-foreground">
-              Mật khẩu mới
-            </label>
-            <div className="relative">
-              <input
-                id="newPassword"
-                type={showPassword ? "text" : "password"}
-                autoComplete="new-password"
-                autoFocus
-                aria-invalid={!!errors.newPassword}
-                aria-describedby={errors.newPassword ? "newPassword-error" : undefined}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 pr-10 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                {...register("newPassword")}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
-                aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-              >
-                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </button>
-            </div>
-            {errors.newPassword && (
-              <p id="newPassword-error" className="text-xs text-destructive">
-                {errors.newPassword.message}
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
-              Xác nhận mật khẩu mới
-            </label>
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
+        <div className="space-y-1.5">
+          <label htmlFor="newPassword" className="text-sm font-medium text-foreground">
+            Mật khẩu mới
+          </label>
+          <div className="relative">
             <input
-              id="confirmPassword"
+              id="newPassword"
               type={showPassword ? "text" : "password"}
               autoComplete="new-password"
-              aria-invalid={!!errors.confirmPassword}
-              aria-describedby={errors.confirmPassword ? "confirmPassword-error" : undefined}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              {...register("confirmPassword")}
+              autoFocus
+              aria-invalid={!!errors.newPassword}
+              aria-describedby={errors.newPassword ? "newPassword-error" : undefined}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 pr-10 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              {...register("newPassword")}
             />
-            {errors.confirmPassword && (
-              <p id="confirmPassword-error" className="text-xs text-destructive">
-                {errors.confirmPassword.message}
-              </p>
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
+              aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+            >
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
+          {errors.newPassword && (
+            <p id="newPassword-error" className="text-xs text-destructive">
+              {errors.newPassword.message}
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
+            Xác nhận mật khẩu mới
+          </label>
+          <input
+            id="confirmPassword"
+            type={showPassword ? "text" : "password"}
+            autoComplete="new-password"
+            aria-invalid={!!errors.confirmPassword}
+            aria-describedby={errors.confirmPassword ? "confirmPassword-error" : undefined}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            {...register("confirmPassword")}
+          />
+          {errors.confirmPassword && (
+            <p id="confirmPassword-error" className="text-xs text-destructive">
+              {errors.confirmPassword.message}
+            </p>
+          )}
+        </div>
+
+        {apiError && (
+          <div role="alert" className="space-y-1 rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {apiError.fieldErrors && apiError.fieldErrors.length > 0 ? (
+              apiError.fieldErrors.map((fe, i) => <p key={i}>{fe.message}</p>)
+            ) : apiError.messages && apiError.messages.length > 0 ? (
+              apiError.messages.map((m, i) => <p key={i}>{m}</p>)
+            ) : (
+              <p>{apiError.message}</p>
             )}
           </div>
+        )}
 
-          {apiError && (
-            <div role="alert" className="space-y-1 rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {apiError.fieldErrors && apiError.fieldErrors.length > 0 ? (
-                apiError.fieldErrors.map((fe, i) => <p key={i}>{fe.message}</p>)
-              ) : apiError.messages && apiError.messages.length > 0 ? (
-                apiError.messages.map((m, i) => <p key={i}>{m}</p>)
-              ) : (
-                <p>{apiError.message}</p>
-              )}
-            </div>
-          )}
+        <Button type="submit" className="w-full" loading={resetPassword.isPending}>
+          {resetPassword.isPending ? "Đang xử lý..." : "Đặt lại mật khẩu"}
+        </Button>
 
-          <Button type="submit" className="w-full" loading={resetPassword.isPending}>
-            {resetPassword.isPending ? "Đang xử lý..." : "Đặt lại mật khẩu"}
-          </Button>
-
-          <Link to="/login" className="block text-center text-sm font-medium text-primary hover:underline">
-            Quay lại đăng nhập
-          </Link>
-        </form>
-      </div>
-    </div>
+        <Link to="/login" className="block text-center text-sm font-medium text-primary hover:underline">
+          Quay lại đăng nhập
+        </Link>
+      </form>
+    </AuthLayout>
   );
 }

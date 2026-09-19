@@ -44,6 +44,12 @@ export enum NotificationType {
   // hằng ngày). Gửi 1 LẦN khi tồn kho xuống ≤ ngưỡng, reset lại khi nhập
   // hàng vượt ngưỡng — cùng pattern `ASSET_WARRANTY_EXPIRING`.
   CONSUMABLE_LOW_STOCK = "CONSUMABLE_LOW_STOCK",
+  // Roadmap B4 (Quản lý nhà cung cấp & hợp đồng bảo trì, 2026-09-16) — bổ
+  // sung thêm, không đổi giá trị cũ. Xem trigger tại
+  // `contractAlerts.service.ts` (cron job hằng ngày). Gửi 1 lần khi hợp đồng
+  // còn ≤30 ngày tới hạn, reset lại khi sửa `endDate` — cùng pattern
+  // `ASSET_WARRANTY_EXPIRING`.
+  CONTRACT_EXPIRING = "CONTRACT_EXPIRING",
 }
 
 /**
@@ -61,6 +67,8 @@ export enum NotificationResourceType {
   ASSET = "Asset",
   // 🔗 Roadmap B3 (module Quản lý vật tư tiêu hao)
   CONSUMABLE_ITEM = "ConsumableItem",
+  // 🔗 Roadmap B4 (module Quản lý nhà cung cấp & hợp đồng bảo trì)
+  CONTRACT = "Contract",
 }
 
 export enum NotificationChannel {

@@ -4,9 +4,12 @@ import { Role } from "../../models/rbac/role.model";
 import Department from "../../models/departments/department.model";
 import UserAudit from "../../models/users/userAudit.model";
 import RefreshToken from "../../models/auth/refreshToken.model";
+import TwoFactorOtp from "../../models/auth/twoFactorOtp.model";
 import { Asset } from "../../models/assets/asset.model";
 import ApiError from "../../shared/errors/ApiError";
 import { clearPermissionCache, getCachedPermissions } from "../rbac/permission.cache";
+import { runBulkDelete } from "../../shared/utils/bulkDelete.util";
+import { parseUserAgent } from "../../shared/helpers/userAgent.helper";
 
 // import { createUserSchema } from "../dtos/users/user.dto";
 
@@ -24,7 +27,7 @@ import { clearPermissionCache, getCachedPermissions } from "../rbac/permission.c
    * 
    */
   export const create = async (data: any, performedBy: any) => {
-    const { username, password, fullName, role: roleId, department } = data;
+    const { username, password, fullName, role: roleId, department, email } = data;
     // Lưu ý: format input (username regex/length, password length, fullName,
     // role/department ObjectId format) đã được validate ở CreateUserDTO middleware.
     // `roleId` ở đây là string ObjectId do client gửi lên — cần resolve thành
@@ -59,6 +62,15 @@ import { clearPermissionCache, getCachedPermissions } from "../rbac/permission.c
       if (!dept) throw ApiError.notFound("Khoa không tồn tại");
     }
 
+    // [MỚI 2026-09-18, khắc phục gap DEV-065 Mục 4] Check trùng email TRƯỚC
+    // khi insert — cùng lý do đã áp dụng cho username phía trên: tránh để lỗi
+    // duplicate-key thô (E11000) từ unique+sparse index rơi ra ngoài thành
+    // lỗi 500 generic, trả thẳng ApiError.conflict dễ hiểu hơn.
+    if (email) {
+      const emailExisted = await User.findOne({ email });
+      if (emailExisted) throw ApiError.conflict("Email đã được sử dụng");
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await User.create({
@@ -66,7 +78,8 @@ import { clearPermissionCache, getCachedPermissions } from "../rbac/permission.c
       password: hashedPassword,
       fullName,
       role: role._id,
-      department
+      department,
+      email,
     });
 
     await UserAudit.create({
@@ -180,7 +193,7 @@ import { clearPermissionCache, getCachedPermissions } from "../rbac/permission.c
    * 8. Ghi audit log
    */
   export const update = async (id: any, data: any, performedBy: any) => {
-    const { fullName, role: roleId, department, username } = data;
+    const { fullName, role: roleId, department, username, email } = data;
 
     // 1 & 2. Tìm user trước tiên
     const user = await User.findById(id);
@@ -236,6 +249,16 @@ import { clearPermissionCache, getCachedPermissions } from "../rbac/permission.c
       if (existed) throw ApiError.conflict("Username đã tồn tại");
     }
 
+    // 6b. [MỚI 2026-09-18, khắc phục gap DEV-065 Mục 4] Validate email trùng
+    // nếu có thay đổi — cùng pattern với username ở trên. Đây là con đường
+    // DUY NHẤT (ngoài tự đăng ký) để gán/sửa email cho user đã tồn tại, CHỈ
+    // ADMIN (permission USER_UPDATE) mới gọi được — email CỐ TÌNH không nằm
+    // trong whitelist tự-cập-nhật của `updateMeService` (xem UpdateUserDTO).
+    if (email && email !== user.email) {
+      const emailExisted = await User.findOne({ email, _id: { $ne: id } });
+      if (emailExisted) throw ApiError.conflict("Email đã được sử dụng");
+    }
+
     // 🔒 FIX ISS-01/SEC-08: lưu lại role CŨ trước khi ghi đè, để biết chính
     // xác role có thực sự đổi hay không (client có thể gửi lại đúng roleId
     // hiện tại) — dùng để quyết định có cần clear permission cache hay không.
@@ -246,6 +269,7 @@ import { clearPermissionCache, getCachedPermissions } from "../rbac/permission.c
     if (role !== undefined) user.role = role._id;
     if (department !== undefined) user.department = department;
     if (username !== undefined) user.username = username;
+    if (email !== undefined) user.email = email;
 
     // 8. Save
     await user.save();
@@ -371,6 +395,24 @@ import { clearPermissionCache, getCachedPermissions } from "../rbac/permission.c
   }
 
   /**
+   * BULK DISABLE (xoá mềm hàng loạt — DEV-060, 2026-09-16). Gọi lại NGUYÊN
+   * VẸN `disable()` cho từng id — giữ đúng mọi validate hiện có (không cho
+   * disable ADMIN, không cho disable user đang giữ tài sản), 1 item lỗi
+   * không chặn các item còn lại.
+   */
+  export const bulkDisable = async (ids: string[], performedBy: any) => {
+    return runBulkDelete(ids, (id) => disable(id, performedBy));
+  }
+
+  /**
+   * BULK RESTORE (khôi phục hàng loạt — DEV-062, 2026-09-17). Gọi lại
+   * NGUYÊN VẸN `restore` cho từng id, cùng pattern `bulkDisable` ở trên.
+   */
+  export const bulkRestore = async (ids: string[], performedBy: any) => {
+    return runBulkDelete(ids, (id) => restore(id, performedBy), "Khôi phục thất bại");
+  }
+
+  /**
    * CHANGE PASSWORD
    * Kiểm tra user tồn tại và isActive
    * Kiểm tra mật khẩu cũ đúng hay không
@@ -485,6 +527,155 @@ import { clearPermissionCache, getCachedPermissions } from "../rbac/permission.c
   }
 
   /**
+   * RESET 2FA (ADMIN) — Roadmap C1 (DEV-068, 2026-09-19)
+   * Đường khôi phục DUY NHẤT khi user tự bật 2FA (self-service, opt-in) rồi
+   * mất quyền truy cập email nhận OTP — user xác nhận qua AskUserQuestion
+   * "chỉ ADMIN reset thủ công" (KHÔNG có backup codes). Mirror ĐÚNG
+   * `resetPassword()` ở trên: chặn target là ADMIN thật (isSystemRole), xoá
+   * mọi OTP đang chờ, ghi audit.
+   */
+  export const resetTwoFactor = async (targetUserId: any, performedBy: any) => {
+    const user = await User.findById(targetUserId);
+    if (!user) throw ApiError.notFound("User không tồn tại");
+    if (!user.isActive) throw ApiError.badRequest("User đã bị vô hiệu hóa");
+
+    const targetRole = await Role.findById(user.role).select("name isSystemRole");
+    if (targetRole?.isSystemRole === true) {
+      throw ApiError.badRequest("Không thể reset xác thực 2 lớp của tài khoản ADMIN");
+    }
+
+    if (!user.twoFactorEnabled) {
+      throw ApiError.badRequest("User chưa bật xác thực 2 lớp");
+    }
+
+    user.twoFactorEnabled = false;
+    await user.save();
+    await TwoFactorOtp.deleteMany({ user: user._id });
+
+    await UserAudit.create({
+      user: user._id,
+      action: "RESET_2FA",
+      performedBy,
+      note: "Admin reset xác thực 2 lớp cho user bị khoá",
+    });
+
+    return true;
+  };
+
+  /**
+   * Roadmap C2 (Quản lý phiên đăng nhập, DEV-069, 2026-09-19) — ADMIN xem
+   * danh sách phiên đăng nhập CÒN HIỆU LỰC của 1 user bất kỳ (permission
+   * `SESSION_VIEW_ALL`, mirror `resetTwoFactor()`/`resetPassword()` — action
+   * ADMIN thao tác TRÊN user khác, sống ở `users.service.ts` chứ không phải
+   * `auths.service.ts` — đúng convention đã dùng cho reset-password/reset-2fa
+   * "by admin"). KHÔNG đánh dấu `isCurrent` — ADMIN xem hộ, không phải phiên
+   * của chính họ, không có ý nghĩa "phiên hiện tại" ở đây.
+   */
+  export const listUserSessions = async (targetUserId: any) => {
+    const user = await User.findById(targetUserId);
+    if (!user) throw ApiError.notFound("User không tồn tại");
+
+    const sessions = await RefreshToken.find({
+      user: targetUserId,
+      revoked: false,
+      expiresAt: { $gt: new Date() },
+    }).sort({ createdAt: -1 });
+
+    return sessions.map((rt: any) => {
+      const { browser, os } = parseUserAgent(rt.userAgent);
+      return {
+        _id: rt._id,
+        browser,
+        os,
+        ip: rt.ip ?? null,
+        createdAt: rt.createdAt,
+        expiresAt: rt.expiresAt,
+      };
+    });
+  };
+
+  /**
+   * Roadmap C2 (DEV-069, 2026-09-19) — ADMIN thu hồi 1 phiên đăng nhập cụ
+   * thể của user khác (permission `SESSION_REVOKE_ALL`, TÁCH RIÊNG khỏi
+   * `SESSION_VIEW_ALL` — xem là hành động giám sát ít rủi ro hơn, thu hồi là
+   * hành động buộc user khác đăng xuất). Hữu ích khi tài khoản nghi bị lộ mà
+   * chính chủ không tự đăng nhập được để tự thu hồi.
+   */
+  export const revokeUserSession = async (targetUserId: any, sessionId: any, performedBy: any) => {
+    const result = await RefreshToken.findOneAndUpdate(
+      { _id: sessionId, user: targetUserId, revoked: false },
+      { revoked: true },
+    );
+    if (!result) throw ApiError.notFound("Không tìm thấy phiên đăng nhập");
+
+    await UserAudit.create({
+      user: targetUserId,
+      action: "REVOKE_SESSION",
+      performedBy,
+      note: "Admin thu hồi phiên đăng nhập của user",
+    });
+
+    return true;
+  };
+
+  /**
+   * Roadmap C3 (Giám sát phiên đăng nhập toàn hệ thống, DEV-070, 2026-09-19)
+   * — ADMIN xem TẤT CẢ phiên đăng nhập còn hiệu lực của MỌI user cùng lúc
+   * (khác `listUserSessions` ở trên chỉ scope 1 user) — dùng LẠI permission
+   * `SESSION_VIEW_ALL` (KHÔNG tạo permission mới: đây vẫn là cùng 1 khả năng
+   * "admin xem phiên đăng nhập của người khác", chỉ khác cách hiển thị —
+   * danh sách tổng hợp thay vì drill-down từng user). Thu hồi từ trang này
+   * dùng LẠI `revokeUserSession()`/`DELETE /users/:id/sessions/:sessionId`
+   * sẵn có — vì vậy response ở đây PHẢI trả kèm `user` (đã populate
+   * username/fullName) để FE có đủ `userId` gọi lại đúng endpoint đó.
+   */
+  export const listAllSessions = async (query: { search?: string; page?: number; limit?: number }) => {
+    const { search, page = 1, limit = 20 } = query;
+
+    const filter: any = { revoked: false, expiresAt: { $gt: new Date() } };
+
+    // `search` lọc theo username/fullName của USER SỞ HỮU phiên — RefreshToken
+    // không có field text nào để search trực tiếp, nên phải resolve ra danh
+    // sách userId khớp trước (giống cách `performedBy`/`user` dropdown filter
+    // ở Audit Log hoạt động, chỉ khác input là text thay vì chọn từ dropdown).
+    if (search) {
+      const matchedUsers = await User.find({
+        $or: [
+          { username: { $regex: search, $options: "i" } },
+          { fullName: { $regex: search, $options: "i" } },
+        ],
+      }).select("_id");
+      filter.user = { $in: matchedUsers.map((u) => u._id) };
+    }
+
+    const skip = (page - 1) * limit;
+    const [sessions, total] = await Promise.all([
+      RefreshToken.find(filter)
+        .populate("user", "username fullName")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      RefreshToken.countDocuments(filter),
+    ]);
+
+    return {
+      data: sessions.map((rt: any) => {
+        const { browser, os } = parseUserAgent(rt.userAgent);
+        return {
+          _id: rt._id,
+          user: rt.user ? { _id: rt.user._id, username: rt.user.username, fullName: rt.user.fullName } : null,
+          browser,
+          os,
+          ip: rt.ip ?? null,
+          createdAt: rt.createdAt,
+          expiresAt: rt.expiresAt,
+        };
+      }),
+      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  };
+
+  /**
    *  GET ME
    * Kiểm tra user tồn tại và isActive
    * Trả về thông tin user (không bao gồm password)
@@ -542,7 +733,10 @@ import { clearPermissionCache, getCachedPermissions } from "../rbac/permission.c
    */
 
   export const updateMeService = async(userId: any, payload: any) => {
-    const allowedFields = ["fullName", "username"];
+    // Roadmap B7 (2026-09-18) — `subscribedToWeeklyReport` thêm vào whitelist
+    // tự-cập-nhật (an toàn: field boolean thuần, không phải role/department/
+    // isActive như 3 field CỐ TÌNH không có ở đây).
+    const allowedFields = ["fullName", "username", "subscribedToWeeklyReport"];
 
     const updates = Object.keys(payload)
       .filter(key => allowedFields.includes(key))

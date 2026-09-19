@@ -80,9 +80,11 @@ export const createPermissionService = async (payload: any) => {
 /**
  * GET PERMISSIONS — search + filter + pagination
  *
- * Format input (page/limit number, max limit 100, sortBy enum, order enum)
- * đã được validate ở validateQuery(GetPermissionsQueryDTO) middleware trước
- * khi vào đây — service chỉ còn lo build query và trả kết quả + pagination.
+ * Format input (page/limit number, max limit 300 — nâng từ 100 lúc
+ * 2026-09-19, xem comment ở `GetPermissionsQueryDTO`, sortBy enum, order
+ * enum) đã được validate ở validateQuery(GetPermissionsQueryDTO) middleware
+ * trước khi vào đây — service chỉ còn lo build query và trả kết quả +
+ * pagination.
  */
 export const getPermissionService = async (query: any) => {
   const { page, limit, sortBy, order, keyword, resource, action } = query;

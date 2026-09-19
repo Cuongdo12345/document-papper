@@ -19,10 +19,14 @@ import { registerAssetAlertsCron } from "./assetAlerts.cron";
 import { registerMedicalDeviceAlertsCron } from "./medicalDeviceAlerts.cron";
 import { registerWorkflowSlaAlertsCron } from "./workflowSlaAlerts.cron";
 import { registerConsumableAlertsCron } from "./consumableAlerts.cron";
+import { registerContractAlertsCron } from "./contractAlerts.cron";
+import { registerWeeklyReportCron } from "./weeklyReport.cron";
 
 export const registerCronJobs = () => {
   registerAssetAlertsCron();
   registerMedicalDeviceAlertsCron();
   registerWorkflowSlaAlertsCron();
   registerConsumableAlertsCron();
+  registerContractAlertsCron();
+  registerWeeklyReportCron();
 };

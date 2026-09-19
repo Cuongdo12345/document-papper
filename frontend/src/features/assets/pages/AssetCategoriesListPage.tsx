@@ -5,15 +5,20 @@ import { FilterBar } from "@/components/shared/FilterBar";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { Pagination } from "@/components/shared/Pagination";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { BatchActionBar } from "@/components/shared/BatchActionBar";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
+import { usePermission } from "@/hooks/usePermission";
 import { PERMISSIONS } from "@/constants/permissions";
+import { useRowSelection } from "@/hooks/useRowSelection";
 import { AssetSectionTabs } from "@/features/assets/components/AssetSectionTabs";
 import { AssetCategoryFormModal } from "@/features/assets/components/AssetCategoryFormModal";
 import { useAssetCategories } from "@/features/assets/hooks/useAssetCategories";
 import { useDeleteAssetCategory } from "@/features/assets/hooks/useDeleteAssetCategory";
+import { useBulkDeleteAssetCategory } from "@/features/assets/hooks/useBulkDeleteAssetCategory";
 import { useRestoreAssetCategory } from "@/features/assets/hooks/useRestoreAssetCategory";
+import { useBulkRestoreAssetCategory } from "@/features/assets/hooks/useBulkRestoreAssetCategory";
 import { useDebounce } from "@/hooks/useDebounce";
 import { parseApiError } from "@/utils/parseApiError";
 import type { AssetCategory } from "@/types/asset.types";
@@ -41,6 +46,13 @@ const LIMIT = 10;
  * động không ai dùng được ở thời điểm này.
  */
 export function AssetCategoriesListPage() {
+  const { hasPermission } = usePermission();
+  // [MỞ RỘNG 2026-09-17, DEV-062] 2 permission khác nhau cho 2 nút hàng loạt,
+  // khớp đúng guard nút từng dòng — cùng cách DocumentsListPage/AssetsListPage.
+  const canBulkDelete = hasPermission(PERMISSIONS.ASSET_CATEGORY_DELETE);
+  const canBulkRestore = hasPermission(PERMISSIONS.ASSET_CATEGORY_UPDATE);
+  const canBulkAct = canBulkDelete || canBulkRestore;
+
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState("");
   const [isActive, setIsActive] = useState<"true" | "false" | "">("true");
@@ -49,6 +61,8 @@ export function AssetCategoriesListPage() {
   const [formState, setFormState] = useState<{ open: boolean; category?: AssetCategory }>({ open: false });
   const [deleteTarget, setDeleteTarget] = useState<AssetCategory | null>(null);
   const [restoreTarget, setRestoreTarget] = useState<AssetCategory | null>(null);
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
+  const [batchRestoreOpen, setBatchRestoreOpen] = useState(false);
 
   function resetFilters() {
     setKeyword("");
@@ -64,9 +78,12 @@ export function AssetCategoriesListPage() {
   });
   const deleteMutation = useDeleteAssetCategory();
   const restoreMutation = useRestoreAssetCategory();
+  const bulkDeleteMutation = useBulkDeleteAssetCategory();
+  const bulkRestoreMutation = useBulkRestoreAssetCategory();
 
   const categories = query.data?.data ?? [];
   const pagination = query.data?.pagination;
+  const selection = useRowSelection(categories.map((c) => c._id));
 
   const columns: DataTableColumn<AssetCategory>[] = [
     { key: "code", header: "Mã danh mục", className: "font-mono" },
@@ -139,6 +156,16 @@ export function AssetCategoriesListPage() {
         </div>
       </FilterBar>
 
+      {canBulkAct && (
+        <BatchActionBar
+          count={selection.selectedIds.size}
+          onClear={selection.clear}
+          onDelete={canBulkDelete ? () => setBatchDeleteOpen(true) : undefined}
+          onRestore={canBulkRestore ? () => setBatchRestoreOpen(true) : undefined}
+          isLoading={bulkDeleteMutation.isPending || bulkRestoreMutation.isPending}
+        />
+      )}
+
       <DataTable
         columns={columns}
         data={categories}
@@ -149,6 +176,11 @@ export function AssetCategoriesListPage() {
         onRetry={() => query.refetch()}
         emptyTitle="Chưa có danh mục tài sản nào"
         emptyMessage="Thêm danh mục đầu tiên để bắt đầu phân loại tài sản."
+        selection={
+          canBulkAct
+            ? { selectedIds: selection.selectedIds, onToggleRow: selection.toggleRow, onToggleAll: selection.toggleAll }
+            : undefined
+        }
         rowActions={(row) =>
           row.isActive === false ? (
             <div className="flex justify-end gap-1">
@@ -209,6 +241,39 @@ export function AssetCategoriesListPage() {
         title="Khôi phục danh mục tài sản"
         message={`Khôi phục "${restoreTarget?.name}"?`}
         isLoading={restoreMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={batchDeleteOpen}
+        onClose={() => setBatchDeleteOpen(false)}
+        onConfirm={() => {
+          bulkDeleteMutation.mutate([...selection.selectedIds], {
+            onSuccess: () => {
+              setBatchDeleteOpen(false);
+              selection.clear();
+            },
+          });
+        }}
+        title="Xoá danh mục tài sản đã chọn"
+        message={`Ẩn ${selection.selectedIds.size} danh mục đã chọn? Backend sẽ từ chối danh mục nào còn tài sản/danh mục con tham chiếu.`}
+        danger
+        isLoading={bulkDeleteMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={batchRestoreOpen}
+        onClose={() => setBatchRestoreOpen(false)}
+        onConfirm={() => {
+          bulkRestoreMutation.mutate([...selection.selectedIds], {
+            onSuccess: () => {
+              setBatchRestoreOpen(false);
+              selection.clear();
+            },
+          });
+        }}
+        title="Khôi phục danh mục tài sản đã chọn"
+        message={`Khôi phục ${selection.selectedIds.size} danh mục đã chọn?`}
+        isLoading={bulkRestoreMutation.isPending}
       />
     </div>
   );

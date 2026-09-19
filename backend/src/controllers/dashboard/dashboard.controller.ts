@@ -23,6 +23,8 @@ import {
 
 import { getOverdueApprovalsListService } from "../../services/dashboard/workflowDashboard.service";
 
+import { sendWeeklyReportsService } from "../../services/dashboard/weeklyReport.service";
+
 import ApiError from "../../shared/errors/ApiError";
 import { parsePaginationQuery, parseOptionalDate } from "../../shared/utils/Queryparsing.util";
 import { catchAsync } from "../../shared/utils/catchAsync"; 
@@ -345,4 +347,18 @@ export const getWorkflowOverdueApprovals = catchAsync(async (req: Request, res: 
   );
 
   res.json({ success: true, ...data });
+});
+
+/* =====================================================================
+   Roadmap B7 (2026-09-18) — chạy tay gửi báo cáo tuần (bình thường chạy tự
+   động qua cron, xem `shared/cron/weeklyReport.cron.ts`).
+===================================================================== */
+export const runWeeklyReport = catchAsync(async (req: Request, res: Response) => {
+  const result = await sendWeeklyReportsService();
+
+  res.json({
+    success: true,
+    message: "Chạy gửi báo cáo tuần thành công",
+    data: result,
+  });
 });

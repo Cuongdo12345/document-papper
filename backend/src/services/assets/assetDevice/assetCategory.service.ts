@@ -7,6 +7,7 @@ import {
   pickWhitelisted,
 } from "../assets.constants";
 import { escapeRegex } from "../../../shared/utils/regex.util";
+import { runBulkDelete } from "../../../shared/utils/bulkDelete.util";
 
 /**
  * 📌 CREATE ASSET CATEGORY
@@ -193,6 +194,16 @@ export const deleteAssetCategoryService = async (id: any, userId?: any) => {
 };
 
 /**
+ * 📌 BULK DELETE ASSET CATEGORY (xoá mềm hàng loạt — DEV-060, 2026-09-16)
+ * Lưu ý: nếu 1 batch chứa cả danh mục cha VÀ con của nó, xoá cha có thể
+ * fail (còn con active) trong khi con xoá thành công — kết quả trả về nêu
+ * rõ id nào fail kèm lý do, user tự xoá lại cha sau khi con đã bị xoá.
+ */
+export const bulkDeleteAssetCategoryService = async (ids: string[], userId?: any) => {
+  return runBulkDelete(ids, (id) => deleteAssetCategoryService(id, userId));
+};
+
+/**
  * 📌 HARD DELETE ASSET CATEGORY (xoá vĩnh viễn)
  *
  * Cùng nguyên tắc 2 bước như `hardDeleteAssetService`: chỉ hard-delete
@@ -241,4 +252,11 @@ export const restoreAssetCategoryService = async (id: any) => {
   await category.save();
 
   return category;
+};
+
+/**
+ * 📌 BULK RESTORE ASSET CATEGORY (khôi phục hàng loạt — DEV-062, 2026-09-17)
+ */
+export const bulkRestoreAssetCategoryService = async (ids: string[]) => {
+  return runBulkDelete(ids, (id) => restoreAssetCategoryService(id), "Khôi phục thất bại");
 };
