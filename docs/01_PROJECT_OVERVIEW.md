@@ -199,7 +199,7 @@ Không có. Repo chỉ chứa backend API service tại thời điểm khảo s�
 - Có auto-retry kết nối sau 5s nếu thất bại.
 - Pool size cấu hình qua env `MONGO_MAX_POOL_SIZE` (mặc định 20) / `MONGO_MIN_POOL_SIZE` (mặc định 2).
 - Có file riêng cho database events (`database.events.ts`) và shutdown hook (`database.shutdown.ts`), cùng logger riêng (`mongo.logger.ts`).
-- Danh sách Mongoose model tìm thấy (21 model, theo domain):
+- Danh sách Mongoose model tìm thấy (21 model tại thời điểm Phase 01, theo domain):
   - `apiPerformance/apiPerformance.model.ts`
   - `users/user.model.ts`, `users/userAudit.model.ts`
   - `auth/passwordResetToken.model.ts`, `auth/refreshToken.model.ts`
@@ -210,6 +210,12 @@ Không có. Repo chỉ chứa backend API service tại thời điểm khảo s�
   - `departments/department.model.ts`
   - `uploadFiles/upload.model.ts`
   - `documents/counter.model.ts`, `documents/workflowTemplate.model.ts`, `documents/document.model.ts`, `documents/workflowInstance.model.ts`
+  - **[CẬP NHẬT DEV-071, 2026-09-21]** 10 model mới thêm từ `DEV-057`→`070`, nay tổng cộng **31 model**:
+    `assets/assetMaintenancePlan.model.ts`, `vendors/vendor.model.ts`, `vendors/contract.model.ts`,
+    `inventory/consumableCategory.model.ts`, `inventory/consumableItem.model.ts`,
+    `inventory/consumableRequest.model.ts`, `inventory/consumableTransaction.model.ts`,
+    `auth/twoFactorOtp.model.ts`, `documents/documentPdfExport.model.ts`, `documents/documentVersion.model.ts`.
+    Chi tiết schema/index/quan hệ: `docs/04_DATABASE_ANALYSIS.md` §4.22–§4.31.
 - Có tài liệu riêng `backend/mongodb-transaction-setup-guide.md` (12K) — hướng dẫn setup transaction MongoDB, chưa đọc chi tiết.
 - README cảnh báo vận hành quan trọng: không xoá trực tiếp collection cốt lõi (`User`, `Role`, `Department`) rồi tạo lại vì sẽ sinh `_id` mới làm gãy tham chiếu `ObjectId`.
 

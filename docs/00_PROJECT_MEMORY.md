@@ -14,7 +14,9 @@
 - Stack backend: Node.js + TypeScript, Express 5, MongoDB + Mongoose, JWT auth, Zod validate, Swagger/OpenAPI docs.
 - Kiến trúc: layered theo domain — routes → middlewares → controllers → services → models.
 - Entry point chính: `backend/server.ts` → `backend/src/app.ts`.
-- Có 21 Mongoose model, 15 route file (1227 dòng, 116 endpoint/87 path), thư mục `services/` lớn nhất (468K).
+- Có **31 Mongoose model** (SỬA DEV-071, 2026-09-21 — trước ghi "21", lỗi thời từ `DEV-057`→`070`, xem
+  `docs/04_DATABASE_ANALYSIS.md` Mục 4). Route file/dòng/endpoint count KHÔNG được xác minh lại ở DEV-071
+  (ngoài phạm vi task — chỉ sửa model count), có thể cũng lỗi thời, thư mục `services/` lớn nhất (468K).
 - **[CẬP NHẬT 2026-08-30]** `backend/tsconfig.test.json` có khai báo `"types": ["node", "jest"]`, nhưng xác minh lại `backend/package.json` và `package-lock.json` hiện tại **KHÔNG có** `jest`/`ts-jest`/`@types/jest` trong dependencies/devDependencies (chỉ có 1 thư mục mồ côi `node_modules/@jest` không đi kèm core `jest`). Vẫn **chưa có bất kỳ file `.test.ts` nào** trong `backend/src`. Kết luận: hiện tại project **không có khả năng chạy Jest** dù có config trỏ tới jest types — cần cài `jest`/`ts-jest` trước khi viết test, không chỉ thêm file test.
   - OLD: "Có cấu hình Jest (ts-jest) nhưng chưa có bất kỳ file test nào trong repo."
   - REASON: Xác minh trực tiếp `package.json`/`package-lock.json` không thấy dependency Jest nào — cấu hình chỉ còn `tsconfig.test.json` mồ côi.
@@ -67,7 +69,9 @@
 
 - **Phase 02 (Architecture)**: monolith layered theo domain; transaction cần replica set; permission cache in-memory TTL 5 phút; `WorkflowInstance.steps[].role` string tự do.
 - **Phase 03 (Backend)**: `POST /documents/proposal` thiếu authorizePermission; nhiều `validateQuery` comment out; response format không đồng nhất (auth/upload); dead code (`loadDocument`, `mongo.logger`, `errorHandler` cũ).
-- **Phase 04 (Database)**: 7/21 model không có index ngoài `_id`; `WorkflowInstance` risk cao nhất (COLLSCAN qua `$expr`); 2 lỗ hổng hard-delete không check tham chiếu ngược.
+- **Phase 04 (Database)**: 7/31 model không có index ngoài `_id` (SỬA DEV-071 — mẫu số 21→31, tử số không
+  đổi; 10 model mới từ `DEV-057`→`070` đều có index); `WorkflowInstance` risk cao nhất (COLLSCAN qua
+  `$expr`); 2 lỗ hổng hard-delete không check tham chiếu ngược.
 - **Phase 05 (API)**: 116 endpoint/87 path khớp gần hoàn hảo `openAPI.yaml`; pagination bug 3 domain; file upload không serve qua HTTP.
 - **Phase 06 (Frontend)**: N/A — không có frontend.
 - **Phase 07 (Auth/RBAC)**: ABAC hoàn toàn dead runtime; privilege escalation qua `PUT /users/:id`; JWT payload dư thừa; bất đối xứng revoke token khi đổi mật khẩu.

@@ -350,8 +350,91 @@ CẬP NHẬT TÀI LIỆU
 >   không để tài liệu mâu thuẫn source). CHỈ sửa `navigation.ts`, không đụng `Sidebar.tsx`. Verify: tự chụp
 >   Playwright tạm xác nhận đúng khối duy nhất; build/vitest (25/25)/lint PASS; FE-17 regression đầy đủ
 >   PASS, không cần update baseline. Chi tiết: `docs/frontend/tasks/FE-22.md`.
-> - **Next Task**: chưa được user chỉ định cho phiên kế tiếp. FE-19/FE-20/FE-21/FE-22 đều đã DONE HOÀN
->   TOÀN. Việc
+> - **`DEV-071`** (2026-09-21, cập nhật `04_DATABASE_ANALYSIS.md`/`02_ARCHITECTURE.md` — task tài liệu
+>   thuần, KHÔNG đụng code): user báo thiếu 7 model, đếm lại trực tiếp `backend/src/models/` phát hiện
+>   **thiếu 10, không phải 7** (thêm `AssetMaintenancePlan`/`DocumentPdfExport`/`DocumentVersion` ngoài 7
+>   model user liệt kê) — đã báo lại rồi bổ sung đủ 10 để tài liệu thực khớp source. Model count 21→31.
+>   Bổ sung mục 4.22→4.31 ở `04_DATABASE_ANALYSIS.md` (GIỮ NGUYÊN số thứ tự 21 model gốc, không renumber —
+>   tránh vỡ tham chiếu "mục 4.X" rải rác trong file), cập nhật quan hệ/index/Mixed-field count, SỬA 1 lỗi
+>   cũ không liên quan (Mục 11 gốc ghi sai "không có custom validator" — `ConsumableRequest.items` có).
+>   `02_ARCHITECTURE.md`: bổ sung 4 route mount thiếu (`maintenance-plans`/`inventory`/`vendors`/`contracts`),
+>   domain Vendors/Inventory mới, 2 cron mới phát hiện (`contractAlerts`/`consumableAlerts`). Sửa
+>   `00_PROJECT_MEMORY.md` (2 chỗ "21 model"); `FRONTEND_MEMORY.md` grep xác nhận không có entry liên quan.
+>   **[CẬP NHẬT 2026-09-21, cùng ngày]** User yêu cầu làm tiếp 8 file trên (9 file thật, tính cả 2 file
+>   trong `module-reviews/`): `15_ARCHITECTURE_REVIEW.md` (2 chỗ), `14_ANALYSIS_AUDIT.md`,
+>   `module-reviews/16_DATABASE_CROSS_DOMAIN_REVIEW.md`, `module-reviews/01_AUTH_CODE_REVIEW.md` (2 chỗ),
+>   `12_ISSUES_AND_RISKS.md`, `13_FINAL_PROJECT_REPORT.md` (7 chỗ), `11_TECHNICAL_DEBT.md` (2 chỗ),
+>   `10_PERFORMANCE_ANALYSIS.md` (2 chỗ), `01_PROJECT_OVERVIEW.md`. Vì đây là báo cáo/snapshot lịch sử
+>   Phase 01/04/10/11/12/13/14/15 (COMPLETED, CLAUDE.md §6) — KHÔNG rewrite số gốc, chỉ thêm chú thích
+>   `[CẬP NHẬT DEV-071, 2026-09-21]` trỏ về `04_DATABASE_ANALYSIS.md`; riêng `01_PROJECT_OVERVIEW.md` §8 là
+>   danh sách file thật nên bổ sung trực tiếp 10 đường dẫn model mới. Tỷ lệ "7/21 model thiếu index" →
+>   annotate thành 7/31 (danh sách 7 model không đổi, 10 model mới đều có index). Chi tiết đầy đủ:
+>   `docs/development/tasks/DEV-071.md` Mục 8.
+> - **`DEV-072`/`FE-23`** (2026-09-21, trang nội bộ "System Design" — bản đồ 31 module + quan hệ dữ liệu,
+>   chỉ dev/admin): permission mới `SYSTEM_DESIGN_VIEW` gán cho role `IT` (role kỹ thuật duy nhất trong 6
+>   role, không có "DEV" riêng — ADMIN có qua wildcard), KHÔNG dừng hỏi user vì đã tìm được role phù hợp.
+>   Dữ liệu module (`frontend/src/features/systemDesign/data/systemModules.ts`) SINH RA từ
+>   `04_DATABASE_ANALYSIS.md`/`02_ARCHITECTURE.md`, không tự đọc lại source. Trang
+>   (`SystemDesignPage.tsx`) nhóm theo 12 domain, "đường nối quan hệ" thuần CSS (border-left kiểu cây +
+>   click-to-scroll/ring-highlight tức thời — KHÔNG animation mới, KHÔNG thư viện diagram). Route + nav item
+>   (nhóm "Quản trị hệ thống", cuối dãy liền kề). Build/lint/test backend (39/393) + frontend (25/25) đều
+>   PASS. **[CẬP NHẬT cùng ngày]** User đổi ý, cung cấp trực tiếp tài khoản ADMIN (`admin`/`12345678` + mã
+>   OTP 2FA) để Claude ghi thẳng DB dev qua API thật (KHÔNG qua UI): `POST /rbac/permissions` tạo
+>   `SYSTEM_DESIGN_VIEW` (`_id 6ab0a41e...`), `POST /rbac/roles/:id/assign-permissions` cho CẢ `IT`
+>   (37→38 permission) VÀ `ADMIN` (110→111 permission) — gửi kèm ĐỦ permission ID cũ + mới (service
+>   `assign-permissions` THAY THẾ toàn bộ danh sách, không cộng dồn — gửi thiếu sẽ xoá sạch quyền cũ của
+>   role, đã tránh đúng bẫy này). Verify lại qua `GET /users/me` thật — `admin` có `SYSTEM_DESIGN_VIEW`
+>   trong 111 permission. Đã xoá file tạm chứa accessToken ngay sau khi dùng. **User đã tự mở trình duyệt
+>   xác nhận chạy được** (2026-09-21, "ok đã chạy được nhé") — `DEV-072`/`FE-23` DONE HOÀN TOÀN, không còn
+>   bước nào treo. Dev server vẫn chạy nền: backend port 3000, frontend port **5174** (5173 đang bị 1
+>   instance khác chiếm). Chi tiết: `docs/development/tasks/DEV-072.md`, `docs/frontend/tasks/FE-23.md`.
+> - **`DEV-073`** (2026-09-21, `GET /api/system-design` — introspect schema THẬT thay vì đọc docs): tái
+>   dùng permission `SYSTEM_DESIGN_VIEW` (đã có từ DEV-072, KHÔNG tạo permission trùng — CLAUDE.md §11) thay
+>   vì tạo mới như user yêu cầu ban đầu, đã báo rõ lý do. Endpoint đúng layer Route→Controller→Service
+>   (`systemDesign.service.ts`): suy `modules` từ tên thư mục `backend/src/models/<domain>/` (quét
+>   `fs.readdirSync` + `require()` từng file, tự nhận diện Model export dù file dùng LẪN LỘN
+>   `export const`/`export default`), trích `relationships` từ 4 kiểu khai báo `ref` khác nhau trong schema
+>   (ObjectId đơn, mảng shorthand, mảng object-literal — 2 cơ chế lưu ref KHÁC HẲN nhau dù cùng "mảng
+>   ObjectId ref" về nghiệp vụ, xác nhận qua inspect runtime thật — và subdocument đệ quy). Test mới
+>   (5 test, KHÔNG mock, dùng schema thật) — **40 suite/398 test PASS**. Verify HTTP thật: không token→401,
+>   token admin→200 đúng `totalModels:31, modules:12, relationships:75`. **CHƯA verify 403** (thiếu tài
+>   khoản role khác để test, nêu rõ trong task doc — rủi ro thấp vì dùng chung middleware đã có test riêng).
+>   **Phát hiện + sửa luôn 3 lỗi thật trong `04_DATABASE_ANALYSIS.md`** (endpoint bắt được ngay đúng mục
+>   đích task): `CalibrationRecord.certificateFileUrl:String` SAI cả tên lẫn kiểu (thật là
+>   `certificateFileId: ObjectId ref Upload`), thiếu `AssetCategory --deletedBy--> User`, `Vendor` ghi sai
+>   "không có ref ra ngoài" (thật có `createdBy`/`updatedBy`). Viết script Node tạm so sánh toàn bộ 31 model
+>   giữa API thật và `frontend/.../systemModules.ts` (FE-23) — phát hiện thêm 4 model lệch (3 lỗi kế thừa từ
+>   doc cũ + 1 lỗi transcribe riêng của FE-23 ở `ConsumableCategory`), đã sửa cả 4, verify lại 0 mismatch.
+>   Chi tiết đầy đủ: `docs/development/tasks/DEV-073.md`.
+> - **`FE-24`** (2026-09-21, cùng ngày — user giao tiếp task graph): **THAY THẾ HOÀN TOÀN FE-23**. Cài
+>   `@xyflow/react@12.11.6` (xác nhận `dist-tags.latest` trước khi cài, không dùng bản `-next`), code-split
+>   qua `React.lazy` (file riêng `routes/SystemDesignPage.lazy.tsx` — tránh warning oxlint
+>   `only-export-components` nếu khai báo thẳng trong `routes/index.tsx`) — verify build thật: chunk
+>   `@xyflow/react` 188KB TÁCH RIÊNG khỏi bundle chính. Trang gọi thật `GET /api/system-design` (DEV-073,
+>   KHÔNG đổi backend/permission — dùng lại `SYSTEM_DESIGN_VIEW`). Trước khi code, hỏi user
+>   (AskUserQuestion) cách xử lý trang FE-23 cũ — user chọn **xoá hẳn** (`data/systemModules.ts` +
+>   `SystemDesignPage.tsx` bản card), tránh dead code lệch schema (đúng vấn đề DEV-073 vừa giải quyết).
+>   Kiến trúc: Module = group node (khung nét đứt) chứa Model node con (thẻ) — layout grid packing THỦ CÔNG
+>   (KHÔNG thêm lib auto-layout thứ 2, chỉ đúng 1 dependency được yêu cầu). Click Module → `fitView`; click
+>   Model → `AppDrawer` (field + quan hệ, tái dùng component sẵn có); click edge → `AppDrawer` info quan hệ;
+>   MiniMap/Controls dùng thẳng của lib; filter module chỉ gắn `hidden:true` (KHÔNG xoá khỏi state gốc);
+>   chọn 1 node → highlight model/edge liên quan + làm mờ phần còn lại (tính lại tức thời, KHÔNG animation
+>   — đúng nguyên tắc restraint đã áp dụng từ FE-21). Token màu dùng lại toàn bộ, KHÔNG thêm màu domain
+>   riêng (không đủ token dataviz cho 12 module, tránh phá `UI_DESIGN_SYSTEM.md`) — phân biệt Module/Model
+>   qua hình dạng. Build/tsc/lint/vitest đều PASS. User đã tự browser-verify xong (2026-09-21, "đã xem qua
+>   chạy được") — trạng thái **DONE**. Sau xác nhận, user yêu cầu thêm 5 vòng tinh chỉnh UI nhỏ (đều đã làm,
+>   xem `docs/frontend/tasks/FE-24.md` Mục 10→16): (1) transition mượt khi chọn/highlight node (150ms, không
+>   custom duration — đúng convention `transition-colors`/`transition-all` trần của project); (2) edge
+>   `animated:true` (nét đứt tự chạy, prop built-in của lib); (3) edge type đổi `smoothstep`→`step` (bẻ góc
+>   vuông, theo ảnh tham khảo user gửi); (4) **BUG THẬT phát hiện+fix**: `ModelNode.tsx` thiếu `<Handle>` nên
+>   edge không hề render dù data đúng (lỗi âm thầm) — đã thêm 2 Handle ẩn (`opacity-0`, `isConnectable=false`)
+>   target-trái/source-phải; (5) nhãn cardinality "1"/"N" + tô màu xanh (`--success`)/đỏ (`--destructive`)
+>   cho CẢ path/marker/label theo yêu cầu trực tiếp của user — lưu ý đi ngược khuyến nghị cũ FE-09 (không tái
+>   dùng màu status cho dataviz identity) nhưng là chỉ định trực tiếp, đã ghi rõ trong task doc. Dev server
+>   vẫn chạy sẵn (`:3000`/`:5174`). Chi tiết đầy đủ: `docs/frontend/tasks/FE-24.md`.
+> - **Next Task**: chưa được user chỉ định cho phiên kế tiếp. FE-19→24/DEV-071/DEV-072/DEV-073 đều đã DONE
+>   (trừ DEV-073 còn 1 việc tuỳ chọn không bắt buộc — verify 403 bằng role khác, xem task doc Mục 7 — mục
+>   "đổi `SystemDesignPage.tsx` sang gọi API thật" đã hoàn thành ở FE-24, không còn treo). Việc
 >   CẦN LÀM THÊM khác (KHÔNG bắt buộc, chỉ cần khi dùng tính năng tương ứng, thao tác tay qua UI "Phân
 >   quyền"): tick 4 `CONSUMABLE_REQUEST_*` cho role USER/IT/PHONG_VAT_TU_TTB (DEV-067) — `Permission`
 >   catalog đã có sẵn để chọn. Riêng cho finding contrast ở FE-17 Mục 5: cần user QUYẾT ĐỊNH có duyệt

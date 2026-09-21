@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { createBrowserRouter, Navigate } from "react-router-dom";
+import { LoadingState } from "@/components/shared/LoadingState";
 import { AppLayout } from "@/layouts/AppLayout";
 import { AuthLayout } from "@/layouts/AuthLayout";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
@@ -37,6 +39,9 @@ import { AuditLogsPage } from "@/features/audit/pages/AuditLogsPage";
 import { NotificationsPage } from "@/features/notifications/pages/NotificationsPage";
 import { ProfilePage } from "@/features/profile/pages/ProfilePage";
 import { FilesListPage } from "@/features/files/pages/FilesListPage";
+// DEV-073/FE-24: code-split qua React.lazy — wrapper tách riêng file, xem
+// `SystemDesignPage.lazy.tsx` (lý do: tránh warning only-export-components).
+import { SystemDesignPage } from "@/routes/SystemDesignPage.lazy";
 import { ForbiddenPage } from "@/pages/ForbiddenPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -311,6 +316,26 @@ export const router = createBrowserRouter([
             // Document/Asset nào, xem `types/file.types.ts`).
             element: <ProtectedRoute permission={PERMISSIONS.VIEW_FILES} />,
             children: [{ path: "files", element: <FilesListPage /> }],
+          },
+          {
+            // DEV-072/DEV-073/FE-24 (2026-09-21) — "System Design": bản đồ
+            // module + quan hệ dữ liệu, CHỈ dev/admin (IT + ADMIN qua
+            // wildcard). Gọi GET /api/system-design thật (KHÔNG còn dữ liệu
+            // tĩnh — FE-23 đã bị thay thế hoàn toàn). Lazy-load qua
+            // React.lazy (khai báo ở import phía trên) — Suspense đặt NGAY
+            // Ở route con để fallback loading chỉ che đúng vùng nội dung
+            // (Sidebar/Header của AppLayout vẫn hiện bình thường trong lúc chờ).
+            element: <ProtectedRoute permission={PERMISSIONS.SYSTEM_DESIGN_VIEW} />,
+            children: [
+              {
+                path: "system-design",
+                element: (
+                  <Suspense fallback={<LoadingState variant="spinner" label="Đang tải System Design..." />}>
+                    <SystemDesignPage />
+                  </Suspense>
+                ),
+              },
+            ],
           },
         ],
       },

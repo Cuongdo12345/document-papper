@@ -322,7 +322,7 @@ Các issue MEDIUM/LOW/INFO được liệt kê dạng bảng tổng hợp ở §
 | ISS-33 | Security (File Upload) | LOW | Type check file chỉ dựa MIME/extension client cung cấp | `upload.middleware.ts` — SEC-17 | CONFIRMED |
 | ISS-34 | Security (API) | LOW | Không có `trust proxy`, ảnh hưởng độ chính xác rate-limit sau reverse proxy | `app.ts` — SEC-22 | CONFIRMED, UNKNOWN (hạ tầng) |
 | ISS-35 | Security (API) | LOW | Rò rỉ `err.message` gốc ở nhánh lỗi không xác định | `error.middleware.ts`, `upload.controller.ts` — SEC-23 | CONFIRMED |
-| ISS-36 | Database | LOW–MEDIUM | 7/21 model thiếu index ngoài `_id` | Phase 04 §10, PERF-04 | CONFIRMED |
+| ISS-36 | Database | LOW–MEDIUM | 7/21 model thiếu index ngoài `_id` (nay 7/31, xem DEV-071) | Phase 04 §10, PERF-04 | CONFIRMED |
 | ISS-37 | Database | LOW–MEDIUM | `Document` thiếu index compound `isActive/deletedAt` cho dashboard | Phase 04 §9.2, PERF-03 | CONFIRMED |
 | ISS-38 | Database | LOW–MEDIUM | Thiếu `.lean()` ở list endpoint Users/RBAC | `users.service.ts:getList`, `rbac.service.ts` — PERF-05 | CONFIRMED |
 | ISS-39 | Backend | LOW | Dead code tích luỹ (7 vị trí: errorHandler, loadDocument, mongo.logger, upload.validator, documents.validator×2, `assignRole`) | Phase 03 §11.4, Phase 07 §6.1/9.2 | CONFIRMED |

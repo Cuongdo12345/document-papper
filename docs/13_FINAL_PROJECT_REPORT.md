@@ -24,7 +24,7 @@ Trước khi tổng hợp, đối chiếu `00_PROJECT_MEMORY.md` với các tài
 
 **Mục đích**: số hoá quy trình tạo — trình duyệt — lưu trữ tài liệu nội bộ (đề xuất, biên bản, tham chiếu) gắn với vòng đời tài sản y tế (bảo hành, kiểm định, cấp phát), thay thế quy trình giấy tờ thủ công. (INFERRED từ domain model, Phase 08 §1)
 
-**Quy mô**: 116 endpoint / 87 path pattern, 21 Mongoose model, 15 route file (~1227 dòng route), thư mục `services/` là lớn nhất hệ thống (468K) — cho thấy phần lớn độ phức tạp nằm ở business logic tầng Service chứ không phải ở routing/controller. (Phase 01, Phase 05)
+**Quy mô**: 116 endpoint / 87 path pattern, 21 Mongoose model, 15 route file (~1227 dòng route), thư mục `services/` là lớn nhất hệ thống (468K) — cho thấy phần lớn độ phức tạp nằm ở business logic tầng Service chứ không phải ở routing/controller. (Phase 01, Phase 05; **[CẬP NHẬT DEV-071, 2026-09-21]** model count là snapshot Phase 01 — nay là **31 model** sau `DEV-057`→`070`, xem `docs/04_DATABASE_ANALYSIS.md`; endpoint/route/service-size KHÔNG được re-verify trong DEV-071, ngoài phạm vi task đó)
 
 **Công nghệ**: Node.js + TypeScript, Express 5, MongoDB/Mongoose, JWT, Zod, Swagger/OpenAPI, ExcelJS, node-cron, Nodemailer. Xem chi tiết mục 2.
 
@@ -57,7 +57,7 @@ Trước khi tổng hợp, đối chiếu `00_PROJECT_MEMORY.md` với các tài
 |---|---|---|
 | **Frontend** | Không tồn tại | Repo chỉ có `backend/` — backend-only tại thời điểm phân tích (Phase 01, Phase 06) |
 | **Backend** | Node.js, TypeScript, Express 5 (`^5.2.1`) | Layered theo domain; entry `backend/server.ts` → `backend/src/app.ts` |
-| **Database** | MongoDB + Mongoose (`^9.1.5`) | Single database, 21 model; cần replica set cho transaction (UNKNOWN đã verify ở production hay chưa) |
+| **Database** | MongoDB + Mongoose (`^9.1.5`) | Single database, 21 model tại Phase 01 → **31 model** sau DEV-057→070 (DEV-071, xem `04_DATABASE_ANALYSIS.md`); cần replica set cho transaction (UNKNOWN đã verify ở production hay chưa) |
 | **Authentication** | JWT (`jsonwebtoken ^9.0.3`) + `bcrypt ^6.0.0` | Access + Refresh token; RBAC + ABAC theo model (ABAC dead runtime) |
 | **Validation** | Zod (`^4.3.6`) | DTO layer, một số route bị comment out |
 | **API Docs** | Swagger/OpenAPI (`swagger-jsdoc`, `swagger-ui-express`), `openAPI.yaml` (~160K) | Khớp gần hoàn hảo với implementation |
@@ -149,7 +149,10 @@ Response JSON chuẩn hoá { success, message, data } (không 100% nhất quán 
 
 **Database**: MongoDB, single database qua Mongoose ODM; kết nối `database.ts` fail-fast nếu thiếu `MONGO_URI`, tự retry 5s nếu lỗi lần đầu (không giới hạn số lần). (Phase 04 §2)
 
-**Models**: 21 model, model trung tâm là `Document` (8 index, nhiều nhất hệ thống) và `WorkflowInstance`.
+**Models**: 21 model tại Phase 04 → **31 model** sau `DEV-057`→`070` (**[CẬP NHẬT DEV-071, 2026-09-21]**, xem
+`docs/04_DATABASE_ANALYSIS.md` §4.22–§4.31: thêm Vendor/Contract, ConsumableCategory/Item/Request/Transaction,
+TwoFactorOtp, AssetMaintenancePlan, DocumentPdfExport, DocumentVersion), model trung tâm là `Document` (8
+index, nhiều nhất hệ thống) và `WorkflowInstance`.
 
 **Relationships**: chủ yếu qua `ref:` ObjectId (User→Role, Document→Department, Asset→Category, MedicalDeviceProfile 1-1 Asset). Ngoại lệ đáng chú ý: **`WorkflowInstance.steps[].role` lưu free string thay vì ObjectId reference** — rủi ro Workflow "kẹt vĩnh viễn" nếu Role bị đổi tên/xoá sau khi Template đã tạo. (Phase 02, Phase 04 §12.3, TD-Architecture)
 
@@ -157,7 +160,7 @@ Response JSON chuẩn hoá { success, message, data } (không 100% nhất quán 
 - `getPendingApprovalsForRole` (`WorkflowInstance`) — dùng `$expr + $arrayElemAt`, **không có index**, khả năng cao full collection scan (COLLSCAN), rủi ro hiệu năng cao nhất hệ thống (PERF-01, ISS-05).
 - Dashboard (`adminDashboardSummaryService`) — dùng `Promise.all` chạy song song nhiều aggregate (điểm tốt).
 
-**Indexes** (tổng hợp Phase 04 §10): **7/21 model không có index** ngoài `_id` — `RefreshToken`, `Role`, `Permission`, `Policy`, `WorkflowTemplate`, `WorkflowInstance`, `Upload`. Trong đó `RefreshToken`, `Policy`, `WorkflowInstance` có evidence bị query theo field không index ở tần suất cao (login/refresh/logout, ABAC fallback, hộp thư chờ duyệt).
+**Indexes** (tổng hợp Phase 04 §10): **7/21 model không có index** ngoài `_id` — `RefreshToken`, `Role`, `Permission`, `Policy`, `WorkflowTemplate`, `WorkflowInstance`, `Upload`. Trong đó `RefreshToken`, `Policy`, `WorkflowInstance` có evidence bị query theo field không index ở tần suất cao (login/refresh/logout, ABAC fallback, hộp thư chờ duyệt). **[CẬP NHẬT DEV-071, 2026-09-21]** danh sách 7 model trên KHÔNG đổi, nhưng mẫu số nay là 31 (cả 10 model mới từ `DEV-057`→`070` đều CÓ index) → tỷ lệ thực tế **7/31 (≈23%)**, giảm so với 7/21 (≈33%).
 
 **Data risks** (Phase 04 §12):
 - Hard-delete `deleteDocumentsByMonthService` và `hardDeleteAssetService` **không check tham chiếu ngược** trước khi xoá → dữ liệu mồ côi/mất tham chiếu vĩnh viễn (ISS-02).
@@ -294,7 +297,7 @@ Chống account-enumeration/timing attack nhất quán; whitelist JWT `HS256`; `
 - `WorkflowInstance` COLLSCAN qua `$expr` ở endpoint duyệt tần suất cao, không index (PERF-01, CONFIRMED FROM CODE).
 - `RefreshToken` không index `token`, không tự dọn (PERF-02).
 - `Document` thiếu index `isActive`/`deletedAt` cho dashboard (PERF-03).
-- 7/21 model không có index bổ sung (PERF-04).
+- 7/21 model không có index bổ sung (PERF-04; nay 7/31, xem DEV-071).
 - Thiếu `.lean()` nhất quán ở list endpoint Users/RBAC (PERF-05, POTENTIAL RISK).
 
 **API issues**: không có caching layer nào (Redis/CDN/HTTP cache) toàn hệ thống (PERF-14); pagination bug là hệ quả performance ngoài ý muốn ở Users/Notifications (PERF-15, NEEDS BENCHMARK).
@@ -450,7 +453,7 @@ Không chỉ là danh sách lỗi — các điểm tích cực đã được xá
 ### 2. Important folders
 - `backend/src/routes/` — điểm vào của mọi domain.
 - `backend/src/services/` — chứa toàn bộ business logic (folder lớn nhất, 468K).
-- `backend/src/models/` — 21 Mongoose schema.
+- `backend/src/models/` — 21 Mongoose schema tại Phase 01 → 31 sau `DEV-057`→`070` (DEV-071).
 - `backend/src/shared/` — cross-cutting concerns (`ApiError`, `catchAsync`, `withTransaction`, cache, cron, performance).
 - `backend/src/docs/openAPI.yaml` — tài liệu API đầy đủ, khớp 100% với implementation, nên dùng làm reference đầu tiên khi tìm hiểu 1 endpoint cụ thể.
 
@@ -500,7 +503,7 @@ document-manager (backend-only, Node.js/TS/Express 5/MongoDB)
   ├── Backend: layered theo domain, routes→middleware→controllers→services→models
   │            Business logic tập trung ở services/ (folder lớn nhất)
   │
-  └── Database: MongoDB (Mongoose), 21 model, Document là model trung tâm,
+  └── Database: MongoDB (Mongoose), 21 model tại Phase 01 → 31 sau DEV-057→070 (DEV-071), Document là model trung tâm,
                WorkflowInstance rủi ro hiệu năng cao nhất (không index),
                transaction yêu cầu replica set (chưa xác minh production)
 ```

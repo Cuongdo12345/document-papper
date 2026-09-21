@@ -82,6 +82,9 @@ export const PERMISSIONS = {
   // SYSTEM
   SYSTEM_SETTING: "SYSTEM_SETTING",
   SYSTEM_ADMIN: "SYSTEM_ADMIN",
+  // DEV-072/FE-23 (2026-09-21) — trang "System Design" (bản đồ module nội
+  // bộ), chỉ IT/ADMIN. Mirror đúng backend (`permission.constant.ts`).
+  SYSTEM_DESIGN_VIEW: "SYSTEM_DESIGN_VIEW",
 
   // DASHBOARD
   DASHBOARD_READ: "DASHBOARD_READ",

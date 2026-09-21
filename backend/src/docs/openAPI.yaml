@@ -67,6 +67,11 @@ tags:
     description: >
       Roadmap B4 (2026-09-16) — Hợp đồng bảo trì/bảo hành ký với 1 Vendor,
       áp dụng cho nhiều Asset cùng lúc. Cảnh báo tự động khi sắp hết hạn.
+  - name: System Design
+    description: >
+      DEV-073 (2026-09-21) — bản đồ module/model/quan hệ dữ liệu nội bộ,
+      đọc TRỰC TIẾP từ Mongoose schema đang chạy (không parse tài liệu).
+      Chỉ dev/admin (permission SYSTEM_DESIGN_VIEW).
 
 security:
   - bearerAuth: []
@@ -5529,6 +5534,66 @@ paths:
                   data:
                     type: array
                     items: { $ref: "#/components/schemas/ApiPerformanceStat" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/system-design:
+    get:
+      tags: [System Design]
+      summary: Bản đồ module/model/quan hệ dữ liệu (permission SYSTEM_DESIGN_VIEW, chỉ dev/admin)
+      description: >
+        DEV-073: introspect `mongoose.modelNames()` + `schema.paths` của
+        TỪNG model thật đang chạy trong process — modules suy ra từ tên
+        thư mục domain (`backend/src/models/<domain>/`), relationships lấy
+        trực tiếp từ field có `ref` trong schema (kể cả field ref lồng
+        trong subdocument/mảng). KHÔNG đọc/parse
+        `docs/04_DATABASE_ANALYSIS.md` — nếu model thay đổi, response tự
+        động đúng theo, không cần đồng bộ tay.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      totalModels:
+                        type: integer
+                        description: Bằng đúng `mongoose.modelNames().length` tại thời điểm gọi.
+                      modules:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name: { type: string, description: "Tên thư mục domain, vd \"vendors\"" }
+                            models:
+                              type: array
+                              items: { type: string }
+                      models:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name: { type: string, description: "Tên Mongoose model, vd \"Vendor\"" }
+                            module: { type: string }
+                            collection: { type: string }
+                            fields:
+                              type: array
+                              items: { type: string }
+                      relationships:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            model: { type: string }
+                            field:
+                              type: string
+                              description: "Tên field — hậu tố \"[]\" nếu là mảng, có thể lồng dạng \"steps[].approvedBy\" nếu ref nằm trong subdocument."
+                            ref: { type: string, description: "Tên model đích." }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 

@@ -115,7 +115,7 @@ POST /api/auths/login {username, password}
 - **Evidence**: đọc toàn bộ 27 dòng `refreshToken.model.ts` — không có dòng `.index(...)` nào.
 - **Impact**: (1) Mỗi lần `refresh()`/`logout()` chạy, MongoDB phải collection-scan toàn bộ `RefreshToken` để tìm đúng `token` — chậm dần khi số lượng bản ghi tăng theo thời gian (mỗi lần login tạo 1 document mới, KHÔNG BAO GIỜ bị xoá tự động dù đã `revoked:true` hay đã hết hạn từ lâu). (2) Không có TTL cleanup → bảng phình to vô hạn theo thời gian vận hành thực tế (khác hẳn `PasswordResetToken` đã tự dọn sau khi hết hạn).
 - **Recommendation**: Thêm `{ token: 1 }` (nên `unique: true` nếu đảm bảo không trùng — JWT ký khác nhau mỗi lần gần như chắc chắn không trùng), thêm `{ user: 1 }` (dùng bởi `resetPassword()`/`disable()`/`resetPassword by admin` ở module Users khi `updateMany({user}, {revoked:true})`), và cân nhắc TTL index trên `expiresAt` giống `PasswordResetToken` để tự dọn token hết hạn định kỳ (lưu ý: TTL index xoá HẲN document — nếu cần giữ lại lịch sử token đã revoke để audit, không nên dùng TTL, cần cron dọn riêng có logic giữ lại theo nhu cầu nghiệp vụ).
-- **Confidence**: CONFIRMED (code — không tìm thấy index nào). Đây có thể trùng với 1 phát hiện đã có trong `docs/04_DATABASE_ANALYSIS.md` (Phase 04 ghi nhận "7/21 model không có index ngoài `_id`") — **CHƯA đối chiếu lại danh sách 7 model cụ thể đó ở review này** (ngoài phạm vi đọc lại toàn bộ Phase 04), nên có thể đây là 1 model đã nằm trong danh sách đó, không hẳn là phát hiện hoàn toàn mới — nêu rõ để tránh trùng lặp khi tổng hợp.
+- **Confidence**: CONFIRMED (code — không tìm thấy index nào). Đây có thể trùng với 1 phát hiện đã có trong `docs/04_DATABASE_ANALYSIS.md` (Phase 04 ghi nhận "7/21 model không có index ngoài `_id`", nay là **7/31** sau `DEV-057`→`070` — xem DEV-071) — **CHƯA đối chiếu lại danh sách 7 model cụ thể đó ở review này** (ngoài phạm vi đọc lại toàn bộ Phase 04), nên có thể đây là 1 model đã nằm trong danh sách đó, không hẳn là phát hiện hoàn toàn mới — nêu rõ để tránh trùng lặp khi tổng hợp.
 
 ---
 
@@ -204,7 +204,7 @@ POST /api/auths/login {username, password}
 
 ## 8. Unknowns cần xác minh thêm
 
-- RV01-04: cần đối chiếu lại danh sách "7/21 model không có index" ở `docs/04_DATABASE_ANALYSIS.md` xem `RefreshToken` đã được liệt kê chưa, tránh trùng ID khi tổng hợp vào `CODE_REVIEW_SUMMARY.md`.
+- RV01-04: cần đối chiếu lại danh sách "7/21 model không có index" (nay "7/31", xem DEV-071) ở `docs/04_DATABASE_ANALYSIS.md` xem `RefreshToken` đã được liệt kê chưa, tránh trùng ID khi tổng hợp vào `CODE_REVIEW_SUMMARY.md`.
 - RV01-05: chủ đích nghiệp vụ thật của `register()` (public hay nên giới hạn) vẫn UNKNOWN — chính source code tự flag câu hỏi này, không phải review này đặt ra mới.
 - Mức độ nghiêm trọng thực tế của RV01-02/RV01-03 phụ thuộc threat model thực tế (có bị khai thác chưa) — UNKNOWN, ngoài phạm vi static analysis.
 

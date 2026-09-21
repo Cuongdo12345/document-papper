@@ -351,6 +351,41 @@ Xem đầy đủ `docs/30_DEVELOPMENT_COMPLETION_AUDIT.md` Mục 8-9. Đáng ch�
   source (CLAUDE.md §3/§29). CHỈ sửa `navigation.ts`, không đụng `Sidebar.tsx` (logic gom nhóm liền kề đã
   đủ dùng). Verify: tự chụp Playwright tạm xác nhận đúng khối duy nhất; build/vitest (25/25)/lint PASS;
   FE-17 regression đầy đủ PASS, không cần update baseline (DONE, 2026-09-20).
+- `docs/frontend/tasks/FE-23.md` (+ `docs/development/tasks/DEV-072.md`) — Trang "System Design" (bản đồ
+  31 module + quan hệ dữ liệu, sinh TỪ `04_DATABASE_ANALYSIS.md`/`02_ARCHITECTURE.md`, không tự đọc lại
+  source backend), chỉ dev/admin. Permission mới `SYSTEM_DESIGN_VIEW` gán cho `IT` (role kỹ thuật duy nhất,
+  không có role "DEV" riêng trong 6 role hệ thống — ADMIN có qua wildcard). Dữ liệu module TĨNH
+  (`features/systemDesign/data/systemModules.ts`, KHÔNG gọi API). "Đường nối quan hệ" thuần CSS
+  (border-left danh sách kiểu cây thư mục + click-to-scroll/ring-highlight tức thời, KHÔNG animation/fade
+  mới — đúng `UI_DESIGN_SYSTEM.md` §5), KHÔNG thêm thư viện diagram. **Phát hiện quan trọng**:
+  `usePermission.ts` KHÔNG hard-code "ADMIN = full quyền" ở FE (chỉ đọc `user.permissions` thật từ
+  `GET /users/me`) — nên nav/route mới ẩn với CẢ ADMIN tới khi permission tồn tại thật trong DB dev. User
+  đổi ý cung cấp tài khoản ADMIN, Claude ghi trực tiếp qua API (`POST /rbac/permissions` +
+  `POST /rbac/roles/:id/assign-permissions` cho cả `IT` 37→38 và `ADMIN` 110→111 permission, verify lại qua
+  `GET /users/me`) — DB dev đã DONE, user đã tự mở trình duyệt xác nhận chạy được (2026-09-21).
+- **[CẬP NHẬT DEV-073, cùng ngày]** Backend thêm `GET /api/system-design` (introspect schema THẬT thay vì
+  đọc docs, tái dùng permission `SYSTEM_DESIGN_VIEW` — không tạo permission mới) — endpoint này phát hiện
+  `frontend/src/features/systemDesign/data/systemModules.ts` (file dữ liệu tĩnh của FE-23) có **4 model sai
+  quan hệ** (`Vendor`, `AssetCategory`, `ConsumableCategory` thiếu ref tới `User`; `CalibrationRecord` còn
+  ghi field cũ `certificateFileUrl` thay vì `certificateFileId: ObjectId ref Upload`), kế thừa từ lỗi trong
+  chính `04_DATABASE_ANALYSIS.md` lúc sinh dữ liệu FE-23 (+ 1 lỗi transcribe riêng). Đã sửa cả 4, verify lại
+  bằng script so sánh trực tiếp với response API thật — khớp 100%/31 model. `SystemDesignPage.tsx` (FE-23)
+  VẪN dùng dữ liệu tĩnh này lúc đó (CHƯA đổi sang gọi API thật — ngoài phạm vi DEV-073).
+- `docs/frontend/tasks/FE-24.md` (cùng ngày, 2026-09-21) — **FE-23 bị THAY THẾ HOÀN TOÀN**: trang "System
+  Design" nay là graph tương tác (`@xyflow/react@12.11.6`, xác nhận bản stable mới nhất trước khi cài),
+  gọi thật `GET /api/system-design` (DEV-073) thay vì dữ liệu tĩnh — `data/systemModules.ts` (FE-23) và
+  bản `SystemDesignPage.tsx` kiểu card ĐÃ XOÁ (user xác nhận thay thế hoàn toàn qua AskUserQuestion, tránh
+  đúng vấn đề dead-code/lệch schema mà DEV-073 vừa giải quyết). Code-split qua `React.lazy` (file riêng
+  `routes/SystemDesignPage.lazy.tsx` để tránh warning oxlint `only-export-components`) — verify qua
+  `npm run build`: `@xyflow/react` (188KB) tách chunk riêng, KHÔNG vào bundle chính. Kiến trúc: `Page` giữ
+  toàn bộ state (filter/selection/drawer), `Canvas` (con của `<ReactFlowProvider>`, bắt buộc để dùng
+  `useReactFlow()`) chỉ lo cơ chế xyflow. Layout node/edge tính THỦ CÔNG (grid packing theo module, KHÔNG
+  thêm lib auto-layout thứ 2). Filter theo module chỉ gắn `hidden:true`, KHÔNG xoá khỏi `masterNodes`/
+  `masterEdges`. Token màu dùng lại toàn bộ (`border-primary`/`bg-muted`/...) — KHÔNG thêm màu riêng cho 12
+  domain (không đủ token dataviz sẵn có, tránh phá restraint principle của `UI_DESIGN_SYSTEM.md`), phân
+  biệt Module/Model qua HÌNH DẠNG. Route/nav permission GIỮ NGUYÊN `SYSTEM_DESIGN_VIEW` từ DEV-072, không
+  đổi gì ở `navigation.ts`. Build/lint/tsc/vitest PASS — CHƯA tự verify trực quan (Claude không có phiên
+  trình duyệt tương tác), user tự kiểm tra tiếp.
 
 ## 12. Liên kết toàn bộ tài liệu FE
 

@@ -41,7 +41,9 @@ Nguồn: `03_BACKEND_ANALYSIS.md` (đọc toàn văn) — xác nhận lại bằ
 Domain `documents` tách rõ nhất (`.validator/.mapper/.query/.types/.constants`), các domain khác Service gọi thẳng Model (đã xác nhận ARCH-22).
 
 ### 3.5 Models/Data Access
-21 Mongoose model. Chỉ `documents` có tầng data-access tách riêng (`.query.ts`).
+21 Mongoose model tại thời điểm review này → **31 model** sau `DEV-057`→`070` (**[CẬP NHẬT DEV-071,
+2026-09-21]**, xem `docs/04_DATABASE_ANALYSIS.md` §4.22–§4.31; tầng data-access của 10 model mới CHƯA được
+review lại ở đây — ngoài phạm vi DEV-071). Chỉ `documents` có tầng data-access tách riêng (`.query.ts`).
 
 ### 3.6 Utilities/Configuration
 Xem Mục 8 (Configuration) — nhiều vị trí thiếu đồng bộ giữa `.env.example` và code thực tế dùng (ARCH-28).
@@ -100,7 +102,7 @@ Xem `ARCH` tương ứng đã có trong Global Security/Architecture Review — 
 
 Trace: `Service → Data Access → Model → Database`.
 
-- **Data access responsibility**: chỉ domain `documents` có tầng `.query.ts` tách biệt Service (business rule) khỏi Model (Mongoose query thuần) — 20/21 model còn lại bị Service gọi trực tiếp (ARCH-22, đã có trong Global Architecture Review).
+- **Data access responsibility**: chỉ domain `documents` có tầng `.query.ts` tách biệt Service (business rule) khỏi Model (Mongoose query thuần) — 20/21 model còn lại bị Service gọi trực tiếp (ARCH-22, đã có trong Global Architecture Review). **[CẬP NHẬT DEV-071, 2026-09-21]** "21" là tổng tại thời điểm review này; nay là 31 model (`DEV-057`→`070`) — tỷ lệ "còn lại bị Service gọi trực tiếp" CHƯA được re-verify cho 10 model mới (Vendors/Inventory/2FA/PDF export/Document version), ngoài phạm vi DEV-071.
 - **Model coupling**: Dashboard/Excel import thẳng Model domain khác, bỏ qua Service layer (ARCH-01, ARCH-02).
 - **Query placement**: nhất quán ở domain có `.query.ts`; ở domain khác, query nằm ngay trong Service (chấp nhận được với domain nhỏ, nhưng không có ranh giới rõ khi domain lớn dần).
 - **Aggregation placement**: tập trung đúng trong `services/dashboard/*.ts` — không có aggregation nào bị đặt lẫn trong Controller.

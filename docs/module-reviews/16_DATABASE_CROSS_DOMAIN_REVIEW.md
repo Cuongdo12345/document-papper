@@ -14,7 +14,7 @@
 > `backend/src/services/documents/{document.service.ts,workflow.service.ts,documents.query.ts}`,
 > `backend/src/services/assets/assetDevice/{asset.service.ts,assetAssignment.service.ts}`,
 > `backend/src/services/assets/medicalDevice/medicalDevice.service.ts`,
-> `backend/src/models/**/*.model.ts` (toàn bộ 21 model),
+> `backend/src/models/**/*.model.ts` (toàn bộ 21 model tại thời điểm review này; nay 31 sau `DEV-057`→`070`, xem DEV-071),
 > `backend/src/shared/utils/{withTransaction.ts,getNext.ts}`,
 > `backend/src/shared/helpers/generateAssetCode.ts`, `backend/src/shared/utils/generateDocumentCode.ts`.
 >

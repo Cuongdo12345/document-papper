@@ -47,6 +47,9 @@
 - **Recommendation**: Thêm index compound có `isActive`/`deletedAt` làm field đầu (vd `{isActive:1, deletedAt:1, createdAt:-1}`).
 
 ### PERF-04 — 7/21 model không có index ngoài `_id` (kế thừa Phase 04 §10)
+> **[CẬP NHẬT DEV-071, 2026-09-21]** "21" là tổng model tại thời điểm Phase 04/10. Sau `DEV-057`→`070` tổng
+> hiện là **31 model**; danh sách 7 model thiếu index dưới đây KHÔNG đổi (cả 10 model mới đều CÓ index), nên
+> tỷ lệ thực tế nay là **7/31 (≈23%)**, giảm so với 7/21 (≈33%) — xem `docs/04_DATABASE_ANALYSIS.md` §10.
 - **Area**: Database / Missing Index (tổng hợp)
 - **Evidence**: `RefreshToken`, `Role`, `Permission`, `Policy`, `WorkflowTemplate`, `WorkflowInstance`, `Upload`.
 - **Risk**: **POTENTIAL RISK**, mức độ khác nhau theo model — `Role`/`Permission`/`Department` có bản chất bảng nhỏ (rủi ro thấp, INFERRED từ ngữ cảnh nghiệp vụ nội bộ), `Policy` phụ thuộc số lượng Policy thực tế (hiện ABAC dead runtime nên tần suất query = 0 theo Phase 07, risk thực tế hiện tại = KHÔNG ĐÁNG KỂ dù thiếu index), `WorkflowInstance`/`RefreshToken`/`Upload` có tần suất query cao hơn (xem PERF-01/02).
@@ -218,7 +221,7 @@
 | PERF-02 | Database | CONFIRMED FROM CODE (thiếu index) | `RefreshToken` không index `token`, không tự dọn | CONFIRMED (kế thừa Phase 04) |
 | PERF-05 | Database | POTENTIAL RISK | Thiếu `.lean()` ở Users/RBAC list (hydration overhead) | CONFIRMED (thiếu lean), POTENTIAL (mức ảnh hưởng) |
 | PERF-03 | Database | POTENTIAL RISK | `Document` thiếu index `isActive`/`deletedAt` cho dashboard | CONFIRMED (kế thừa Phase 04) |
-| PERF-04 | Database | POTENTIAL RISK | 7/21 model không có index bổ sung | CONFIRMED (kế thừa Phase 04) |
+| PERF-04 | Database | POTENTIAL RISK | 7/21 model không có index bổ sung (nay 7/31, xem DEV-071) | CONFIRMED (kế thừa Phase 04) |
 | PERF-14 | API | POTENTIAL RISK | Không có caching layer nào (Redis/HTTP cache) | CONFIRMED (thiếu), NEEDS BENCHMARK (mức ảnh hưởng) |
 | PERF-15 | API | NEEDS BENCHMARK | Pagination bug — hệ quả performance chưa rõ với Users/Notifications | UNKNOWN (kế thừa Phase 05) |
 | PERF-13 | Backend | NEEDS BENCHMARK | Overhead cố hữu của MongoDB transaction, khuếch đại bởi PERF-07 | INFERRED |

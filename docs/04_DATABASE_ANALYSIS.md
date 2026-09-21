@@ -4,6 +4,11 @@
 > Phạm vi: CHỈ database + data access layer (schema/field chi tiết, quan hệ, index, CRUD, query pattern, transaction, data integrity). Không phân tích lại Backend chung (đã ở Phase 03), không phân tích API inventory đầy đủ (Phase 05).
 > Nguồn: source code thực tế tại commit `f4ce8e9` (branch `main`), re-clone xác nhận khớp commit với `00_PROJECT_MEMORY.md`.
 > Quy ước: **CONFIRMED** = có evidence trực tiếp trong source. **INFERRED** = suy luận hợp lý từ evidence nhưng chưa xác nhận trực tiếp. **UNKNOWN** = chưa đủ evidence. **OBSERVED** = hành vi đọc được từ code. **POTENTIAL RISK** = rủi ro suy ra từ cấu trúc, chưa benchmark.
+> **[CẬP NHẬT DEV-071, 2026-09-21]** Phase 04 gốc (dưới đây) dừng ở 21 model, đã lỗi thời từ `DEV-057`→`070`
+> (Vendors/Contracts, Vật tư tiêu hao, Xuất PDF, Lịch sử phiên bản tài liệu, Lịch bảo trì chủ động, 2FA).
+> Đã bổ sung 10 model còn thiếu ở mục 4.22→4.31 (KHÔNG đổi số thứ tự phần gốc, KHÔNG viết lại file mới) +
+> cập nhật số liệu tổng (model count, index summary, relationships) ở các mục liên quan — xem
+> `docs/development/tasks/DEV-071.md` để biết đầy đủ những gì đã sửa.
 
 ---
 
@@ -11,7 +16,8 @@
 
 - Engine: **MongoDB**, 1 database duy nhất, không sharding, không read replica riêng trong code (CONFIRMED, khớp Phase 02).
 - ODM: **Mongoose** (`mongoose: ^9.1.5`).
-- 21 model, tổ chức theo domain trong `backend/src/models/`.
+- **31 model** (CẬP NHẬT DEV-071, 2026-09-21 — trước đó tài liệu ghi "21 model", đã lỗi thời kể từ
+  `DEV-057`→`070`, xem cảnh báo đầu Mục 4), tổ chức theo domain trong `backend/src/models/`.
 - `autoIndex: true` được set tường minh trong `mongoOptions` (`database.ts`) — Mongoose tự đồng bộ toàn bộ index khai báo trong schema lên MongoDB mỗi khi app khởi động (không tắt ở production trong code hiện tại, dù comment ghi nhận "prod có thể tắt") — **CONFIRMED**: ở production hiện tại, index vẫn được tự động tạo/đồng bộ lúc `connectDB()` chạy.
 
 ---
@@ -61,14 +67,24 @@ server.ts
   → http.createServer(app).listen(PORT)
 ```
 
-- 1 connection pool dùng chung cho toàn bộ 21 model, toàn bộ request (khớp kiến trúc monolith đã ghi nhận Phase 02).
+- 1 connection pool dùng chung cho toàn bộ 31 model, toàn bộ request (khớp kiến trúc monolith đã ghi nhận Phase 02).
 - Không có multi-tenant / multi-database routing trong code.
 
 ---
 
-## 4. Models — Chi tiết đầy đủ (21 model)
+## 4. Models — Chi tiết đầy đủ (31 model)
 
 > Ký hiệu: 🔑 = unique, 📇 = có index field-level, 🔗 = reference (ObjectId), ⏱ = TTL index.
+
+> **[CẬP NHẬT DEV-071, 2026-09-21]** Bản Phase 04 gốc chỉ liệt kê 21 model (4.1→4.21 bên dưới, giữ nguyên
+> KHÔNG đổi số thứ tự — mọi tham chiếu "mục 4.X" ở các phần khác của tài liệu này vẫn đúng). Từ
+> `DEV-057`→`070` (Vendors/Contracts, Vật tư tiêu hao, Xuất PDF, Lịch sử phiên bản tài liệu, Lịch bảo trì
+> chủ động, 2FA) đã thêm **10 model MỚI**, được bổ sung ở 4.22→4.31 bên dưới theo ĐÚNG format/evidence
+> style (CONFIRMED/INFERRED/UNKNOWN) của phần gốc:
+> `AssetMaintenancePlan`, `Vendor`, `Contract`, `ConsumableCategory`, `ConsumableItem`,
+> `ConsumableRequest`, `ConsumableTransaction`, `TwoFactorOtp`, `DocumentPdfExport`, `DocumentVersion`.
+> Tổng 21+10 = **31 model**, khớp đúng số file thật trong `backend/src/models/` (đếm trực tiếp, loại trừ
+> `notifications/notification.types.ts` — file type definition thuần, KHÔNG export Mongoose model).
 
 ### 4.1 `User` (`models/users/user.model.ts`)
 
@@ -289,7 +305,7 @@ Không có index bổ sung ngoài unique `code`. Bảng nhỏ theo bản chất 
 | `calibratedAt` | Date | ✅ | |
 | `calibratedBy` | String | ✅ | trim — **lưu tên chuỗi tự do, KHÔNG phải ref tới User/đơn vị kiểm định** |
 | `result` | String enum (`CalibrationResult`) | ✅ | |
-| `certificateFileUrl` | String | ❌ | trim |
+| `certificateFileId` | ObjectId 🔗 `Upload` | ❌ | **[SỬA DEV-073, 2026-09-21]** bản gốc ghi sai cả tên field lẫn kiểu (`certificateFileUrl: String`) — phát hiện qua `GET /api/system-design` (đọc thẳng schema thật, không qua doc); field thật là ref `ObjectId` tới `Upload` (mục 4.19), không phải chuỗi URL |
 | `nextDueDate` | Date | ✅ | |
 | `recordedBy` | ObjectId 🔗 `User` | ✅ | người ghi nhận trong hệ thống (khác `calibratedBy` — đơn vị/người thực hiện kiểm định thực tế) |
 
@@ -368,14 +384,172 @@ Model có 1 khối code phiên bản trước bị comment nguyên (khai 3 field
 `timestamps: {createdAt:true, updatedAt:false}`, `suppressReservedKeysWarning: true` (vì `errors` là tên field nội bộ Mongoose reserved — comment tự giải thích quyết định giữ nguyên tên vì API đã trả field này ra ngoài, đổi tên sẽ breaking change).
 **Index**: `{importedBy:1, createdAt:-1}`, `{createdAt:-1}`.
 
+### 4.22 `AssetMaintenancePlan` (`models/assets/assetMaintenancePlan.model.ts`) — CONFIRMED, DEV-071
+
+Roadmap B2 (Lịch bảo trì chủ động, 2026-09-15).
+
+| Field | Type | Required | Default | Ghi chú |
+|---|---|---|---|---|
+| `asset` | ObjectId 🔗 `Asset` | ✅ | — | |
+| `title` | String | ✅ | — | trim |
+| `description` | String | ❌ | — | trim |
+| `scheduledDate` | Date | ✅ | — | |
+| `status` | String enum (`MaintenancePlanStatus`) | ❌ | `PLANNED` | |
+| `completedAt`/`completedBy` | Date / ObjectId 🔗 `User` | ❌ | — | |
+| `cancelledAt`/`cancelledBy` | Date / ObjectId 🔗 `User` | ❌ | — | |
+| `resolutionNote` | String | ❌ | — | trim — dùng chung cho cả kết quả hoàn tất lẫn lý do huỷ (tương tự `Asset`/`Document` pattern gộp field) |
+| `createdBy`/`updatedBy` | ObjectId 🔗 `User` | ❌ | — | |
+
+**Index**: `{asset:1, scheduledDate:-1}` (lịch sử theo 1 asset — `AssetDetailPage` "Lịch bảo trì"), `{scheduledDate:1, status:1}` (calendar/dashboard, quét theo khoảng ngày + lọc `status="planned"`, comment tự xác nhận mục đích ghép 2 field).
+**Không có index trên `status` đơn lẻ** ngoài compound `{scheduledDate:1, status:1}` — đủ dùng cho 2 pattern query đã biết (theo asset, theo khoảng ngày), UNKNOWN nếu có query lọc CHỈ theo `status` (chưa đọc `assetMaintenance*.service.ts` chi tiết ở phase này).
+
+### 4.23 `Vendor` (`models/vendors/vendor.model.ts`) — CONFIRMED, DEV-071
+
+Roadmap B4 (Quản lý nhà cung cấp & hợp đồng bảo trì, 2026-09-16).
+
+| Field | Type | Required | Default | Ghi chú |
+|---|---|---|---|---|
+| `name` | String | ✅ | — | trim |
+| `contactPerson`/`phone`/`email`/`address`/`taxCode`/`notes` | String | ❌ | — | trim, KHÔNG có validate format email/phone ở tầng schema (khác `User.email` không có `sparse`/`unique` ở đây — Vendor không cần unique email, nhiều NCC có thể chung email liên hệ) |
+| `isActive` | Boolean | ❌ | `true` | soft-delete kiểu toggle (khác `deletedAt` timestamp của `Document`/`Asset`/`AssetCategory`) |
+| `createdBy`/`updatedBy` | ObjectId 🔗 `User` | ❌ | — | |
+
+**Index**: `{name:1}`, `{isActive:1}`. Không có `unique` trên `name` — CONFIRMED (không có `.index({name:1},{unique:true})` hay field-level `unique:true`) — nhiều Vendor được phép trùng tên.
+
+### 4.24 `Contract` (`models/vendors/contract.model.ts`) — CONFIRMED, DEV-071
+
+Roadmap B4 — hợp đồng bảo trì/bảo hành, gắn 1 `Vendor` với N `Asset`.
+
+| Field | Type | Required | Default | Ghi chú |
+|---|---|---|---|---|
+| `vendor` | ObjectId 🔗 `Vendor` | ✅ | — | |
+| `assets` | ObjectId[] 🔗 `Asset` | ✅ (mỗi phần tử required) | — | Many-to-many qua mảng — 1 Contract áp dụng nhiều Asset, ngược lại 1 Asset có thể xuất hiện trong nhiều Contract (không ràng buộc 1-1) |
+| `contractNumber` | String | ❌ | — | trim |
+| `title` | String | ✅ | — | trim |
+| `description` | String | ❌ | — | trim |
+| `startDate`/`endDate` | Date | ✅ | — | |
+| `status` | String enum (`ContractStatus`) | ❌ | `ACTIVE` | |
+| `cancelledAt`/`cancelledBy`/`cancelReason` | Date/ObjectId 🔗 `User`/String | ❌ | — | |
+| `expiryAlertSentAt` | Date | ❌ | `null` | cờ chống gửi trùng cảnh báo — CONFIRMED có cron riêng, xem `shared/cron/contractAlerts.cron.ts` (grep xác nhận file tồn tại, chưa đọc nội dung chi tiết ở phase này) |
+| `createdBy`/`updatedBy` | ObjectId 🔗 `User` | ❌ | — | |
+
+**Index**: `{vendor:1, createdAt:-1}` (danh sách hợp đồng theo NCC — trang chi tiết Vendor), `{assets:1}` (tra cứu "hợp đồng nào áp dụng cho asset X" — section trong `AssetDetailPage`), `{status:1, endDate:1, expiryAlertSentAt:1}` (compound đúng shape cho cron quét hợp đồng sắp hết hạn — comment tự xác nhận mục đích, cùng pattern thiết kế index-khớp-query đã thấy ở `Document`/`MedicalDeviceProfile`).
+
+### 4.25 `ConsumableCategory` (`models/inventory/consumableCategory.model.ts`) — CONFIRMED, DEV-071
+
+Roadmap B3 (Vật tư tiêu hao, 2026-09-15) — **mirror thiết kế đúng `AssetCategory`** (comment nguồn tự xác nhận).
+
+| Field | Type | Required | Ghi chú |
+|---|---|---|---|
+| `code` | String | ✅ | 🔑 unique (explicit `.index()`), `uppercase`, `trim` |
+| `name` | String | ✅ | trim |
+| `parentCategory` | ObjectId 🔗 `ConsumableCategory` (tự tham chiếu, cây phân cấp) | ❌ | |
+| `isActive` | Boolean | ❌ | default `true` |
+| `deletedBy`/`deletedAt` | ObjectId/Date | ❌ | soft-delete |
+
+**Index**: `{code:1}` unique, `{parentCategory:1}` — **khác `AssetCategory` (mục 4.14)**: `AssetCategory` KHÔNG có index trên `parentCategory` (ghi nhận UNKNOWN ở 4.14), còn `ConsumableCategory` CÓ — 2 model cùng shape nhưng độ hoàn thiện index khác nhau dù `ConsumableCategory` được tạo SAU và tự nhận "mirror" `AssetCategory` trong comment nguồn.
+
+### 4.26 `ConsumableItem` (`models/inventory/consumableItem.model.ts`) — CONFIRMED, DEV-071
+
+Roadmap B3 — vật tư tiêu hao (kim tiêm, bông băng...), khác hẳn `Asset` (không quản lý theo từng đơn vị vật lý, chỉ theo dõi tồn kho dạng số lượng).
+
+| Field | Type | Required | Default | Ghi chú |
+|---|---|---|---|---|
+| `name` | String | ✅ | — | trim |
+| `unit` | String | ✅ | — | trim — đơn vị tính (hộp, cái...) |
+| `category` | ObjectId 🔗 `ConsumableCategory` | ❌ | — | |
+| `department` | ObjectId 🔗 `Department` | ✅ | — | |
+| `quantityOnHand` | Number | ✅ | `0` | `min:0` |
+| `minStockThreshold` | Number | ✅ | `0` | `min:0` — ngưỡng cảnh báo sắp hết |
+| `lowStockAlertSentAt` | Date | ❌ | `null` | cờ chống gửi trùng cảnh báo — CONFIRMED có cron riêng, `shared/cron/consumableAlerts.cron.ts` (grep xác nhận tồn tại) |
+| `isActive` | Boolean | ❌ | `true` | |
+| `createdBy`/`updatedBy` | ObjectId 🔗 `User` | ❌ | — | |
+
+**Index**: `{department:1, name:1}` **unique** — CONFIRMED ràng buộc nghiệp vụ đáng chú ý: chặn trùng tên vật tư TRONG CÙNG 1 khoa/phòng, nhưng CHO PHÉP trùng tên giữa các khoa/phòng khác nhau (comment nguồn tự giải thích rõ — mỗi phòng ban tự quản lý danh mục riêng). Đây là **unique constraint compound theo tenant-like scoping** — pattern KHÔNG xuất hiện ở bất kỳ model nào khác trong hệ thống (các unique khác đều là single-field toàn cục: `User.username`, `Department.code`, `AssetCategory.code`...). `{department:1, isActive:1}` (list chính theo khoa/phòng), `{category:1}` (lọc theo nhóm vật tư).
+
+### 4.27 `ConsumableRequest` (`models/inventory/consumableRequest.model.ts`) — CONFIRMED, DEV-071
+
+Roadmap B8 (`DEV-067`, 2026-09-18) — đề xuất mua vật tư hàng tháng theo khoa/phòng. **KHÔNG có luồng duyệt** (khác `Document`/`WorkflowInstance` — xác nhận qua schema không có field liên quan workflow nào).
+
+| Field | Type | Required | Ghi chú |
+|---|---|---|---|
+| `department` | ObjectId 🔗 `Department` | ✅ | |
+| `requestMonth` | String | ✅ | `match: /^\d{4}-(0[1-9]\|1[0-2])$/` — validate format `YYYY-MM` NGAY Ở TẦNG SCHEMA (regex) — **khác đa số field khác trong hệ thống, vốn để validate format cho tầng Zod DTO**, đây là 1 trong số ít ví dụ validate format cụ thể ở Mongoose |
+| `items` | subdocument[] `{consumableItem→ConsumableItem, quantity, unitPrice, totalPrice}` (`_id:false`) | ✅, `validate` custom bắt buộc `length>0` | Embedded subdocument (không phải collection riêng) — **1 trong số ít nơi dùng Mongoose custom `validate` function** (đã ghi nhận Mục 11 gốc là "không thấy `validate:` nào" — PHÁT HIỆN MỚI, đính chính ở Mục 5 bên dưới) |
+| `totalAmount` | Number | ✅ | `min:0` |
+| `status` | String enum (`ConsumableRequestStatus`) | ❌ (default `PENDING`) | Trạng thái RIÊNG của domain này (PENDING/FULFILLED/CANCELLED theo `docs/development/tasks/DEV-067.md`), KHÔNG dùng chung enum với `WorkflowInstance.status` |
+| `note` | String | ❌ | trim |
+| `createdBy`/`updatedBy` | ObjectId 🔗 `User` | ❌ | |
+
+**Index**: `{department:1, requestMonth:1}` (màn hình chính — filter thường dùng nhất), `{status:1}` (lọc PENDING cần xử lý).
+
+### 4.28 `ConsumableTransaction` (`models/inventory/consumableTransaction.model.ts`) — CONFIRMED, DEV-071
+
+Roadmap B3 — nhật ký nhập/xuất kho, **bất biến (append-only)** — cùng pattern `AssetAssignmentHistory` (mục 4.17): `timestamps:{createdAt:true, updatedAt:false}`.
+
+| Field | Type | Required | Ghi chú |
+|---|---|---|---|
+| `consumableItem` | ObjectId 🔗 `ConsumableItem` | ✅ | |
+| `type` | String enum (`ConsumableTransactionType`) | ✅ | Nhập/Xuất kho |
+| `quantity` | Number | ✅ | `min:1` |
+| `balanceAfter` | Number | ✅ | `min:0` — số dư tồn kho SAU giao dịch, lưu snapshot (không cần tính lại từ lịch sử mỗi lần đọc) |
+| `reason` | String | ❌ | trim |
+| `performedBy` | ObjectId 🔗 `User` | ❌ | |
+
+**Index**: `{consumableItem:1, createdAt:-1}` — lịch sử theo 1 vật tư, mới nhất trước (query chính của màn hình chi tiết vật tư).
+
+### 4.29 `TwoFactorOtp` (`models/auth/twoFactorOtp.model.ts`) — CONFIRMED, DEV-071
+
+Roadmap C1 (`DEV-068`, 2026-09-19) — xác thực 2 lớp qua email OTP. Comment nguồn tự xác nhận: **mirror index/TTL của `PasswordResetToken`** (mục 4.4).
+
+| Field | Type | Required | Default | Ghi chú |
+|---|---|---|---|---|
+| `user` | ObjectId 🔗 `User` | ✅ | — | `index:true` field-level |
+| `codeHash` | String | ✅ | — | lưu dạng hash, không lưu mã OTP thô (cùng nguyên tắc `PasswordResetToken.token`) |
+| `expiresAt` | Date | ✅ | — | |
+| `used` | Boolean | ❌ | `false` | |
+| `attempts` | Number | ❌ | `0` | đếm số lần thử sai — KHÔNG có field `maxAttempts`/giới hạn cứng ở tầng schema (validate giới hạn số lần thử là UNKNOWN ở tầng nào — chưa đọc `auths.service.ts`/`twoFactor*.service.ts` ở phase này) |
+
+**Index**: `{expiresAt:1}` với `expireAfterSeconds:0` (⏱ TTL — tự xoá, giống hệt `PasswordResetToken`), `{user:1, createdAt:-1}` (luôn tìm OTP MỚI NHẤT chưa dùng của 1 user — comment nguồn tự xác nhận mục đích). **Khác `RefreshToken` (mục 4.3, KHÔNG có TTL) — `TwoFactorOtp` đi đúng pattern tốt của `PasswordResetToken`, không lặp lại thiếu sót đã ghi nhận ở `RefreshToken`.**
+
+### 4.30 `DocumentPdfExport` (`models/documents/documentPdfExport.model.ts`) — CONFIRMED, DEV-071
+
+Roadmap B5 (`DEV-064`, Xuất PDF chính thức) — nhật ký các lần xuất PDF, **bất biến** (`timestamps:{createdAt:true, updatedAt:false}`, comment nguồn tự ghi "không có khái niệm sửa 1 bản ghi audit").
+
+| Field | Type | Required | Ghi chú |
+|---|---|---|---|
+| `document` | ObjectId 🔗 `Document` | ✅ | |
+| `exportedBy` | ObjectId 🔗 `User` | ❌ | |
+| `contentHash` | String | ✅ | băm nội dung tại thời điểm xuất — dùng để xác minh file PDF sau này khớp đúng nội dung đã ký (chống giả mạo/chỉnh sửa sau khi xuất) |
+| `signature` | String | ✅ | **"ký" nội bộ hệ thống, KHÔNG PHẢI chữ ký số CA hợp lệ pháp lý** — đã xác nhận với user ở `DEV-064.md` (CLAUDE.md §41 lịch sử ghi rõ), tránh hiểu nhầm đây là chữ ký số thật |
+| `algorithm` | String | ✅ | thuật toán tạo `signature`/`contentHash` (tên cụ thể UNKNOWN ở phase này — chưa đọc `documentPdfExport.service.ts`/`pdfSigning.util.ts` nếu có) |
+
+**Index**: `{document:1, createdAt:-1}` — danh sách các lần đã xuất PDF của 1 document, mới nhất trước.
+
+### 4.31 `DocumentVersion` (`models/documents/documentVersion.model.ts`) — CONFIRMED, DEV-071
+
+Roadmap A4 — lịch sử nội dung tài liệu (`title`/`meta`) TRƯỚC mỗi lần bị sửa, **bất biến** (`timestamps:{createdAt:true, updatedAt:false}`, comment nguồn tự xác nhận "không có update nào cho 1 version record sau khi tạo").
+
+| Field | Type | Required | Ghi chú |
+|---|---|---|---|
+| `document` | ObjectId 🔗 `Document` | ✅ | |
+| `versionNumber` | Number | ✅ | KHÔNG có `unique` compound với `document` ở tầng schema (CONFIRMED — không có `.index({document:1,versionNumber:1},{unique:true})`) — tính đơn điệu tăng của `versionNumber` phụ thuộc HOÀN TOÀN tầng Service, không có ràng buộc DB chống trùng/nhảy số |
+| `title` | String | ✅ | snapshot title TẠI thời điểm version bị thay thế |
+| `meta` | Mixed (`Schema.Types.Mixed`) | ✅ | snapshot `meta` — **field Mixed thứ 3 trong hệ thống** (cùng `Document.meta`, `Asset.specs` — đính chính số lượng ở Mục 5) |
+| `editedBy` | ObjectId 🔗 `User` | ❌ | |
+| `editedAt` | Date | ✅ | thời điểm bản ghi GỐC bị sửa (khác `createdAt` của chính version — là thời điểm snapshot được TẠO, về logic 2 giá trị này thường trùng nhau nhưng không có ràng buộc DB nào đảm bảo, UNKNOWN nếu có thể lệch trong thực tế) |
+
+**Index**: `{document:1, versionNumber:-1}` — comment nguồn tự xác nhận "mirror `CalibrationRecordSchema.index`" (mục 4.16) — liệt kê lịch sử theo 1 document, version mới nhất trước.
+
 ---
 
 ## 5. Schemas — Tổng hợp đặc điểm chung
 
 - **Không có model nào dùng Mongoose `virtual`** — CONFIRMED, `grep "\.virtual("` trong toàn bộ `models/` không có kết quả nào.
 - **Không có model nào dùng schema-level middleware/hook** (`pre`/`post` save, remove, v.v.) — CONFIRMED, không có `\.pre(`/`\.post(` nào trong `models/`. Mọi logic phụ trợ (audit, notification, đồng bộ trạng thái) đều nằm ở tầng Service, không nằm trong Mongoose hook.
-- **2 field dùng `Schema.Types.Mixed`**: `Document.meta` (required) và `Asset.specs` (default `{}`) — không có schema con, không validate shape ở tầng DB, phụ thuộc hoàn toàn Zod DTO + validator service.
-- **3 quan hệ tự tham chiếu (self-reference)**: `Document.referenceTo → Document`, `AssetCategory.parentCategory → AssetCategory`.
+- **3 field dùng `Schema.Types.Mixed`** (SỬA DEV-071, trước ghi "2"): `Document.meta` (required), `Asset.specs` (default `{}`), `DocumentVersion.meta` (required, mục 4.31) — không có schema con, không validate shape ở tầng DB, phụ thuộc hoàn toàn Zod DTO + validator service.
+- **3 quan hệ tự tham chiếu (self-reference)** (SỬA DEV-071 — bản gốc ghi "3" nhưng chỉ liệt kê 2, thiếu 1; nay liệt kê đủ 3, số đếm khớp thật): `Document.referenceTo → Document`, `AssetCategory.parentCategory → AssetCategory`, `ConsumableCategory.parentCategory → ConsumableCategory` (mục 4.25).
+- **[MỚI DEV-071]** **1 field dùng Mongoose `Array.isArray(...) && length>0` custom `validate:` function**: `ConsumableRequest.items` (mục 4.27) — ĐÍNH CHÍNH claim cũ ở Mục 11 ("KHÔNG có custom validator function nào") không còn đúng kể từ model này.
 - **1 polymorphic reference thủ công** (không dùng `refPath`): `Notification.resourceId`.
 - **2 field lưu vai trò dạng String tự do thay vì ObjectId ref**: `WorkflowTemplate.steps[].role`, `WorkflowInstance.steps[].role` — đã ghi nhận rủi ro ở Phase 02.
 - Có **duplicate index tiềm ẩn KHÔNG xảy ra** nhờ thiết kế cẩn thận: comment ở `CalibrationRecord` tự xác nhận đã tránh khai `unique`/`index` ở field-level TRÙNG với `.index()` gọi riêng — cho thấy nhóm phát triển đã từng gặp warning "Duplicate schema index" ở model khác và tự rút kinh nghiệm áp dụng nơi khác trong codebase.
@@ -383,6 +557,14 @@ Model có 1 khối code phiên bản trước bị comment nguyên (khai 3 field
 ---
 
 ## 6. Relationships (đọc trực tiếp từ `ref:`)
+
+> **[CẬP NHẬT DEV-073, 2026-09-21]** Phát hiện qua `GET /api/system-design` (endpoint mới, introspect
+> TRỰC TIẾP `mongoose schema.paths` thay vì đọc tài liệu này) — sơ đồ dưới đây có 3 chỗ sai/thiếu, đã sửa
+> tại đúng vị trí: (1) thiếu `AssetCategory --deletedBy--> User`, (2) `Vendor` ghi sai "không có ref ra
+> ngoài" (thực tế có `createdBy`/`updatedBy` → `User`), (3) thiếu `CalibrationRecord --certificateFileId-->
+> Upload` (mục 4.16 cũng sai TÊN + KIỂU field — trước ghi `certificateFileUrl: String`, thật ra là
+> `certificateFileId: ObjectId ref Upload`). Đây chính xác là loại doc-drift mà endpoint `/api/system-design`
+> được tạo ra để tránh về sau — response của nó luôn tự động đúng theo schema thật, không cần đồng bộ tay.
 
 ```
 User        --role-->                 Role
@@ -409,11 +591,13 @@ Asset       --category-->             AssetCategory
 Asset       --department-->           Department
 Asset       --assignedTo/lastInventoryCheckBy/createdBy/updatedBy/deletedBy--> User
 AssetCategory --parentCategory-->     AssetCategory     (self-reference, cây phân cấp)
+AssetCategory --deletedBy-->          User              [SỬA DEV-073] bỏ sót ở bản gốc dù mục 4.14 có liệt kê field này
 
 MedicalDeviceProfile --asset-->       Asset             (1-1, unique index)
 MedicalDeviceProfile --createdBy/updatedBy--> User
 CalibrationRecord    --deviceProfile--> MedicalDeviceProfile
 CalibrationRecord    --recordedBy-->  User
+CalibrationRecord    --certificateFileId--> Upload      [SỬA DEV-073, xem mục 4.16]
 
 AssetAssignmentHistory --asset-->     Asset
 AssetAssignmentHistory --fromDepartment/toDepartment--> Department
@@ -427,6 +611,37 @@ ImportHistory --importedBy-->         User
 RefreshToken/PasswordResetToken --user--> User
 UserAudit    --user/performedBy-->    User
 ApiPerformance --user-->              User
+
+--- [BỔ SUNG DEV-071 — 10 model mới, DEV-057→070] ---
+
+AssetMaintenancePlan --asset-->       Asset
+AssetMaintenancePlan --completedBy/cancelledBy/createdBy/updatedBy--> User
+
+Vendor       --createdBy/updatedBy--> User              [SỬA DEV-073] bản gốc ghi "không có ref ra ngoài" —
+                                                          SAI, mâu thuẫn với chính bảng field ở mục 4.23 (có
+                                                          liệt kê 2 field này); Vendor vẫn chủ yếu là model
+                                                          BỊ tham chiếu (từ Contract), chỉ KHÔNG tự tham chiếu
+Contract     --vendor-->              Vendor
+Contract     --assets[]-->            Asset             (many-to-many)
+Contract     --cancelledBy/createdBy/updatedBy--> User
+
+ConsumableCategory --parentCategory--> ConsumableCategory (self-reference, cây phân cấp)
+ConsumableCategory --deletedBy-->     User
+ConsumableItem --category-->          ConsumableCategory
+ConsumableItem --department-->        Department
+ConsumableItem --createdBy/updatedBy--> User
+ConsumableRequest --department-->     Department
+ConsumableRequest.items[].consumableItem --> ConsumableItem  (embedded array field)
+ConsumableRequest --createdBy/updatedBy--> User
+ConsumableTransaction --consumableItem--> ConsumableItem
+ConsumableTransaction --performedBy--> User
+
+TwoFactorOtp --user-->                User
+
+DocumentPdfExport --document-->       Document
+DocumentPdfExport --exportedBy-->     User
+DocumentVersion --document-->         Document
+DocumentVersion --editedBy-->         User
 ```
 
 ### 6.1 Phân loại quan hệ (CONFIRMED từ schema)
@@ -435,9 +650,9 @@ ApiPerformance --user-->              User
 |---|---|
 | One-to-one (qua unique index) | `MedicalDeviceProfile.asset → Asset` |
 | One-to-many (reference, không embed) | `Document.department`, `Asset.category`, `Notification.recipient`, phần lớn còn lại |
-| Many-to-many (qua mảng ObjectId) | `Role.permissions[]`, `User.extraPermissions[]/denyPermissions[]` |
-| Self-reference | `Document.referenceTo[]`, `AssetCategory.parentCategory` |
-| Embedded subdocument (không phải collection riêng) | `WorkflowInstance.steps[]`, `WorkflowTemplate.steps[]`, `Document.signedBy[]`, `ImportHistory.errors[]` |
+| Many-to-many (qua mảng ObjectId) | `Role.permissions[]`, `User.extraPermissions[]/denyPermissions[]`, **[MỚI DEV-071]** `Contract.assets[]` |
+| Self-reference | `Document.referenceTo[]`, `AssetCategory.parentCategory`, **[MỚI DEV-071]** `ConsumableCategory.parentCategory` |
+| Embedded subdocument (không phải collection riêng) | `WorkflowInstance.steps[]`, `WorkflowTemplate.steps[]`, `Document.signedBy[]`, `ImportHistory.errors[]`, **[MỚI DEV-071]** `ConsumableRequest.items[]` |
 | Polymorphic reference thủ công | `Notification.resourceId` + `resourceType` |
 | "Soft FK" bằng String (không phải ObjectId) | `WorkflowInstance/WorkflowTemplate.steps[].role`, `CalibrationRecord.calibratedBy` |
 
@@ -613,8 +828,24 @@ Phase 02/03 chỉ nêu 2 flow (Document tạo mới, Workflow approve). Grep tr�
 | Upload | ❌ **KHÔNG CÓ** | — |
 | ApiPerformance | ✅ | endpoint, createdAt, TTL 30 ngày |
 | ImportHistory | ✅ | importedBy+createdAt, createdAt |
+| **[MỚI DEV-071]** AssetMaintenancePlan | ✅ | asset+scheduledDate, scheduledDate+status |
+| **[MỚI DEV-071]** Vendor | ✅ | name, isActive |
+| **[MỚI DEV-071]** Contract | ✅ | vendor+createdAt, assets, status+endDate+expiryAlertSentAt |
+| **[MỚI DEV-071]** ConsumableCategory | ✅ | unique code, parentCategory (hơn `AssetCategory`, mục 4.14) |
+| **[MỚI DEV-071]** ConsumableItem | ✅ | unique compound department+name, department+isActive, category |
+| **[MỚI DEV-071]** ConsumableRequest | ✅ | department+requestMonth, status |
+| **[MỚI DEV-071]** ConsumableTransaction | ✅ | consumableItem+createdAt |
+| **[MỚI DEV-071]** TwoFactorOtp | ✅ | unique-ish user+createdAt, TTL expiresAt |
+| **[MỚI DEV-071]** DocumentPdfExport | ✅ | document+createdAt |
+| **[MỚI DEV-071]** DocumentVersion | ✅ | document+versionNumber |
 
-**Tổng kết OBSERVED**: 6/21 model không có bất kỳ index bổ sung nào ngoài `_id` (`RefreshToken`, `Role`, `Permission`, `Policy`, `WorkflowTemplate`, `WorkflowInstance`, `Upload` — thực tế 7/21). Trong đó `RefreshToken`, `Policy`, `WorkflowInstance` có evidence trực tiếp bị query theo field không có index ở tần suất cao (login/refresh/logout, ABAC fallback, hộp thư chờ duyệt).
+**Tổng kết OBSERVED (SỬA DEV-071 — mẫu số đổi 21→31, tử số KHÔNG đổi)**: **7/31 model** không có bất kỳ
+index bổ sung nào ngoài `_id` (`RefreshToken`, `Role`, `Permission`, `Policy`, `WorkflowTemplate`,
+`WorkflowInstance`, `Upload` — cả 7 đều nằm trong nhóm 21 model gốc). **Cả 10 model mới (DEV-057→070) đều
+CÓ index bổ sung** — không model nào trong nhóm mới thuộc diện "không có index ngoài `_id`", khác biệt rõ so
+với nhóm 21 model gốc (tỷ lệ thiếu index giảm từ 7/21 ≈ 33% xuống 7/31 ≈ 23%). Trong đó `RefreshToken`,
+`Policy`, `WorkflowInstance` có evidence trực tiếp bị query theo field không có index ở tần suất cao
+(login/refresh/logout, ABAC fallback, hộp thư chờ duyệt).
 
 ---
 
@@ -622,7 +853,7 @@ Phase 02/03 chỉ nêu 2 flow (Document tạo mới, Workflow approve). Grep tr�
 
 | Tầng | Cơ chế | Phạm vi |
 |---|---|---|
-| Schema (Mongoose) | `required`, `enum`, `unique`, `min`, `trim`, `uppercase`, `lowercase`, `sparse` | Shape cơ bản + 1 số ràng buộc giá trị (enum, min). KHÔNG có custom validator function nào (`grep "validate:"` trong `models/` — cần xác nhận thêm nếu cần, chưa thấy trong các file đã đọc). |
+| Schema (Mongoose) | `required`, `enum`, `unique`, `min`, `trim`, `uppercase`, `lowercase`, `sparse` | Shape cơ bản + 1 số ràng buộc giá trị (enum, min). **[SỬA DEV-071]** Claim gốc "KHÔNG có custom validator function nào" KHÔNG còn đúng — `ConsumableRequest.items` (mục 4.27) có 1 custom `validate:` function chặn mảng rỗng (`items.length>0`), thêm từ `DEV-067`. Vẫn là NGOẠI LỆ DUY NHẤT đã xác nhận (không thấy thêm nơi nào khác trong 10 model mới đọc ở DEV-071). |
 | DTO (Zod) | `dto/<domain>/*.dto.ts`, middleware `validateBody/Params/Query` | Shape đầy đủ hơn schema (type coercion, custom rule Zod) — chạy TRƯỚC khi vào Service. Đã ghi nhận Phase 03: một số route bị comment out `validateQuery` (`GET /documents`, `GET /workflows/pending`). |
 | Service (validator riêng) | `documents.validator.ts` và tương đương ở domain khác | Rule phụ thuộc dữ liệu DB (vd `referenceTo` phải cùng `department`, Role phải tồn tại khi tạo WorkflowTemplate) — Zod/Schema không làm được vì cần query DB. |
 
@@ -733,9 +964,12 @@ Input: workflowId, userId, userRole, comment
 - Chi tiết `bulkWrite` trong `excel.service.ts` (câu lệnh cụ thể, có transaction bao ngoài đúng cách hay không ngoài đoạn đã xác nhận ở dòng ~512).
 - Có cron/script nào dọn `RefreshToken` hết hạn/revoked hay không (không thấy trong `shared/cron/` ở các phase trước, nhưng `shared/cron/` chưa được đọc toàn bộ file-by-file ở phase nào).
 - Xử lý `VersionError` (Mongoose optimistic concurrency) quanh `approveStep` — có bắt riêng để retry hay để lỗi ném thẳng ra `error.middleware.ts`.
-- Custom validator function (`validate:` option) ở tầng Mongoose schema — chưa grep xác nhận có/không trong toàn bộ `models/`.
+- ~~Custom validator function (`validate:` option) ở tầng Mongoose schema — chưa grep xác nhận có/không trong toàn bộ `models/`~~ — **[RESOLVED DEV-071]** CONFIRMED có 1 nơi: `ConsumableRequest.items` (mục 4.27, Mục 5).
 - Guard cụ thể trước khi `policy.deleteOne()` trong `rbac.service.ts` (có check Policy đang được dùng ở đâu không, vì Policy không có "consumer" rõ ràng như Role/Permission).
 - Asset soft-delete (`deleteAssetService`) — câu lệnh Mongo cụ thể chưa đọc trực tiếp (chỉ suy luận từ comment ở hard-delete).
+- **[MỚI DEV-071]** Thuật toán cụ thể dùng để sinh `DocumentPdfExport.contentHash`/`signature` (tên hàm hash/sign, có phải HMAC hay chỉ SHA-256 thuần) — chưa đọc `documentPdfExport.service.ts`/util liên quan.
+- **[MỚI DEV-071]** `TwoFactorOtp.attempts` — giới hạn số lần thử sai tối đa được enforce ở tầng nào (Service hay chỉ đếm mà không chặn) — chưa đọc `auths.service.ts` phần xác thực OTP.
+- **[MỚI DEV-071]** Nội dung cụ thể `shared/cron/contractAlerts.cron.ts`/`consumableAlerts.cron.ts` (tần suất chạy, logic set `expiryAlertSentAt`/`lowStockAlertSentAt`) — chỉ xác nhận 2 file này TỒN TẠI (grep), chưa đọc nội dung.
 
 ---
 

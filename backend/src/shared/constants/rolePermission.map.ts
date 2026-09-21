@@ -162,6 +162,12 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.EXCEL_DEPARTMENT_SYNC,
     PERMISSIONS.DOCUMENT_EXCEL_HISTORY,
 
+    // DEV-072 (2026-09-21) — trang "System Design" (bản đồ kiến trúc/module
+    // nội bộ). IT là role kỹ thuật DUY NHẤT trong 6 role hiện có (không có
+    // role "DEV" riêng) — gần nghĩa "dev" nhất để tra cứu kiến trúc hệ
+    // thống. ADMIN có sẵn qua wildcard `Object.values(PERMISSIONS)` ở đầu
+    // file, không cần liệt kê lại.
+    PERMISSIONS.SYSTEM_DESIGN_VIEW,
   ],
   
   //Nơi cấp quyền nếu token trả về role check đk trong này

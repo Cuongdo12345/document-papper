@@ -127,6 +127,17 @@ export const PERMISSIONS = {
   // SYSTEM
   SYSTEM_SETTING: "SYSTEM_SETTING",
   SYSTEM_ADMIN: "SYSTEM_ADMIN",
+  // DEV-072 (2026-09-21) — trang nội bộ "System Design" (bản đồ module +
+  // quan hệ dữ liệu, sinh từ docs/04_DATABASE_ANALYSIS.md +
+  // docs/02_ARCHITECTURE.md), CHỈ dev/admin dùng để tra cứu kiến trúc, không
+  // liên quan nghiệp vụ người dùng cuối — cùng nhóm SYSTEM_* ở trên. KHÔNG
+  // có route backend nào đọc permission này (trang FE thuần tĩnh, dữ liệu
+  // bundle sẵn trong FE, không gọi API) — permission chỉ dùng để gate
+  // hiển thị route/nav ở FE (ProtectedRoute + PermissionGuard), CHƯA có
+  // route backend cần bảo vệ (không có "Security impact" backend nào để
+  // verify 401/403 — khác các permission mới khác ở CLAUDE.md §18, vì
+  // KHÔNG có route mới nào được thêm).
+  SYSTEM_DESIGN_VIEW: "SYSTEM_DESIGN_VIEW",
 
   // DASHBOARD
   // ⚠️ MỚI: `routes/dashboard/dashboard.route.ts` (10 route) dùng

@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { LayoutDashboard, FileText, ClipboardCheck, Boxes, Users, Building2, ShieldCheck, ScrollText, Bell, Paperclip, Package, Handshake, FileSignature, Laptop } from "lucide-react";
+import { LayoutDashboard, FileText, ClipboardCheck, Boxes, Users, Building2, ShieldCheck, ScrollText, Bell, Paperclip, Package, Handshake, FileSignature, Laptop, Network } from "lucide-react";
 import { PERMISSIONS, type Permission } from "@/constants/permissions";
 
 export interface NavItem {
@@ -116,4 +116,11 @@ export const NAV_ITEMS: NavItem[] = [
   // `group: "Quản trị hệ thống"` theo chỉ định trực tiếp của user — KHÔNG
   // đổi path/permission.
   { label: "Tệp tin", path: "/app/files", icon: Paperclip, permission: PERMISSIONS.VIEW_FILES, group: "Quản trị hệ thống" },
+  // DEV-072/FE-23 (2026-09-21) — "System Design": bản đồ module + quan hệ dữ
+  // liệu nội bộ, CHỈ dev/admin (permission mới `SYSTEM_DESIGN_VIEW`, gán cho
+  // IT — role kỹ thuật gần nghĩa "dev" nhất trong 6 role hiện có; ADMIN có
+  // qua wildcard). Đặt CUỐI dãy liền kề "Quản trị hệ thống" (yêu cầu user:
+  // xếp vào nhóm này) — không chèn giữa để tránh xáo trộn thứ tự FE-22 vừa
+  // chỉnh.
+  { label: "System Design", path: "/app/system-design", icon: Network, permission: PERMISSIONS.SYSTEM_DESIGN_VIEW, group: "Quản trị hệ thống" },
 ];

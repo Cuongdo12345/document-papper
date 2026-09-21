@@ -90,9 +90,19 @@ Danh sách route mount (`app.ts`):
 | `/api/notifications` | `routes/notifications/notification.routes.ts` |
 | `/api/assets/asset-categories` | `routes/assets/assetCategory.routes.ts` |
 | `/api/assets/medical-devices` | `routes/assets/medicalDevice.routes.ts` |
+| `/api/assets/maintenance-plans` | `routes/assets/assetMaintenancePlan.routes.ts` **[BỔ SUNG DEV-071]** — Roadmap B2, `DEV-071` phát hiện thiếu khỏi bảng này |
 | `/api/assets` | `routes/assets/asset.routes.ts` |
+| `/api/inventory` | `routes/inventory/*.routes.ts` **[BỔ SUNG DEV-071]** — Roadmap B3/B8 (Vật tư tiêu hao + đề xuất mua) |
+| `/api/vendors` | `routes/vendors/vendor.routes.ts` **[BỔ SUNG DEV-071]** — Roadmap B4 |
+| `/api/contracts` | `routes/vendors/contract.routes.ts` **[BỔ SUNG DEV-071]** — Roadmap B4 |
 
-Lưu ý thứ tự mount: `/api/assets/asset-categories` và `/api/assets/medical-devices` được mount **trước** `/api/assets` — bắt buộc, nếu không Express sẽ khớp nhầm các path con này vào router `assetRoutes` tổng quát hơn.
+Lưu ý thứ tự mount: `/api/assets/asset-categories`, `/api/assets/medical-devices`, `/api/assets/maintenance-plans` được mount **trước** `/api/assets` — bắt buộc, nếu không Express sẽ khớp nhầm các path con này vào router `assetRoutes` tổng quát hơn.
+
+**[CẬP NHẬT DEV-071, 2026-09-21]** Bảng trên đã lỗi thời (dừng ở 15 route file/13 prefix cũ) — đối chiếu
+lại trực tiếp `app.ts` xác nhận đủ. Không thấy mount riêng cho 2FA (`TwoFactorOtp`)/Xuất PDF
+(`DocumentPdfExport`)/Lịch sử phiên bản (`DocumentVersion`) — INFERRED 3 domain này là sub-route lồng trong
+`/api/auths` và `/api/documents` sẵn có (chưa đọc trực tiếp file route để xác nhận endpoint cụ thể, để dành
+phase sau nếu cần).
 
 ### 3.3 Layer trong mỗi domain
 
@@ -131,16 +141,20 @@ Pattern này lặp lại (với mức độ tách file khác nhau) ở các doma
 - **Pool**: `maxPoolSize` (mặc định 20, qua `MONGO_MAX_POOL_SIZE`), `minPoolSize` (mặc định 2, qua `MONGO_MIN_POOL_SIZE`).
 - **Transaction**: dùng multi-document ACID transaction của MongoDB (`mongoose.startSession()` + `session.withTransaction()`), áp dụng cho các chuỗi ghi ảnh hưởng ≥2 collection (vd tạo `Document` + `UserAudit`; tạo `WorkflowInstance` + update `Document`). **Điều kiện bắt buộc: MongoDB phải chạy dạng replica set** — đây là một ràng buộc hạ tầng quan trọng, không thấy có xác nhận trong `.env`/docs là môi trường thực tế đã đáp ứng điều kiện này hay chưa (cần xác minh ở phase Deployment/Infra).
 - **Không có sharding, không có cấu hình đọc/ghi tách biệt (read replica) trong code.**
-- **21 Mongoose model**, tổ chức theo thư mục con domain trong `src/models/`:
+- **31 Mongoose model** (CẬP NHẬT DEV-071, 2026-09-21 — trước ghi "21", lỗi thời từ `DEV-057`→`070`, xem
+  `docs/04_DATABASE_ANALYSIS.md` Mục 4 để biết chi tiết schema/index/quan hệ đầy đủ của 10 model mới), tổ
+  chức theo thư mục con domain trong `src/models/`:
 
 | Domain | Models |
 |---|---|
 | Users | `user.model.ts`, `userAudit.model.ts` |
-| Auth | `refreshToken.model.ts`, `passwordResetToken.model.ts` |
+| Auth | `refreshToken.model.ts`, `passwordResetToken.model.ts`, `twoFactorOtp.model.ts` **[MỚI DEV-071]** |
 | RBAC | `role.model.ts`, `permission.model.ts`, `policy.model.ts` |
 | Departments | `department.model.ts` |
-| Documents | `document.model.ts`, `workflowTemplate.model.ts`, `workflowInstance.model.ts`, `counter.model.ts` |
-| Assets | `asset.model.ts`, `assetCategory.model.ts`, `assetAssignmentHistory.model.ts`, `medicalDeviceProfile.model.ts`, `calibrationRecord.model.ts` |
+| Documents | `document.model.ts`, `workflowTemplate.model.ts`, `workflowInstance.model.ts`, `counter.model.ts`, `documentPdfExport.model.ts` **[MỚI DEV-071]**, `documentVersion.model.ts` **[MỚI DEV-071]** |
+| Assets | `asset.model.ts`, `assetCategory.model.ts`, `assetAssignmentHistory.model.ts`, `medicalDeviceProfile.model.ts`, `calibrationRecord.model.ts`, `assetMaintenancePlan.model.ts` **[MỚI DEV-071]** |
+| Vendors **[MỚI DEV-071]** | `vendor.model.ts`, `contract.model.ts` |
+| Inventory **[MỚI DEV-071]** | `consumableCategory.model.ts`, `consumableItem.model.ts`, `consumableRequest.model.ts`, `consumableTransaction.model.ts` |
 | Notifications | `notification.model.ts` |
 | Upload | `upload.model.ts` |
 | Performance | `apiPerformance.model.ts` |
@@ -267,6 +281,17 @@ Excel     ──▶ Departments, ImportAudit, (+ domain đang export tuỳ endpo
 Cron (assetAlerts, medicalDeviceAlerts) ──▶ Assets, Notifications
               (assetAlerts.service.ts / medicalDeviceAlerts tương tự kiểm tra Asset sắp hết hạn
                bảo hành/kiểm định rồi gửi Notification)
+
+Cron (contractAlerts) ──▶ Vendors, Notifications  [MỚI DEV-071]
+              (shared/cron/contractAlerts.cron.ts — CONFIRMED file tồn tại qua grep, cùng pattern
+               assetAlerts/medicalDeviceAlerts: quét Contract sắp hết hạn (status+endDate+
+               expiryAlertSentAt, xem docs/04_DATABASE_ANALYSIS.md mục 4.24) rồi gửi Notification —
+               nội dung cron CHƯA đọc chi tiết ở DEV-071, chỉ xác nhận sự tồn tại)
+
+Cron (consumableAlerts) ──▶ Inventory, Notifications  [MỚI DEV-071]
+              (shared/cron/consumableAlerts.cron.ts — CONFIRMED file tồn tại qua grep, cùng pattern
+               trên: quét ConsumableItem sắp hết tồn kho (quantityOnHand ≤ minStockThreshold,
+               lowStockAlertSentAt) rồi gửi Notification — nội dung cron CHƯA đọc chi tiết)
 
 Middlewares (authorizePermission) ──▶ RBAC (Policy, permission.cache) + Users (UserAudit)
 ```

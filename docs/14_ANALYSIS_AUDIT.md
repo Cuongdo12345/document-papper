@@ -98,7 +98,7 @@ PROJECT_MEMORY (đã đọc đầy đủ, nhiều lần trong session)
 
 | Kết luận Phase 04 | Trạng thái | Evidence |
 |---|---|---|
-| 7/21 model không có index ngoài `_id` (`RefreshToken`, `Role`, `Permission`, `Policy`, `WorkflowTemplate`, `WorkflowInstance`, `Upload`) | **CONFIRMED, không đổi** | RV05-08 xác nhận lại `WorkflowInstance`; không có module review nào phát hiện index mới được thêm |
+| 7/21 model không có index ngoài `_id` (`RefreshToken`, `Role`, `Permission`, `Policy`, `WorkflowTemplate`, `WorkflowInstance`, `Upload`) | **CONFIRMED tại thời điểm audit này, không đổi**; **[CẬP NHẬT DEV-071, 2026-09-21]** tổng model nay là 31 (không phải 21) — danh sách 7 model KHÔNG đổi, tỷ lệ thực tế nay 7/31, xem `docs/04_DATABASE_ANALYSIS.md` | RV05-08 xác nhận lại `WorkflowInstance`; không có module review nào phát hiện index mới được thêm |
 | `WorkflowInstance` là risk cao nhất (COLLSCAN qua `$expr`) | **CONFIRMED, không đổi** | RV05-08 (REVIEW-05) |
 | 2 lỗ hổng hard-delete không check tham chiếu ngược (Document→month-delete, Asset→relatedAsset) | **CONFIRMED, MỞ RỘNG PHẠM VI đáng kể** | Phase 04 chỉ ghi nhận 2 vị trí — `16_DATABASE_CROSS_DOMAIN_REVIEW.md` (RV16-01) phát hiện THÊM 1 chuỗi tham chiếu 2 tầng chưa từng biết (`MedicalDeviceProfile`→`CalibrationRecord`), NGHIÊM TRỌNG HƠN 2 vị trí cũ vì không có bất kỳ đường dọn nào (kể cả thủ công qua API) |
 | Transaction yêu cầu MongoDB replica set, chưa xác minh môi trường thật | **UNKNOWN, không đổi** | Không module review nào xác minh được hạ tầng thật — vẫn đúng nguyên trạng thái Phase 02/04 |

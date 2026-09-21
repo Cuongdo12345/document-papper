@@ -25,6 +25,7 @@ import assetRoutes from "./routes/assets/asset.routes";
 import inventoryRoutes from "./routes/inventory/inventory.routes";
 import vendorRoutes from "./routes/vendors/vendor.routes";
 import contractRoutes from "./routes/vendors/contract.routes";
+import systemDesignRoutes from "./routes/systemDesign/systemDesign.routes";
 
 import { performanceMiddleware } from "./middlewares/performance.middleware";
 import { errorHandler } from "./middlewares/error.middleware";
@@ -133,6 +134,7 @@ app.use("/api/inventory", inventoryRoutes)
 // khác trùng/lồng nhau cần quan tâm thứ tự mount.
 app.use("/api/vendors", vendorRoutes)
 app.use("/api/contracts", contractRoutes)
+app.use("/api/system-design", systemDesignRoutes)
 
 /* ===============================
    ❌ GLOBAL ERROR HANDLER
