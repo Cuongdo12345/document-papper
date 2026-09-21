@@ -54,7 +54,10 @@ export function WorkflowActionModal({
           </Button>
           <Button
             type="button"
-            variant={danger ? "destructive" : "primary"}
+            // FE-19 (UI_DESIGN_SYSTEM.md Mục 2) — cùng lý do `ConfirmDialog.tsx`:
+            // `primary` chỉ dành cho ĐÚNG 1 CTA chính/trang, các action workflow
+            // không-phá-huỷ (Duyệt/Hoàn tất...) không nên mặc định trùng màu.
+            variant={danger ? "destructive" : "secondary"}
             size="sm"
             loading={isLoading}
             disabled={confirmDisabled}

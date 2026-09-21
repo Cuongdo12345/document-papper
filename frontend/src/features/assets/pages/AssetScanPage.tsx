@@ -93,7 +93,10 @@ export function AssetScanPage() {
           aria-label="Mã tài sản"
           className="flex-1 rounded-md border border-input bg-background px-3 py-3 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
-        <Button type="submit" loading={lookupMutation.isPending} disabled={!code.trim()}>
+        {/* FE-19 — "Xác nhận đã thấy tài sản" (bên dưới, sau khi tìm thấy) mới
+            là hành động cốt lõi của trang (kiểm kê); "Tra cứu" chỉ là bước tìm
+            trước đó nên hạ xuống secondary, tránh 2 primary cùng hiện đồng thời. */}
+        <Button type="submit" variant="secondary" loading={lookupMutation.isPending} disabled={!code.trim()}>
           <ScanLine /> Tra cứu
         </Button>
       </form>

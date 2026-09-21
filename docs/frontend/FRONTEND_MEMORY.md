@@ -8,7 +8,7 @@
 
 - **Frontend CHƯA TỒN TẠI trên đĩa** — chưa có thư mục `frontend/`, chưa cài dependency nào, chưa viết dòng code FE nào.
 - Đã hoàn thành: **UI-00** (phân tích + lập roadmap ban đầu) và **Frontend Knowledge Base task hiện tại** (bộ 13 tài liệu `docs/frontend/`) — cả 2 đều CHỈ phân tích/tài liệu, KHÔNG code.
-- **Ghi chú lịch sử**: 4 file tạo ở UI-00 (`00_FRONTEND_ROADMAP.md`, `UI_DESIGN_SYSTEM.md`, `API_LAYER_SPEC.md`, `FRONTEND_MEMORY.md` bản cũ) đã bị **user chủ động xoá** để làm lại phân tích từ đầu (xác nhận trực tiếp từ user) — không phải sự cố/lỗi hệ thống. Nội dung của 4 file đó (roadmap FE-00→18, design token màu/typography) **KHÔNG nằm trong bộ tài liệu hiện tại** (phạm vi task Frontend Knowledge Base không yêu cầu 2 loại tài liệu này) — **nếu cần roadmap theo giai đoạn (FE-00→FE-18) hoặc design system (màu/typography/component visual spec), cần yêu cầu 1 task riêng**, không tự suy đoán đã tồn tại.
+- **Ghi chú lịch sử**: 4 file tạo ở UI-00 (00_FRONTEND_ROADMAP.md, UI_DESIGN_SYSTEM.md, API_LAYER_SPEC.md, FRONTEND_MEMORY.md bản cũ) đã bị user chủ động xoá để làm lại phân tích từ đầu (xác nhận trực tiếp từ user) — không phải sự cố/lỗi hệ thống. Nội dung của 4 file đó (roadmap FE-00→18, design token màu/typography) KHÔNG nằm trong bộ tài liệu hiện tại (phạm vi task Frontend Knowledge Base không yêu cầu 2 loại tài liệu này) — nếu cần roadmap theo giai đoạn (FE-00→FE-18) hoặc design system (màu/typography/component visual spec), cần yêu cầu 1 task riêng, không tự suy đoán đã tồn tại.
 - Backend: 25/25 development task DONE, xem `docs/30_DEVELOPMENT_COMPLETION_AUDIT.md` (kết luận: DEVELOPMENT COMPLETE WITH OPEN RISKS).
 - **FE FOUNDATION SPECIFICATION hoàn thành** (`FE_FOUNDATION_SPEC.md`) — cầu nối chính thức KB → coding contract (stack/folder/API layer/response normalization/error/auth/RBAC/routing/state/React Query/TypeScript/forms/UI/table/filter/upload/dashboard/notification/security/env/naming/coding rules/testing/observability/DoD).
 - **FE-00 — Frontend Project Bootstrap: DONE (2026-09-05)**. Foundation ban đầu (axios/authStore/router/Tailwind+shadcn cơ bản) — xem lịch sử ở `docs/frontend/tasks/FE-00.md`.
@@ -223,6 +223,134 @@ Xem đầy đủ `docs/30_DEVELOPMENT_COMPLETION_AUDIT.md` Mục 8-9. Đáng ch�
 - `docs/development/tasks/DEV-055.md` — Feature Roadmap B2: Lịch bảo trì chủ động — domain mới `AssetMaintenancePlan` (ĐỘC LẬP với luồng PROPOSE_REPAIR phản ứng), CRUD + `GET /assets/maintenance-plans/calendar`, permission mới `ASSET_MAINTENANCE_PLAN_VIEW/CREATE/UPDATE` (IT + PHONG_VAT_TU_TTB), UI: section trong `AssetDetailPage` + trang mới `/app/assets/maintenance-calendar` (lưới CSS Grid tự viết, không thêm thư viện) (DONE 2026-09-15). **ĐÃ chạy `seed-rbac.ts`** (user xác nhận) — vẫn cần gán tay qua UI "Phân quyền" cho IT/PHONG_VAT_TU_TTB.
 - `docs/development/tasks/DEV-056.md` — Feature Roadmap B3: Quản lý vật tư tiêu hao (Inventory/Consumables) — module hoàn toàn mới, tách biệt `Asset`. 2 model mới `ConsumableItem` (tồn kho theo item+department) + `ConsumableTransaction` (giao dịch nhập/xuất BẤT BIẾN, `quantityOnHand` là running balance cập nhật atomic trong Mongo transaction). API `/api/inventory/*`, permission mới `CONSUMABLE_VIEW/CREATE/UPDATE/TRANSACTION_CREATE/ALERTS_TRIGGER` (IT+PHONG_VAT_TU_TTB đủ cả 5, USER chỉ VIEW). Cảnh báo tồn kho thấp: cron 08:15 hằng ngày (mirror `assetAlerts.service.ts`). UI: mục sidebar riêng "Vật tư tiêu hao" — `ConsumablesListPage` (`/app/inventory`) + `ConsumableDetailPage` (`/app/inventory/:id`, nhập/xuất kho + lịch sử giao dịch) (DONE 2026-09-15). **ĐÃ chạy `seed-rbac.ts`** (user xác nhận) — vẫn cần gán tay qua UI "Phân quyền" cho IT/PHONG_VAT_TU_TTB.
 - `docs/development/tasks/DEV-057.md` — Feature Roadmap B4: Quản lý nhà cung cấp & hợp đồng bảo trì (Vendor & Contract Management) — module hoàn toàn mới, KHÔNG nhồi field vào `Asset`. 2 model mới `Vendor` + `Contract` (`assets: ObjectId[]` nhúng trực tiếp — 1 hợp đồng ↔ NHIỀU tài sản, KHÔNG collection trung gian riêng). API `/api/vendors/*` + `/api/contracts/*`, permission mới `VENDOR_VIEW/CREATE/UPDATE` + `CONTRACT_VIEW/CREATE/UPDATE/ALERTS_TRIGGER` (IT+PHONG_VAT_TU_TTB đủ cả 7, USER chỉ VIEW cả 2). Cảnh báo hợp đồng sắp hết hạn: cron 08:20 hằng ngày, CHỈ gửi role PHONG_VAT_TU_TTB (không broadcast theo phòng ban, khác B3). UI: 2 mục sidebar riêng "Nhà cung cấp" (`/app/vendors`) + "Hợp đồng bảo trì" (`/app/contracts`), component mới `AssetMultiPicker` (chọn nhiều asset, KHÔNG sửa `AssetPicker` có sẵn), section CHỈ ĐỌC "Hợp đồng bảo trì" mới trong `AssetDetailPage` (DONE 2026-09-16). **ĐÃ chạy `seed-rbac.ts`** (user xác nhận) — vẫn cần gán tay qua UI "Phân quyền" cho IT/PHONG_VAT_TU_TTB.
+- **[CẬP NHẬT 2026-09-19]** Changelog phía trên dừng ở `DEV-057` — các task `DEV-058`→`070` (bao gồm
+  `DEV-064`→`070` là Roadmap B5-C3) chưa được ghi nhận ở đây (chỉ có trong `docs/00_PROJECT_MEMORY.md`/
+  `CLAUDE.md` §41/từng file `DEV-0XX.md` riêng) — ghi nhận gap này thay vì âm thầm bỏ qua, KHÔNG backfill
+  toàn bộ trong task này (ngoài phạm vi FE-17).
+- `docs/frontend/tasks/FE-17.md` — Hạ tầng test WCAG AA contrast (`@axe-core/playwright`) + visual
+  regression snapshot (`@playwright/test`) cho 4 màn đại diện (Dashboard/`UsersListPage`/
+  `ResetPasswordModal`/`UserFormDrawer`) — CHỈ hạ tầng, KHÔNG đổi UI (`UI_DESIGN_SYSTEM.md` Mục 6). Backend
+  bootstrap riêng (`startPlaywrightServer.ts`, tái dùng hạ tầng E2E DEV-048) + 2 `webServer` port riêng
+  (4100/4173, tránh đụng dev server thật). Phát hiện + sửa 2 bug hạ tầng: `ts-node` cần cờ `--files` mới
+  nạp được ambient type `express.d.ts`; `vitest` mặc định nhặt nhầm file `*.spec.ts` của Playwright, phải
+  `exclude: ["e2e/**"]` tường minh. **Finding thật CHƯA sửa** (đúng phạm vi được giao): `StatusBadge`
+  variant `success` ("Hoạt động") có contrast 3.24:1, dưới ngưỡng AA 4.5:1 — CONFIRMED bằng axe-core, việc
+  sửa thuộc `UI_DESIGN_SYSTEM.md` Mục 2 (còn PROPOSAL, chưa duyệt) (DONE — hạ tầng, 2026-09-19).
+- `docs/frontend/tasks/FE-18.md` — Phân cấp thị giác (`UI_DESIGN_SYSTEM.md` Mục 3/4), THÍ ĐIỂM CHỈ
+  `DashboardPage` tab "Tổng quan" (KHÔNG rollout 2 tab "Tài sản"/"Thiết bị y tế" cùng trang, KHÔNG đụng
+  trang nào khác — Pass 3 CHƯA bắt đầu). `KpiCard.tsx` thêm `size?:"default"|"display"` (mặc định giữ
+  NGUYÊN, `AuditStatsTab.tsx` không đổi gì); `DashboardSummaryLayout.tsx` tách 1 KPI chính ("Tổng tài
+  liệu", `size="display"`, `text-4xl/700`) đứng riêng + 4 KPI phụ gộp 1 khối `bg-muted`, divider CHỈ ở
+  ranh giới nhóm dữ liệu thật ("documents": Đề xuất/Báo cáo vs "org": Khoa/Phòng/Người dùng — field `group`
+  mới, caller khai báo tường minh). Tự chụp màn hình qua Playwright để xem trước khi cập nhật baseline
+  chính thức — xác nhận đúng ý đồ thiết kế (desktop lẫn mobile 390px). Chạy lại hạ tầng FE-17: Dashboard
+  a11y PASS (không phát sinh violation mới), 3 màn còn lại vẫn cùng 1 finding cũ (không liên quan), visual
+  baseline Dashboard cập nhật CHỦ Ý, 3 baseline còn lại KHÔNG đổi (xác nhận đúng phạm vi) (DONE — thí
+  điểm, CHỜ user duyệt trước Pass 3, 2026-09-19).
+- `docs/frontend/tasks/FE-19.md` — Audit `--primary` cho >1 action/trang (`UI_DESIGN_SYSTEM.md` Mục 2),
+  2 phase. **Phase 1 (2026-09-19)**: audit **23/36 trang VI PHẠM** (số liệu sửa lại 2026-09-20 — bản đầu
+  ghi nhầm 26, do chép nguyên dòng tổng kết sai của agent audit không khớp bảng chi tiết của chính nó, rút
+  kinh nghiệm CLAUDE.md §34 luôn tự cộng lại evidence, không tin số tổng kết của agent). Root cause chính:
+  `ConfirmDialog`/`WorkflowActionModal` mặc định `variant="primary"` khi không truyền `danger`, khiến xác
+  nhận không-phá-huỷ (Khôi phục/Hoàn tất...) trùng trọng lượng thị giác với CTA chính của trang. Phần
+  active-state Sidebar/AppLayout (được phép sửa luôn theo yêu cầu) hoá ra KHÔNG cần sửa: `Sidebar.tsx` đã
+  dùng `bg-sidebar-accent` (giá trị OKLCH giống hệt `--accent`), không phải `--primary` — giả định gốc
+  trong `UI_DESIGN_SYSTEM.md` Mục 2 sai so với source, đính chính tại chỗ, không tạo diff giả. **Phase 2
+  (2026-09-20, theo chỉ định user)**: phân loại lại cả 23 trang xem trang nào CHỈ có Confirm/Workflow (chờ
+  quyết định thủ công) — nhóm đó RỖNG, mọi trang đều có ≥1 tính năng độc lập khác — nên tiến hành đổi
+  default `ConfirmDialog.tsx`/`WorkflowActionModal.tsx` (`primary`→`secondary` khi không `danger`), KHÔNG
+  sửa call site nào ở 23 trang. Verify: tự tạo dữ liệu qua UI thật (không seed DB) cho 3 màn tiêu biểu
+  (`AssetCategoriesListPage`/`VendorsListPage` dùng `ConfirmDialog`, `MaintenanceCalendarPage` dùng
+  `WorkflowActionModal`), chụp Playwright trước/sau, tự xem bằng mắt xác nhận đổi màu đúng — phát hiện đánh
+  đổi cần user biết: nút "Huỷ"/"Xác nhận" giờ cùng màu `secondary`, chỉ phân biệt qua vị trí+nhãn chữ (không
+  tự thêm variant mới ngoài scope). FE-17 regression đầy đủ (a11y+visual) PASS, không có violation/baseline
+  mới nào ngoài finding cũ đã biết (DONE — cả audit lẫn code change, 2026-09-19→20). **Phase 3 (GROUP C, bắt
+  đầu 2026-09-20)**: user yêu cầu xử lý lần lượt 14 trang còn lại (không giải quyết được bằng default ở
+  Phase 2, mỗi trang 1 nguyên nhân riêng), xác nhận từng trang trước khi sang trang kế — cập nhật
+  `SESSION_HANDOFF.md` + memory sau MỖI trang, không chỉ khi xong cả 14 (theo yêu cầu tường minh của user).
+  **#1/14 `AssetDetailPage.tsx` — DONE**: audit gốc ghi "6 nguồn primary" nhưng 4/6 là giả tạo do đếm tĩnh
+  (nút submit của 4 modal loại trừ lẫn nhau — KHÔNG sửa, pattern chuẩn cả app, không bao giờ hiện cùng lúc
+  thật sự); 2 nguồn `WorkflowActionModal` đã tự hết nhờ Phase 2. Vấn đề thật: "Cấp phát" (giữ nguyên
+  primary — CTA chính của trang) hiện ĐỒNG THỜI với 2 nút trong `MedicalDeviceSection.tsx` ("Tạo hồ sơ thiết
+  bị y tế"/"Ghi nhận kiểm định", vô tình mặc định primary) ngay khi tải trang, không cần mở modal. Đã thêm
+  `variant="secondary"` cho 2 nút đó, theo ĐÚNG tiền lệ sẵn có trên chính trang này
+  (`MaintenancePlanHistorySection.tsx` "Lên lịch bảo trì" đã secondary từ trước) — không phải quyết định
+  thiết kế mới. `MedicalDeviceSection.tsx` xác nhận chỉ dùng ở `AssetDetailPage.tsx`. Build/vitest
+  (25/25)/lint PASS, git diff đúng 1 file. **#2/14 `AssetScanPage.tsx` — DONE**: KHÁC #1, đây là vi phạm
+  THẬT (không phải đếm tĩnh giả) — "Tra cứu" (luôn hiện, form tìm kiếm đầu trang) và "Xác nhận đã thấy tài
+  sản" (chỉ hiện sau khi tìm thấy, bên dưới) cùng primary khi tìm thấy tài sản; 0 `ConfirmDialog`/
+  `WorkflowActionModal` liên quan, KHÔNG có tiền lệ nội bộ để tự chọn như #1 (đây là quyết định thiết kế
+  thật, không phải lỗi nhất quán). Đã hỏi user qua `AskUserQuestion` (nêu rõ đánh đổi: hạ "Tra cứu" khiến
+  nút DUY NHẤT lúc trang mới tải kém nổi bật hơn) — user chọn hạ "Tra cứu" xuống `secondary`, giữ "Xác nhận
+  đã thấy tài sản" primary (lý do: đó mới là hành động cốt lõi của trang kiểm kê, "Tra cứu" chỉ là bước tìm
+  trước đó). Build/vitest (25/25)/lint PASS, git diff đúng 1 file. **#3/14 `DepartmentsListPage.tsx` —
+  KHÔNG CÓ GÌ ĐỂ SỬA**: giống hệt tình huống #1 — cái audit gốc gọi "2 tính năng độc lập" (Create/Sync)
+  thực ra là 2 modal loại trừ lẫn nhau (`formState.open`/`syncOpen`, không có code path nào mở cả 2 cùng
+  lúc), header vốn ĐÃ chỉ có 1 primary ("Tạo mới"; "Đồng bộ từ Excel" đã `secondary` sẵn từ trước) — không
+  tạo diff giả (CLAUDE.md §3/§29). **#4/14 `DocumentDetailPage.tsx` — KHÔNG CÓ GÌ ĐỂ SỬA**: audit gốc ghi
+  nhầm header ("Xuất PDF"/"Submit"/"Sửa"/"Khôi phục") là primary — đọc source thật xác nhận CẢ 4 đã
+  `secondary` sẵn; section Workflow chỉ có đúng 1 nguồn primary khả dĩ ("Duyệt"/"Duyệt thay", "Từ chối" là
+  destructive, "Huỷ workflow"/"Đánh dấu hoàn tất" đã secondary); 2 `WorkflowActionModal` không-danger
+  ("Duyệt"/"Hoàn tất") đã tự thành secondary nhờ Phase 2; `SubmitWorkflowModal`/`DocumentEditModal` loại
+  trừ lẫn nhau — cùng pattern false-positive đếm tĩnh như #1/#3. **#5/14 `FilesListPage.tsx` — KHÔNG CÓ GÌ
+  ĐỂ SỬA**: rút ra nguyên tắc chung cho các trang còn lại — phân biệt "trigger+submit CÙNG 1 hành động"
+  (VD "Tải file lên" mở modal → modal có nút "Tải lên" riêng, 2 giai đoạn của CÙNG 1 verb, đúng ví dụ
+  `UI_DESIGN_SYSTEM.md` Mục 2 liệt kê là dùng ĐÚNG — không vi phạm) khác với "2 TÍNH NĂNG khác nhau cùng
+  đòi primary" (VD #1 Cấp phát vs Ghi nhận kiểm định — khác verb/mục đích, MỚI là vi phạm thật cần sửa).
+  **#6→14/14 (9 trang còn lại, hoàn tất 2026-09-20) — TẤT CẢ KHÔNG CÓ GÌ ĐỂ SỬA**: áp tiêu chí cuối cùng —
+  vi phạm thật cần 2+ primary CÙNG hiện TĨNH trên trang (không qua modal, hoặc không bị modal khác che),
+  khác "trigger+submit cùng 1 hành động trong modal" hay "nhiều modal loại trừ lẫn nhau" (không phải vi
+  phạm). Đọc source thật `ConsumableDetailPage`/`ProfilePage`/`PermissionsListPage`/`PoliciesListPage`/
+  `RoleDetailPage`/`RolesListPage`/`UsersListPage`/`ContractDetailPage`/`VendorDetailPage` — mỗi trang ĐÃ
+  chỉ có đúng 1 primary tĩnh (nhiều nút audit gốc ghi "primary" thực ra đã `secondary` sẵn, hoặc 2 tính
+  năng thật nhưng loại trừ lẫn nhau qua modal, giống #1/#3/#4). KHÔNG tạo diff giả cho trang nào.
+
+  **TỔNG KẾT GROUP C (14/14 trang, DONE 2026-09-20)**: chỉ **2/14 trang có vi phạm thật** cần sửa call site
+  — #1 `AssetDetailPage.tsx` (qua `MedicalDeviceSection.tsx`, tự quyết theo tiền lệ nội bộ) và #2
+  `AssetScanPage.tsx` (hỏi user qua `AskUserQuestion` vì không có tiền lệ để tự chọn) — cả 2 ĐÃ sửa. 12/14
+  trang còn lại là false positive của audit gốc (đếm tĩnh JSX không tính React conditional rendering loại
+  trừ lẫn nhau giữa các modal, hoặc nhầm nút submit-trong-modal với trigger-ở-header). **FE-19 DONE HOÀN
+  TOÀN** — Phase 1 (audit+Sidebar) + Phase 2 (đổi default 2 shared component) + Phase 3 (14 trang GROUP C).
+  Chi tiết đầy đủ: `docs/frontend/tasks/FE-19.md`.
+- `docs/frontend/tasks/FE-20.md` — Phân nhóm Sidebar theo domain (yêu cầu trực tiếp từ user kèm ảnh chụp
+  UI hiện tại, KHÔNG thuộc `UI_DESIGN_SYSTEM.md`/roadmap). `NavItem` (`navigation.ts`) thêm `group?:
+  string`, gán 4 nhóm domain thật (Tài liệu / Tài sản & Vật tư / Nhà cung cấp / Quản trị hệ thống) dựa trên
+  comment đã có sẵn trong chính file, KHÔNG đổi path/permission/thứ tự; Tổng quan/Thông báo/Tệp tin đứng
+  riêng đúng lý do comment gốc. `Sidebar.tsx` bọc mỗi mục trong `Fragment`, chèn nhãn nhóm
+  (`text-xs uppercase tracking-wide text-muted-foreground`) đúng ranh giới nhóm trong `visibleItems` (mảng
+  ĐÃ lọc permission, không sắp xếp lại — `NAV_ITEMS` vốn đã liền kề theo domain), ẩn hoàn toàn khi
+  collapsed. Số task: user gọi ban đầu là "FE-22" nhưng không có `FE-20`/`FE-21` nào tồn tại trong repo
+  (trái CLAUDE.md §9 đánh số liên tục) — hỏi lại qua `AskUserQuestion`, xác nhận dùng `FE-20`. Verify: tự
+  chụp Playwright tạm xem đúng ý đồ (expanded có nhãn đúng chỗ, collapsed ẩn nhãn hoàn toàn); build/vitest
+  (25/25)/lint PASS; FE-17 regression đầy đủ — a11y Dashboard PASS (3 màn còn lại vẫn finding cũ), **visual
+  CẢ 4 PASS không cần update baseline** (thay đổi Sidebar nằm trong ngưỡng `maxDiffPixelRatio 0.02`). Ghi
+  nhận (không sửa): "Thông báo"/"Tệp tin" (không group) đứng ngay sau 1 nhóm có nhãn, không có divider tách
+  biệt — CÓ THỂ trông giống thuộc nhóm đó dù logic đúng, ngoài phạm vi yêu cầu gốc nên không tự thêm gì
+  (DONE, 2026-09-20).
+- `docs/frontend/tasks/FE-21.md` — Tiếp nối FE-20 (user xem ảnh, yêu cầu tinh chỉnh): (1) nhãn nhóm to/đậm
+  hơn (`text-xs text-muted-foreground` → `text-sm font-semibold text-sidebar-foreground/70`); (2) accordion
+  THU GỌN/MỞ RIÊNG TỪNG NHÓM (tính năng mới, không phải làm đẹp nút thu gọn sidebar có sẵn) — `buildNavBlocks()`
+  gom `visibleItems` (đã lọc permission, không sắp lại) thành khối đơn/nhóm, nhãn nhóm giờ là `<button>` +
+  `ChevronDown` xoay; (3) icon thêm `transition-colors` riêng để đổi màu MƯỢT theo active/hover (dùng đúng
+  token `--sidebar-accent` có sẵn, không thêm màu mới). Cả 3 điểm đều hỏi qua `AskUserQuestion` trước khi
+  code (yêu cầu gốc mơ hồ nhiều hướng) — chọn Recommended cho cả 3. Lưu ý đi ngược 1 phần nguyên tắc
+  restraint ở `UI_DESIGN_SYSTEM.md` Mục 5 (không thêm animation ngoài chủ đích) — đã nêu rõ với user trước
+  khi làm, giữ animation ở mức tối thiểu (chỉ transition màu + xoay chevron). **Bug tự phát hiện qua FE-17
+  a11y scan**: `id`/`aria-controls` ban đầu dùng thẳng tên nhóm tiếng Việt có khoảng trắng
+  (`sidebar-group-Tài sản & Vật tư`) — KHÔNG hợp lệ làm IDREF, axe-core bắt lỗi `aria-valid-attr-value`
+  (critical) ở Dashboard — đã sửa bằng `slugifyGroupId()` (bỏ dấu/khoảng trắng → slug ASCII), chạy lại
+  a11y PASS. Verify: tự chụp Playwright tạm xác nhận đúng ý đồ + ràng buộc quan trọng (thu gọn toàn bộ
+  sidebar lúc 1 nhóm đang đóng vẫn hiện đủ icon, không mất quyền truy cập); build/vitest (25/25)/lint PASS;
+  FE-17 regression đầy đủ PASS sau khi sửa bug (DONE, 2026-09-20).
+- `docs/frontend/tasks/FE-22.md` — User xem ảnh sau FE-21, yêu cầu gộp "Thông báo"/"Tệp tin" (trước đó đứng
+  riêng) vào nhóm "Quản trị hệ thống". Vì Sidebar nhóm theo DÃY LIỀN KỀ trong `NAV_ITEMS` (không tự sắp
+  xếp lại lúc render), chỉ đổi `group` mà giữ nguyên vị trí sẽ tạo 1 khối "Quản trị hệ thống" TRÙNG TÊN
+  thứ 2 tách rời — phải DỜI VỊ TRÍ cả 2 mục xuống ngay sau "Nhật ký audit" (cuối cụm đó) rồi mới gán
+  `group`, để Sidebar tự gộp đúng 1 khối. KHÔNG đổi path/permission. Chủ động ghi đè ràng buộc "không đổi
+  thứ tự" mà chính FE-20 từng đặt ra — cập nhật comment giải thích rõ lý do thay vì để tài liệu mâu thuẫn
+  source (CLAUDE.md §3/§29). CHỈ sửa `navigation.ts`, không đụng `Sidebar.tsx` (logic gom nhóm liền kề đã
+  đủ dùng). Verify: tự chụp Playwright tạm xác nhận đúng khối duy nhất; build/vitest (25/25)/lint PASS;
+  FE-17 regression đầy đủ PASS, không cần update baseline (DONE, 2026-09-20).
 
 ## 12. Liên kết toàn bộ tài liệu FE
 

@@ -49,7 +49,13 @@ export function ConfirmDialog({
           </Button>
           <Button
             type="button"
-            variant={danger ? "destructive" : "primary"}
+            // FE-19 (UI_DESIGN_SYSTEM.md Mục 2) — `primary` phải dành riêng
+            // cho ĐÚNG 1 CTA chính/trang; đa số call site không-phá-huỷ
+            // (Khôi phục/Hoàn tất/Duyệt...) không truyền `danger`, nên trước
+            // đây mặc định `primary` khiến chúng trùng trọng lượng thị giác
+            // với CTA chính của trang. `secondary` vẫn đủ nổi bật cho 1 xác
+            // nhận không-phá-huỷ trong modal riêng.
+            variant={danger ? "destructive" : "secondary"}
             size="sm"
             onClick={onConfirm}
             disabled={confirmDisabled}

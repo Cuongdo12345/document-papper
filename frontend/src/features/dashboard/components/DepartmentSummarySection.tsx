@@ -28,11 +28,14 @@ export function DepartmentSummarySection({ departmentId, emptyMessage }: Departm
 
   return (
     <DashboardSummaryLayout
+      // FE-18 (UI_DESIGN_SYSTEM.md Mục 4) — "Tổng tài liệu" (index 0) là KPI
+      // chính, mirror ĐÚNG cách nhóm ở `AdminSummarySection.tsx` (xem comment
+      // ở đó): "documents" (Đề xuất/Báo cáo) tách khỏi "org" (Người dùng).
       kpiCards={[
         { label: "Tổng tài liệu", value: d.totalDocuments, icon: FileText, tone: "primary" },
-        { label: "Đề xuất", value: d.totalProposals, icon: ClipboardList, tone: "info" },
-        { label: "Báo cáo", value: d.totalReports, icon: FileBarChart, tone: "success" },
-        { label: "Người dùng", value: d.totalUsers, icon: Users, tone: "default" },
+        { label: "Đề xuất", value: d.totalProposals, icon: ClipboardList, tone: "info", group: "documents" },
+        { label: "Báo cáo", value: d.totalReports, icon: FileBarChart, tone: "success", group: "documents" },
+        { label: "Người dùng", value: d.totalUsers, icon: Users, tone: "default", group: "org" },
       ]}
       proposalsByMonth={d.proposalsByMonth}
       reportsByMonth={d.reportsByMonth}

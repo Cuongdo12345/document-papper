@@ -18,6 +18,14 @@ dist-ssr
 .env
 .env.production
 
+# FE-17 (2026-09-19) — Playwright artifacts KHÔNG commit (ephemeral, tự sinh
+# lại mỗi lần chạy). LƯU Ý: `e2e/*.spec.ts-snapshots/` (baseline screenshot)
+# CHỦ Ý KHÔNG bị ignore ở đây — đó là golden snapshot PHẢI commit để visual
+# regression có gì mà so sánh.
+test-results
+playwright-report
+/e2e/.auth
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

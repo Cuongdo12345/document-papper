@@ -53,7 +53,10 @@ export function MedicalDeviceSection({ assetId }: { assetId: string }) {
           Tài sản này chưa có hồ sơ thiết bị y tế. Chỉ tạo hồ sơ nếu đây thực sự là thiết bị y tế cần tuân thủ pháp lý/kiểm định.
         </p>
         <PermissionGuard permission={PERMISSIONS.MEDICAL_DEVICE_CREATE}>
-          <Button size="sm" onClick={() => setProfileModalOpen(true)}>
+          {/* FE-19 — section phụ trong AssetDetailPage, cùng quy ước "secondary"
+              với "Lên lịch bảo trì" (MaintenancePlanHistorySection.tsx) để "Cấp
+              phát" (AssetDetailPage) là CTA chính duy nhất của trang. */}
+          <Button variant="secondary" size="sm" onClick={() => setProfileModalOpen(true)}>
             <ShieldCheck /> Tạo hồ sơ thiết bị y tế
           </Button>
         </PermissionGuard>
@@ -128,7 +131,8 @@ export function MedicalDeviceSection({ assetId }: { assetId: string }) {
           </Button>
         </PermissionGuard>
         <PermissionGuard permission={PERMISSIONS.MEDICAL_DEVICE_CALIBRATE}>
-          <Button size="sm" onClick={() => setCalibrationModalOpen(true)}>
+          {/* FE-19 — cùng lý do nút "Tạo hồ sơ..." phía trên. */}
+          <Button variant="secondary" size="sm" onClick={() => setCalibrationModalOpen(true)}>
             <ClipboardCheck /> Ghi nhận kiểm định
           </Button>
         </PermissionGuard>
