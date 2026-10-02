@@ -17,7 +17,7 @@ jest.mock("../../../../models/assets/asset.model", () => ({
   Asset: { create: jest.fn() },
 }));
 jest.mock("../../../../models/assets/assetCategory.model", () => ({
-  AssetCategory: { find: jest.fn() },
+  AssetCategory: { find: jest.fn(), distinct: jest.fn() },
 }));
 jest.mock("../../../../models/departments/department.model", () => ({
   __esModule: true,
@@ -87,6 +87,8 @@ describe("importAssetsExcel (bổ sung test sau A3)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedCategory.find.mockResolvedValue([{ _id: "cat-pc", code: "PC" }]);
+    // DEV-080: mặc định không danh mục nào trong file là danh mục nhóm (có con).
+    mockedCategory.distinct.mockResolvedValue([]);
     mockedDepartment.find.mockResolvedValue([{ _id: "dept-cntt", code: "CNTT" }]);
     mockedAsset.create.mockResolvedValue({ _id: "asset-1" });
     mockedGenerateAssetCode.mockResolvedValue("TB-CNTT-2026-0001");
@@ -154,6 +156,16 @@ describe("importAssetsExcel (bổ sung test sau A3)", () => {
     expect(mockedAsset.create).not.toHaveBeenCalled();
   });
 
+  it("DEV-080 — mã Danh mục là danh mục NHÓM (có con active) → lỗi theo dòng, không tạo tài sản", async () => {
+    mockedCategory.distinct.mockResolvedValue(["cat-pc"]);
+    const buffer = await buildWorkbook([VALID_ROW]);
+
+    const result = await importAssetsExcel(buffer, "user-1");
+
+    expect(result.errors).toEqual([expect.objectContaining({ row: 2, message: expect.stringContaining("danh mục nhóm") })]);
+    expect(mockedAsset.create).not.toHaveBeenCalled();
+  });
+
   it("mã Khoa/phòng không tồn tại → lỗi rõ ràng theo dòng", async () => {
     const buffer = await buildWorkbook([{ ...VALID_ROW, department: "KHONGTONTAI" }]);
 
@@ -161,6 +173,20 @@ describe("importAssetsExcel (bổ sung test sau A3)", () => {
 
     expect(result.errors).toEqual([expect.objectContaining({ row: 2, message: expect.stringContaining("KHONGTONTAI") })]);
     expect(mockedAsset.create).not.toHaveBeenCalled();
+  });
+
+  it("BR-06 (DEV-100): mã khoa thuộc khoa ĐÃ XOÁ MỀM → lỗi \"đã bị xoá\" theo dòng, KHÔNG tạo Asset, KHÔNG sinh mã", async () => {
+    mockedDepartment.find.mockResolvedValue([{ _id: "dept-cntt", code: "CNTT", name: "Công nghệ thông tin", isActive: false }]);
+    const buffer = await buildWorkbook([VALID_ROW]);
+
+    const result = await importAssetsExcel(buffer, "user-1", { dryRun: false });
+
+    expect(result.created).toBe(0);
+    expect(result.errors).toEqual([
+      { row: 2, message: `Khoa/phòng "Công nghệ thông tin" đã bị xoá (ngừng hoạt động)` },
+    ]);
+    expect(mockedAsset.create).not.toHaveBeenCalled();
+    expect(mockedGenerateAssetCode).not.toHaveBeenCalled();
   });
 
   it("dòng trắng hoàn toàn → bỏ qua lặng lẽ, KHÔNG tính vào totalRows, KHÔNG lỗi", async () => {

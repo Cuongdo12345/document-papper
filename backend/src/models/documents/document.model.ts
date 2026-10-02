@@ -184,8 +184,12 @@ DocumentSchema.index({ subType: 1, department: 1 });
 
 /**
  * REFERENCE LOOKUP
+ *
+ * BR-19 (DEV-109): đã bỏ index đơn `{ referenceTo: 1 }` — nó là tiền tố của
+ * index kép `{ referenceTo, category, isActive, createdAt }` bên dưới, mọi truy
+ * vấn theo `referenceTo` (kể cả `$in`, hoặc kèm `subType`/`isActive`, hoặc
+ * `$lookup` foreignField `referenceTo`) vẫn dùng được index kép đó.
  */
-DocumentSchema.index({ referenceTo: 1 });
 
 /**
  * LIST + FILTER INDEX (quan trọng nhất)

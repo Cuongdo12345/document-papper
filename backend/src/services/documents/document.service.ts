@@ -31,10 +31,13 @@ import {
   countReportsByProposal,
   findDocumentIncludeDeleted,
   findPendingRepairProposalForAsset,
+  findProposalIdsWithActiveReports,
+  hasPendingWorkflow,
+  PENDING_WORKFLOW_FILTER,
 } from "./documents.query";
 import { DOCUMENT_UPDATE_WHITELIST } from "./documents.constants";
 import { runBulkDelete } from "../../shared/utils/bulkDelete.util";
-import { applyDepartmentFilter, canViewAcrossDepartments, isSameDepartment } from "./documents.scope";
+import { applyDepartmentFilter, canCreateInDepartment, canViewAcrossDepartments, isSameDepartment } from "./documents.scope";
 import type {
   CreateDocumentPayload,
   GetAllDocumentsPayload,
@@ -50,6 +53,8 @@ import {
 } from "../../models/notifications/notification.model";
 import { notifyUsersByDepartment } from "../notifications/notification.service";
 import { withTransaction } from "../../shared/utils/withTransaction";
+// BR-09 (DEV-097): "Từ ngày/Đến ngày" dạng YYYY-MM-DD hiểu theo ngày giờ VN.
+import { parseDateRangeBound } from "../../shared/utils/Queryparsing.util";
 
 // ✅ KHÔI PHỤC TRANSACTION (MongoDB đã chuyển sang replica set — xem
 // `withTransaction.ts`). Các luồng bên dưới được bọc lại
@@ -83,7 +88,24 @@ export const createDocumentService = async (payload: CreateDocumentPayload) => {
     referenceTo,
     meta,
     relatedAsset,
+    callerDepartment,
+    isAdmin,
+    canCreateAllDepartments,
   } = payload;
+
+  // BR-03 (DEV-092, 2026-09-29): trước đây tin hoàn toàn `department` client
+  // gửi lên — FE khoá ô khoa cho user thường nhưng gọi API trực tiếp vẫn tạo
+  // được tài liệu vào khoa bất kỳ (kèm thông báo DOCUMENT_SUBMITTED tới toàn
+  // bộ khoa đó). Nay: khoa khác khoa mình chỉ dành cho ADMIN hoặc permission
+  // `DOCUMENT_CREATE_ALL_DEPARTMENTS` (user chọn tạo permission riêng).
+  // Kiểm tra ĐẦU TIÊN, trước mọi truy vấn khác.
+  if (!canCreateInDepartment({ isAdmin, canCreateAllDepartments, callerDepartment }, department)) {
+    throw ApiError.forbidden(
+      callerDepartment
+        ? "Không có quyền tạo tài liệu cho phòng ban khác"
+        : "Tài khoản chưa thuộc khoa/phòng nào, không thể tạo tài liệu",
+    );
+  }
 
   const rule = validateDocumentRule(category, subType);
 
@@ -326,8 +348,8 @@ export const getAllDocumentsService = async ({
   // (Missing Validation #3) trước khi tới đây, nên `new Date(...)` luôn hợp lệ.
   if (fromDate || toDate) {
     filter.createdAt = {};
-    if (fromDate) filter.createdAt.$gte = new Date(fromDate);
-    if (toDate) filter.createdAt.$lte = new Date(toDate);
+    if (fromDate) filter.createdAt.$gte = parseDateRangeBound(fromDate, "start");
+    if (toDate) filter.createdAt.$lte = parseDateRangeBound(toDate, "end");
   }
 
   if (keyword) {
@@ -603,7 +625,13 @@ export const deleteDocumentService = async ({
   // side-effect đổi Asset thật (`syncAssetOnDocumentApproved`) cho 1 document
   // đã bị ẩn khỏi luồng active thông thường. Chặn xoá, buộc admin tự xử lý
   // workflow (huỷ/chờ duyệt xong) trước khi xoá Document.
-  if (document.workflowStatus === "pending") {
+  //
+  // ⚠️ SỬA (BR-11/DEV-098, 2026-09-29): trước đây so `workflowStatus ===
+  // "pending"` — nhưng đó là giá trị MẶC ĐỊNH của schema, nên tài liệu CHƯA
+  // GỬI DUYỆT LẦN NÀO cũng bị chặn xoá với thông báo sai. Nay chỉ chặn khi có
+  // workflow chờ duyệt THẬT — xem `hasPendingWorkflow` (documents.query.ts).
+  // Dùng CHUNG điều kiện với xoá theo tháng (user chọn).
+  if (hasPendingWorkflow(document)) {
     throw ApiError.badRequest(
       "Không thể xoá: document đang có workflow ở trạng thái chờ duyệt (pending) — cần huỷ hoặc chờ workflow xử lý xong trước",
     );
@@ -686,36 +714,66 @@ export const deleteDocumentsByMonthService = async ({
   // batch, dùng lại ĐÚNG điều kiện guard đã có ở `deleteDocumentService`
   // (Missing Validation #5, qua `countReportsByProposal`) để không lệch
   // logic giữa xoá đơn lẻ và xoá hàng loạt.
-  const proposalIdsInScope = await findDocumentIdsByFilter({
-    ...query,
-    category: "PROPOSAL",
+  //
+  // ⚠️ SỬA (BR-11/DEV-098, 2026-09-29) — 3 lỗi so với xoá đơn lẻ:
+  //   (a) KHÔNG loại tài liệu đang có workflow chờ duyệt THẬT (xoá đơn lẻ chặn
+  //       — RV05-06): nay loại khỏi batch bằng `PENDING_WORKFLOW_FILTER`, CÙNG
+  //       điều kiện với `hasPendingWorkflow` ở xoá đơn lẻ.
+  //   (b) KHÔNG ghi UserAudit: nay ghi 1 dòng TỔNG HỢP (user chọn — 1 dòng/tài
+  //       liệu sẽ làm phình bảng audit như BR-04), CÙNG transaction với
+  //       `updateMany`.
+  //   (c) N+1: vòng `for` gọi `countReportsByProposal` tuần tự cho TỪNG đề
+  //       xuất — nay 1 truy vấn `distinct` (`findProposalIdsWithActiveReports`).
+  // Toàn bộ đọc + ghi nằm trong 1 transaction để số liệu trong audit khớp
+  // đúng với những gì đã xoá.
+  const result = await withTransaction(async (session) => {
+    // TUẦN TỰ, không `Promise.all`: MongoDB không cho chạy song song nhiều thao
+    // tác trên cùng 1 session trong transaction. Driver mongodb 7.6 (DEV-099)
+    // trả lỗi "Only servers in a sharded cluster can start a new transaction
+    // at the active transaction number".
+    const proposalIdsInScope = await findDocumentIdsByFilter({ ...query, category: "PROPOSAL" }, session);
+    const pendingWorkflowIds = await findDocumentIdsByFilter({ ...query, ...PENDING_WORKFLOW_FILTER }, session);
+    const referencedProposalIds = await findProposalIdsWithActiveReports(proposalIdsInScope, session);
+
+    const excludedIds = [...referencedProposalIds, ...pendingWorkflowIds];
+    const finalQuery = excludedIds.length > 0 ? { ...query, _id: { $nin: excludedIds } } : query;
+
+    const updated = await softDeleteDocumentsByFilter(finalQuery, userId, session);
+
+    // Không ghi audit khi không ẩn được tài liệu nào — tránh dòng log rỗng.
+    if (updated.modifiedCount > 0) {
+      const appliedFilters = Object.entries(buildDocumentFilter(filters))
+        .map(([k, v]) => `${k}=${v}`)
+        .join(", ");
+      await UserAudit.create(
+        [
+          {
+            user: userId,
+            action: "DELETE",
+            performedBy: userId,
+            note:
+              `Xoá theo tháng ${String(month).padStart(2, "0")}/${year}: ẩn ${updated.modifiedCount} tài liệu` +
+              `; bỏ qua ${referencedProposalIds.length} đề xuất còn biên bản tham chiếu` +
+              `, ${pendingWorkflowIds.length} tài liệu có workflow chờ duyệt` +
+              (appliedFilters ? `. Bộ lọc: ${appliedFilters}` : ""),
+          },
+        ],
+        { session },
+      );
+    }
+
+    return {
+      deletedCount: updated.modifiedCount,
+      // Số PROPOSAL bị loại vì còn REPORT active tham chiếu (giữ nguyên ý
+      // nghĩa field cũ — frontend đang đọc).
+      skippedCount: referencedProposalIds.length,
+      // MỚI (BR-11): số tài liệu bị loại vì có workflow chờ duyệt thật. Một
+      // đề xuất vừa còn biên bản vừa đang chờ duyệt được đếm ở CẢ 2 field.
+      skippedPendingWorkflowCount: pendingWorkflowIds.length,
+    };
   });
 
-  const referencedProposalIds: any[] = [];
-  for (const proposalId of proposalIdsInScope) {
-    const reportCount = await countReportsByProposal(proposalId);
-    if (reportCount > 0) {
-      referencedProposalIds.push(proposalId);
-    }
-  }
-
-  const finalQuery =
-    referencedProposalIds.length > 0
-      ? { ...query, _id: { $nin: referencedProposalIds } }
-      : query;
-
-  // Chỉ 1 write trên 1 collection (`updateMany` trên Document) — KHÔNG cần
-  // transaction (transaction chỉ có ý nghĩa khi ghi NHIỀU collection cần
-  // atomic cùng nhau).
-  const result = await softDeleteDocumentsByFilter(finalQuery, userId);
-
-  return {
-    deletedCount: result.modifiedCount,
-    // Số PROPOSAL bị loại khỏi batch vì còn REPORT active tham chiếu — minh
-    // bạch cho caller biết vì sao deletedCount có thể nhỏ hơn tổng số
-    // document khớp filter tháng/năm.
-    skippedCount: referencedProposalIds.length,
-  };
+  return result;
 };
 
 /* ===============================

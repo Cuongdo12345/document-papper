@@ -1,3 +1,6 @@
+// BR-09 (DEV-097): PHẢI đứng đầu tiên — cố định process.env.TZ = giờ VN
+// trước khi bất kỳ module nào khác được nạp. Xem `src/config/timezone.ts`.
+import "./src/config/timezone";
 import dotenv from "dotenv";
 dotenv.config();
 

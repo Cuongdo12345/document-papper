@@ -17,6 +17,10 @@ export interface IUserAudit extends Document {
     | "ADMIN_BYPASS"
     | "VIEW_DETAIL"
     | "DELETE"
+    // Đã có trong enum của model từ trước nhưng thiếu ở đây — mongoose 9.10
+    // (DEV-099) kiểm tra kiểu filter/create chặt hơn nên lộ ra lệch.
+    | "REGISTER"
+    | "ASSIGN_ROLE"
     // Roadmap C1 (Xác thực 2 lớp qua email OTP, DEV-068, 2026-09-19).
     | "ENABLE_2FA"
     | "DISABLE_2FA"

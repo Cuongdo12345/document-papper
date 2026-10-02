@@ -87,4 +87,21 @@ workflowInstanceSchema.index({ status: 1, createdAt: 1 });
  */
 workflowInstanceSchema.index({ "steps.role": 1, createdAt: -1 });
 
+/**
+ * BR-07 (docs/31_BACKEND_CODE_REVIEW.md, DEV-095, 2026-09-29): trước đây
+ * KHÔNG có index nào chứa `documentId` — mọi truy vấn "workflow của 1 tài
+ * liệu" COLLSCAN toàn collection. 1 index phục vụ cả 5 chỗ:
+ *   - `loadDocument.middleware.ts`: `{documentId, status:"pending"}` sort
+ *     `createdAt:-1` + `{documentId}` (lấy steps.role) — chạy ở MỖI lần mở
+ *     chi tiết tài liệu / lịch sử phiên bản / xuất PDF;
+ *   - `workflow.service.ts`: `submitWorkflow` (BR-02, trong transaction) và
+ *     `getWorkflowByDocument` — `{documentId}` sort `createdAt:-1`;
+ *   - `document.service.ts::getReportsByProposalService`:
+ *     `exists({documentId, "steps.role"})`.
+ * Tiền tố `documentId` (equality) + `createdAt:-1` khớp đúng thứ tự sort, nên
+ * `findOne(...).sort({createdAt:-1})` đọc thẳng bản mới nhất, không cần SORT.
+ * KHÔNG unique — 1 tài liệu có nhiều workflow khi gửi duyệt lại.
+ */
+workflowInstanceSchema.index({ documentId: 1, createdAt: -1 });
+
 export default mongoose.model("WorkflowInstance", workflowInstanceSchema);

@@ -238,6 +238,8 @@ describe("auths.service — login", () => {
 });
 
 describe("auths.service — verifyLoginOtp (Roadmap C1, DEV-068)", () => {
+  beforeEach(() => jest.clearAllMocks());
+
   it("báo lỗi 401 nếu user không tồn tại/không active/chưa bật 2FA", async () => {
     mockedUser.findOne.mockReturnValue({
       populate: fn().mockReturnValue({ populate: fn().mockResolvedValue(null) }),
@@ -257,17 +259,23 @@ describe("auths.service — verifyLoginOtp (Roadmap C1, DEV-068)", () => {
     await expect(verifyLoginOtp("admin1", "123456")).rejects.toMatchObject({ status: 401 });
   });
 
-  it("mã sai: tăng attempts, báo lỗi 401, KHÔNG cấp token", async () => {
+  it("mã sai: giành lượt thử atomic ($inc), báo lỗi 401, KHÔNG dùng mã, KHÔNG cấp token", async () => {
     mockedUser.findOne.mockReturnValue({
       populate: fn().mockReturnValue({
         populate: fn().mockResolvedValue({ _id: "u1", isActive: true, twoFactorEnabled: true }),
       }),
     });
-    const otpDoc: any = { attempts: 0, codeHash: await bcrypt.hash("111111", 10), save: fn().mockResolvedValue(undefined) };
+    const otpDoc: any = { _id: "otp1", attempts: 0, codeHash: await bcrypt.hash("111111", 10) };
     mockedTwoFactorOtp.findOne.mockReturnValue({ sort: fn().mockResolvedValue(otpDoc) });
+    mockedTwoFactorOtp.findOneAndUpdate.mockResolvedValue(otpDoc);
 
-    await expect(verifyLoginOtp("admin1", "999999")).rejects.toMatchObject({ status: 401 });
-    expect(otpDoc.attempts).toBe(1);
+    await expect(verifyLoginOtp("admin1", "999999")).rejects.toMatchObject({ status: 401, message: "Mã xác thực không đúng" });
+    expect(mockedTwoFactorOtp.findOneAndUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ _id: "otp1", used: false, attempts: { $lt: 5 } }),
+      { $inc: { attempts: 1 } },
+      { new: true },
+    );
+    expect(mockedTwoFactorOtp.updateOne).not.toHaveBeenCalled();
     expect(mockedRefreshToken.create).not.toHaveBeenCalled();
   });
 
@@ -277,10 +285,42 @@ describe("auths.service — verifyLoginOtp (Roadmap C1, DEV-068)", () => {
         populate: fn().mockResolvedValue({ _id: "u1", isActive: true, twoFactorEnabled: true }),
       }),
     });
-    const otpDoc: any = { attempts: 5, codeHash: await bcrypt.hash("111111", 10), save: fn().mockResolvedValue(undefined) };
+    const otpDoc: any = { _id: "otp1", attempts: 5, codeHash: await bcrypt.hash("111111", 10) };
     mockedTwoFactorOtp.findOne.mockReturnValue({ sort: fn().mockResolvedValue(otpDoc) });
 
     await expect(verifyLoginOtp("admin1", "111111")).rejects.toMatchObject({ status: 401 });
+    expect(mockedTwoFactorOtp.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it("BR-14: request song song đọc `attempts=4` nhưng bị request khác giành lượt cuối (findOneAndUpdate trả null) → chặn, KHÔNG so mã, KHÔNG cấp token", async () => {
+    mockedUser.findOne.mockReturnValue({
+      populate: fn().mockReturnValue({
+        populate: fn().mockResolvedValue({ _id: "u1", isActive: true, twoFactorEnabled: true }),
+      }),
+    });
+    const otpDoc: any = { _id: "otp1", attempts: 4, codeHash: await bcrypt.hash("111111", 10) };
+    mockedTwoFactorOtp.findOne.mockReturnValue({ sort: fn().mockResolvedValue(otpDoc) });
+    mockedTwoFactorOtp.findOneAndUpdate.mockResolvedValue(null);
+
+    // Mã ĐÚNG nhưng hết lượt → vẫn bị từ chối.
+    await expect(verifyLoginOtp("admin1", "111111")).rejects.toMatchObject({ status: 401 });
+    expect(mockedTwoFactorOtp.updateOne).not.toHaveBeenCalled();
+    expect(mockedRefreshToken.create).not.toHaveBeenCalled();
+  });
+
+  it("BR-14: mã đúng nhưng request khác đã dùng trước (updateOne modifiedCount=0) → từ chối, KHÔNG cấp token (mã không dùng được 2 lần)", async () => {
+    mockedUser.findOne.mockReturnValue({
+      populate: fn().mockReturnValue({
+        populate: fn().mockResolvedValue({ _id: "u1", isActive: true, twoFactorEnabled: true }),
+      }),
+    });
+    const otpDoc: any = { _id: "otp1", attempts: 0, codeHash: await bcrypt.hash("111111", 10) };
+    mockedTwoFactorOtp.findOne.mockReturnValue({ sort: fn().mockResolvedValue(otpDoc) });
+    mockedTwoFactorOtp.findOneAndUpdate.mockResolvedValue(otpDoc);
+    mockedTwoFactorOtp.updateOne.mockResolvedValue({ modifiedCount: 0 });
+
+    await expect(verifyLoginOtp("admin1", "111111")).rejects.toMatchObject({ status: 401 });
+    expect(mockedRefreshToken.create).not.toHaveBeenCalled();
   });
 
   it("mã đúng: đánh dấu used, cấp token bình thường", async () => {
@@ -297,14 +337,16 @@ describe("auths.service — verifyLoginOtp (Roadmap C1, DEV-068)", () => {
         }),
       }),
     });
-    const otpDoc: any = { attempts: 0, used: false, codeHash: await bcrypt.hash("111111", 10), save: fn().mockResolvedValue(undefined) };
+    const otpDoc: any = { _id: "otp1", attempts: 0, used: false, codeHash: await bcrypt.hash("111111", 10) };
     mockedTwoFactorOtp.findOne.mockReturnValue({ sort: fn().mockResolvedValue(otpDoc) });
+    mockedTwoFactorOtp.findOneAndUpdate.mockResolvedValue(otpDoc);
+    mockedTwoFactorOtp.updateOne.mockResolvedValue({ modifiedCount: 1 });
     mockedRefreshToken.create.mockResolvedValue({});
     mockedUserAudit.create.mockResolvedValue({});
 
     const result: any = await verifyLoginOtp("admin1", "111111");
 
-    expect(otpDoc.used).toBe(true);
+    expect(mockedTwoFactorOtp.updateOne).toHaveBeenCalledWith({ _id: "otp1", used: false }, { $set: { used: true } });
     expect(result.accessToken).toEqual(expect.any(String));
     expect(result.refreshToken).toEqual(expect.any(String));
   });
@@ -362,8 +404,10 @@ describe("auths.service — confirmEnableTwoFactor (Roadmap C1, DEV-068)", () =>
   it("mã đúng: set twoFactorEnabled=true, ghi audit ENABLE_2FA", async () => {
     const userDoc: any = { _id: "u1", isActive: true, twoFactorEnabled: false, save: fn().mockResolvedValue(undefined) };
     mockedUser.findById.mockResolvedValue(userDoc);
-    const otpDoc: any = { attempts: 0, used: false, codeHash: await bcrypt.hash("111111", 10), save: fn().mockResolvedValue(undefined) };
+    const otpDoc: any = { _id: "otp1", attempts: 0, used: false, codeHash: await bcrypt.hash("111111", 10) };
     mockedTwoFactorOtp.findOne.mockReturnValue({ sort: fn().mockResolvedValue(otpDoc) });
+    mockedTwoFactorOtp.findOneAndUpdate.mockResolvedValue(otpDoc);
+    mockedTwoFactorOtp.updateOne.mockResolvedValue({ modifiedCount: 1 });
     mockedUserAudit.create.mockResolvedValue({});
 
     const result = await confirmEnableTwoFactor("u1", "111111");

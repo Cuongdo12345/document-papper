@@ -8,6 +8,11 @@ import { generateAssetCode } from "../../../shared/helpers/generateAssetCode";
 import { ASSET_UPDATE_WHITELIST, pickWhitelisted } from "../assets.constants";
 import { escapeRegex } from "../../../shared/utils/regex.util";
 import { runBulkDelete } from "../../../shared/utils/bulkDelete.util";
+import { assertDepartmentNotDeleted } from "../../../shared/helpers/departmentLookup.helper";
+import {
+  assertLeafCategory,
+  getCategoryWithDescendantIds,
+} from "./assetCategory.service";
 
 const ASSET_POPULATE = [
   { path: "category", select: "code name" },
@@ -35,7 +40,10 @@ export const createAssetService = async (payload: any, userId?: any) => {
   if (!departmentExists) {
     throw ApiError.badRequest("Khoa/phòng không tồn tại");
   }
- 
+  // BR-06 (DEV-100): khoa đã xoá mềm không nhận dữ liệu mới.
+  assertDepartmentNotDeleted(departmentExists);
+  await assertLeafCategory(category);
+
   const assetCode = await generateAssetCode(department);
  
   const asset = await Asset.create({
@@ -83,7 +91,8 @@ export const getAllAssetsService = async (query: any) => {
   }
  
   if (department) filter.department = department;
-  if (category) filter.category = category;
+  // DEV-080: lọc theo danh mục nhóm → gồm tài sản của mọi danh mục con cháu.
+  if (category) filter.category = { $in: await getCategoryWithDescendantIds(category) };
   if (status) filter.status = status;
  
   const pageNumber = Math.max(parseInt(page, 10), 1);
@@ -155,6 +164,7 @@ export const updateAssetService = async (
     if (!categoryExists) {
       throw ApiError.badRequest("Danh mục tài sản không tồn tại");
     }
+    await assertLeafCategory(safePayload.category);
   }
 
    // 🔗 Giai đoạn 4 — đổi hạn bảo hành thì phải cho phép cron cảnh báo lại

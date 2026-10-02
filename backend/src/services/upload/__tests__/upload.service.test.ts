@@ -54,18 +54,21 @@ describe("upload.service — buildFilesFilter", () => {
     expect(filter.mimeType).toBe("application/pdf");
   });
 
-  it("fromDate/toDate → khoảng createdAt $gte/$lte", () => {
+  // BR-09 (DEV-097): `YYYY-MM-DD` giờ hiểu theo NGÀY GIỜ VN và "Đến ngày" bao
+  // trọn cả ngày — trước đây `new Date("2026-01-31")` = 07:00 sáng 31/1 giờ
+  // VN, bỏ sót gần hết ngày cuối.
+  it("fromDate/toDate → khoảng createdAt $gte/$lte trọn ngày theo giờ VN", () => {
     const filter = buildFilesFilter(
       { fromDate: "2026-01-01", toDate: "2026-01-31" },
       { isAdmin: true, userId: "a" },
     );
-    expect(filter.createdAt.$gte).toEqual(new Date("2026-01-01"));
-    expect(filter.createdAt.$lte).toEqual(new Date("2026-01-31"));
+    expect(filter.createdAt.$gte).toEqual(new Date("2026-01-01T00:00:00.000+07:00"));
+    expect(filter.createdAt.$lte).toEqual(new Date("2026-01-31T23:59:59.999+07:00"));
   });
 
   it("chỉ truyền fromDate (không toDate) → chỉ có $gte", () => {
     const filter = buildFilesFilter({ fromDate: "2026-01-01" }, { isAdmin: true, userId: "a" });
-    expect(filter.createdAt).toEqual({ $gte: new Date("2026-01-01") });
+    expect(filter.createdAt).toEqual({ $gte: new Date("2026-01-01T00:00:00.000+07:00") });
   });
 
   it("không truyền field lọc nào (non-admin) → filter chỉ còn isDeleted + uploadedBy ép buộc", () => {

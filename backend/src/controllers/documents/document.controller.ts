@@ -25,10 +25,16 @@ import { PERMISSIONS } from "../../shared/constants/permission.constant";
    CREATE
 =============================== */
 export const createDocuments = catchAsync(async (req: Request, res: Response) => {
+  // BR-03 (DEV-092): khoa/cờ quyền lấy từ `req.user` + cache permission, đặt
+  // SAU `...req.body` để body không ghi đè được.
+  const userPermissions = await getCachedPermissions(req.user!._id.toString());
 
   const doc = await createDocumentService({
-    userId: req.user!._id,
     ...req.body,
+    userId: req.user!._id,
+    callerDepartment: req.user!.department,
+    isAdmin: req.user!.role.isSystemRole === true,
+    canCreateAllDepartments: userPermissions.includes(PERMISSIONS.DOCUMENT_CREATE_ALL_DEPARTMENTS),
   });
 
   res.status(201).json({

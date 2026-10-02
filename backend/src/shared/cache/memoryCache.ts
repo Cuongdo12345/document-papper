@@ -28,6 +28,40 @@ interface CacheEntry<T> {
 const cache = new Map<string, CacheEntry<unknown>>();
 
 /**
+ * BR-05 (docs/31_BACKEND_CODE_REVIEW.md, DEV-094, 2026-09-29): trước đây Map
+ * này KHÔNG BAO GIỜ xoá mục hết hạn — mục chỉ bị ghi đè khi request ĐÚNG khoá
+ * đó lần nữa. Khoá chứa tham số query (vd `department`, `month`) nên mỗi tổ
+ * hợp tham số mới là 1 mục sống mãi trong RAM. Nay giới hạn cứng số mục: khi
+ * đầy, dọn mục hết hạn trước; vẫn đầy thì bỏ mục ghi CŨ NHẤT (Map giữ thứ tự
+ * chèn — `setEntry` xoá rồi chèn lại để mục vừa ghi luôn ở cuối). Dọn "lười"
+ * lúc ghi, KHÔNG dùng `setInterval` (không giữ process sống, không cần dọn
+ * timer trong test).
+ *
+ * 500 mục đủ rộng: ~15 endpoint dashboard × vài biến thể tham số hợp lệ.
+ */
+export const MAX_CACHE_ENTRIES = 500;
+
+const setEntry = (key: string, entry: CacheEntry<unknown>) => {
+  cache.delete(key);
+
+  if (cache.size >= MAX_CACHE_ENTRIES) {
+    const now = Date.now();
+    for (const [k, e] of cache) {
+      if (e.expiresAt <= now) cache.delete(k);
+    }
+    while (cache.size >= MAX_CACHE_ENTRIES) {
+      const oldestKey = cache.keys().next().value as string;
+      cache.delete(oldestKey);
+    }
+  }
+
+  cache.set(key, entry);
+};
+
+/** Số mục đang giữ — chỉ dùng cho test/giám sát. */
+export const getCacheSize = (): number => cache.size;
+
+/**
  * Trả về giá trị cache nếu còn hạn; nếu không (chưa có hoặc hết hạn), gọi
  * `compute()` để lấy giá trị mới, lưu lại vào cache rồi trả về.
  *
@@ -48,7 +82,24 @@ export const getOrSetCache = async <T>(
   }
 
   const value = await compute();
-  cache.set(key, { value, expiresAt: Date.now() + ttlMs });
+  setEntry(key, { value, expiresAt: Date.now() + ttlMs });
+  return value;
+};
+
+/**
+ * Bản ĐỒNG BỘ của `getOrSetCache` — cho nơi tính toán vốn đã đồng bộ (vd
+ * `services/systemDesign/relatedDocs.ts`, BR-21/DEV-107) mà không muốn đổi cả
+ * chuỗi hàm gọi sang async. Dùng chung Map, TTL và giới hạn số mục với bản
+ * async. `compute` ném lỗi thì KHÔNG cache gì (lần sau tính lại).
+ */
+export const getOrSetCacheSync = <T>(key: string, ttlMs: number, compute: () => T): T => {
+  const entry = cache.get(key);
+  if (entry && Date.now() < entry.expiresAt) {
+    return entry.value as T;
+  }
+
+  const value = compute();
+  setEntry(key, { value, expiresAt: Date.now() + ttlMs });
   return value;
 };
 

@@ -1,4 +1,5 @@
 import Department from "../../models/departments/department.model";
+import ApiError from "../errors/ApiError";
 
 /**
  * Chuẩn hoá key để so khớp department KHÔNG phân biệt hoa/thường — dùng
@@ -30,5 +31,33 @@ export const findDepartmentsCaseInsensitive = async (names: Iterable<string>): P
     name: { $in: nameList.map((name) => new RegExp(`^${escapeRegExp(name)}$`, "i")) },
   });
 
-  return new Map(departments.map((d: any) => [normalizeDepartmentKey(d.name), d]));
+  // BR-06 (DEV-100): vẫn lấy cả khoa đã xoá mềm, để nơi gọi báo đúng lỗi
+  // "đã bị xoá" thay vì "không tìm thấy". `name` không unique, nên nếu 1 khoa
+  // đang hoạt động và 1 khoa đã xoá trùng tên thì khoa đang hoạt động được ưu tiên.
+  const map = new Map<string, any>();
+  for (const d of departments as any[]) {
+    const key = normalizeDepartmentKey(d.name);
+    const current = map.get(key);
+    if (!current || isDepartmentDeleted(current)) map.set(key, d);
+  }
+  return map;
+};
+
+/**
+ * BR-06 (DEV-100): khoa/phòng đã xoá mềm (DEV-086) KHÔNG được nhận dữ liệu
+ * mới (user, tài liệu, tài sản, cấp phát, vật tư, dự trù, import Excel). So
+ * `=== false` (không phải `!isActive`) để bản ghi cũ thiếu field vẫn coi là
+ * đang hoạt động, đúng `default: true` của schema.
+ */
+export const isDepartmentDeleted = (department: { isActive?: boolean } | null | undefined) =>
+  department?.isActive === false;
+
+export const deletedDepartmentMessage = (department: { name?: string; code?: string }) =>
+  `Khoa/phòng "${department.name ?? department.code}" đã bị xoá (ngừng hoạt động)`;
+
+/** Ném 400 nếu khoa đã bị xoá mềm. Gọi SAU bước kiểm tra tồn tại sẵn có. */
+export const assertDepartmentNotDeleted = (department: { isActive?: boolean; name?: string; code?: string }) => {
+  if (isDepartmentDeleted(department)) {
+    throw ApiError.badRequest(deletedDepartmentMessage(department));
+  }
 };

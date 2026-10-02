@@ -18,6 +18,7 @@ import ApiError from "../../shared/errors/ApiError";
 import { escapeRegex } from "../../shared/utils/regex.util";
 import { withTransaction } from "../../shared/utils/withTransaction";
 import { runBulkDelete } from "../../shared/utils/bulkDelete.util";
+import { assertDepartmentNotDeleted } from "../../shared/helpers/departmentLookup.helper";
 
 const ITEM_POPULATE = [
   { path: "department", select: "code name" },
@@ -54,6 +55,8 @@ export const createConsumableItemService = async (payload: any, userId?: any) =>
   if (!department) {
     throw ApiError.notFound("Không tìm thấy phòng ban");
   }
+  // BR-06 (DEV-100): khoa đã xoá mềm không nhận dữ liệu mới.
+  assertDepartmentNotDeleted(department);
 
   if (payload.category) {
     await validateCategoryActive(payload.category);
@@ -212,6 +215,13 @@ export const updateConsumableItemService = async (
   if (payload.category !== undefined) {
     if (payload.category) await validateCategoryActive(payload.category);
     item.category = payload.category || undefined;
+  }
+  // BR-06 (DEV-100): khôi phục (ẩn → hoạt động) vật tư của khoa đã xoá mềm
+  // sẽ làm tồn kho "sống lại" trong khoa đang bị ẩn — chặn, admin khôi phục
+  // khoa trước. Áp cho cả khôi phục đơn lẻ lẫn hàng loạt (cùng đi qua đây).
+  if (payload.isActive === true && item.isActive === false) {
+    const department = await Department.findById(item.department);
+    if (department) assertDepartmentNotDeleted(department);
   }
   if (payload.isActive !== undefined) item.isActive = payload.isActive;
 

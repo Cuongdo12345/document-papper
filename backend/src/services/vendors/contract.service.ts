@@ -9,6 +9,7 @@ import { Contract } from "../../models/vendors/contract.model";
 import { Asset } from "../../models/assets/asset.model";
 import { ContractStatus } from "../../interfaces/vendors/contract.interface";
 import ApiError from "../../shared/errors/ApiError";
+import { runBulkDelete } from "../../shared/utils/bulkDelete.util";
 
 const CONTRACT_POPULATE = [
   { path: "vendor", select: "name contactPerson phone email" },
@@ -220,4 +221,19 @@ export const restoreContractService = async (contractId: any, userId?: any) => {
 
   await contract.save();
   return withIsExpired(await contract.populate(CONTRACT_POPULATE));
+};
+
+/**
+ * 📌 BULK CANCEL (DEV-087) — "xoá nhiều" của domain Contract: Contract không
+ * có xoá, thao tác tương đương là huỷ (status CANCELLED, khôi phục được). Tái
+ * dùng nguyên `cancelContractService` qua `runBulkDelete` — 1 hợp đồng không
+ * còn "active" không chặn các hợp đồng còn lại. `cancelReason` áp chung.
+ */
+export const bulkCancelContractService = async (ids: string[], userId?: any, cancelReason?: string) => {
+  return runBulkDelete(ids, (id) => cancelContractService(id, userId, cancelReason), "Huỷ thất bại");
+};
+
+/** 📌 BULK RESTORE (DEV-087) — khôi phục hàng loạt hợp đồng đã huỷ. */
+export const bulkRestoreContractService = async (ids: string[], userId?: any) => {
+  return runBulkDelete(ids, (id) => restoreContractService(id, userId), "Khôi phục thất bại");
 };

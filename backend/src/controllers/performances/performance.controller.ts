@@ -96,6 +96,7 @@
 
 import { Request, Response } from "express";
 import { ApiPerformanceModel } from "../../models/apiPerformance/apiPerformance.model";
+import { parseDateRangeBound } from "../../shared/utils/Queryparsing.util";
 
 
 /**
@@ -133,10 +134,11 @@ export const getPerformanceDashboard = async (req: Request, res: Response) => {
   const match: any = {};
   if (from || to) {
     match.createdAt = {};
-    if (from) match.createdAt.$gte = new Date(from as string);
-    if (to) match.createdAt.$lte = new Date(to as string);
+    // BR-09 (DEV-097): `YYYY-MM-DD` hiểu theo ngày giờ VN, "to" bao trọn cả ngày.
+    if (from) match.createdAt.$gte = parseDateRangeBound(from, "start");
+    if (to) match.createdAt.$lte = parseDateRangeBound(to, "end");
   }
-  
+
   // 🔹 truy vấn thống kê từ MongoDB
   // Sử dụng aggregation để tính toán thống kê theo endpoint, đảm bảo tối ưu với index
   // Có thể thêm cache kết quả nếu cần thiết để giảm tải cho DB khi có nhiều request truy vấn dashboard

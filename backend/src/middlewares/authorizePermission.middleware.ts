@@ -33,7 +33,7 @@ type AuthorizeOptions = {
 };
 
 /**
- * Ghi audit khi SUPER ADMIN BYPASS được kích hoạt (Sửa #4, B2 —
+ * Ghi audit khi SUPER ADMIN BYPASS THỰC SỰ có tác dụng (Sửa #4, B2 —
  * DOCUMENT_SECURITY_ANALYSIS.md): ghi best-effort (không chặn request nếu
  * ghi audit lỗi) vì đây là thao tác phụ, không phải điều kiện bắt buộc để
  * request tiếp tục.
@@ -47,16 +47,37 @@ type AuthorizeOptions = {
  * khác thành chuỗi "ADMIN" (nếu vượt qua được guard ở `updateRoleService()`)
  * giờ KHÔNG còn cấp bypass — đóng dứt điểm RV02-01 (role rename hijack).
  */
-const auditAdminBypass = (userId: any, permissions: Permission | Permission[]) => {
-  UserAudit.create({
+//
+// ⚠️ BR-04 (docs/31_BACKEND_CODE_REVIEW.md, DEV-093, 2026-09-29): trước đây
+// ghi 1 bản ghi cho MỌI request của ADMIN (DB dev: 9.826/10.835 = 90,7% bảng
+// `useraudits`, gần 3.000 dòng/tuần, phần lớn là thao tác XEM) với nhãn sai
+// `AUDIT_DASHBOARD_VIEW`. Role ADMIN trên DB đã có đủ mọi permission nên gần
+// như mọi lần "bypass" là quyền Admin VỐN ĐÃ CÓ — log vô nghĩa. Nay (user
+// chọn) CHỈ ghi khi bypass THỰC SỰ có tác dụng: quyền hiệu lực của Admin
+// (role + extra − deny, qua `getCachedPermissions`) KHÔNG đủ để qua đúng
+// check RBAC ở bước 4 — vd permission mới chưa gán cho role ADMIN, hoặc
+// Admin bị `denyPermissions` (RV02-02). Dùng action đúng `ADMIN_BYPASS`, giữ
+// nguyên tiền tố `note` cũ (migration đổi nhãn dữ liệu cũ dựa vào tiền tố này).
+//
+// Fire-and-forget: quyết định cho qua KHÔNG phụ thuộc kết quả hàm này (ADMIN
+// luôn qua), nên không làm chậm request; `getCachedPermissions` có cache
+// in-memory TTL 5 phút, chỉ tốn 1 truy vấn khi cache miss.
+const auditAdminBypassIfEffective = async (
+  userId: any,
+  required: Permission[],
+  requireAll?: boolean,
+) => {
+  const effective = await getCachedPermissions(userId.toString());
+  const covered = requireAll
+    ? required.every((p) => effective.includes(p))
+    : required.some((p) => effective.includes(p));
+  if (covered) return;
+
+  await UserAudit.create({
     user: userId,
-    action: "AUDIT_DASHBOARD_VIEW", // Không có action riêng cho "PERMISSION_BYPASS" trong
-                                     // enum hiện tại (userAudit.model.ts) — TODO: thêm action
-                                     // chuyên dụng (vd "ADMIN_BYPASS") khi sửa model UserAudit.
+    action: "ADMIN_BYPASS",
     performedBy: userId,
-    note: `ADMIN bypass permission check: ${Array.isArray(permissions) ? permissions.join(",") : permissions}`,
-  }).catch((err) => {
-    console.error("[authorizePermission] Ghi audit ADMIN bypass thất bại:", err);
+    note: `ADMIN bypass permission check: ${required.join(",")}`,
   });
 };
 
@@ -87,7 +108,13 @@ export const authorizePermission =
       // kỳ tác dụng nào với user đang giữ role ADMIN, dù field này tồn tại
       // đầy đủ và có API quản lý. Xem thêm comment ở `user.model.ts`.
       if (user.role?.isSystemRole === true) {
-        auditAdminBypass(user._id, permissions);
+        auditAdminBypassIfEffective(
+          user._id,
+          Array.isArray(permissions) ? permissions : [permissions],
+          options?.requireAll,
+        ).catch((err) => {
+          console.error("[authorizePermission] Ghi audit ADMIN bypass thất bại:", err);
+        });
         return next();
       }
 

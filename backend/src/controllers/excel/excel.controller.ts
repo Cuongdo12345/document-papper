@@ -6,6 +6,7 @@ import {
   listImportHistory,
 } from "../../services/excel/excel.service";
 import { Request, Response } from "express";
+import { z } from "zod";
 import { catchAsync } from "../../shared/utils/catchAsync";
 import ApiError from "../../shared/errors/ApiError";
 
@@ -97,18 +98,42 @@ export const getImportHistory = catchAsync(async (req: Request, res: Response) =
 });
 
 /**
- * API đồng bộ name department
+ * [DEV-089] Tên khoa user đã tick ở bước xem trước — gửi kèm multipart dưới dạng
+ * 1 chuỗi JSON (form-data không có mảng chuẩn). Chỉ đóng vai trò BỘ LỌC: service
+ * vẫn tự phân loại lại từ file, tên không có trong danh sách "sẽ tạo mới" bị bỏ qua.
+ */
+const SyncNamesDTO = z.array(z.string().trim().min(1).max(200)).max(5000);
+
+const parseSyncNames = (raw: unknown): string[] | undefined => {
+  if (raw === undefined || raw === "") return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(String(raw));
+  } catch {
+    throw ApiError.badRequest("Trường names phải là mảng JSON các tên khoa/phòng");
+  }
+  const result = SyncNamesDTO.safeParse(parsed);
+  if (!result.success) throw ApiError.badRequest("Trường names phải là mảng JSON các tên khoa/phòng");
+  return result.data;
+};
+
+/**
+ * API đồng bộ name department.
+ * [DEV-089] `?dryRun=true` → chỉ xem trước (không ghi DB, cùng quy ước import tài
+ * liệu); bỏ `dryRun` + gửi `names` (JSON) → chỉ tạo đúng các khoa đã chọn.
  */
 export const syncDepartmentData = catchAsync(async (req: Request, res: Response) => {
   if (!req.file) {
     throw ApiError.badRequest("Vui lòng chọn file Excel");
   }
 
-  const result = await syncDepartmentFromExcel(req.file.buffer);
+  const dryRun = String(req.query.dryRun).toLowerCase() === "true";
+  const names = dryRun ? undefined : parseSyncNames(req.body?.names);
+  const result = await syncDepartmentFromExcel(req.file.buffer, { dryRun, names });
 
   res.json({
     success: true,
-    message: "Đồng bộ dữ liệu khoa thành công",
+    message: dryRun ? "Xem trước đồng bộ khoa/phòng (chưa lưu dữ liệu)" : "Đồng bộ dữ liệu khoa thành công",
     data: result,
   });
 });

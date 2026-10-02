@@ -10,6 +10,11 @@ export interface CreateDocumentPayload {
   meta?: any;
   /** 🔗 Giai đoạn 3 (module Asset) — xem `document.model.ts` (`relatedAsset`) */
   relatedAsset?: any;
+  /** BR-03 (DEV-092) — khoa của người tạo, lấy từ `req.user`, KHÔNG từ body. */
+  callerDepartment?: any;
+  isAdmin: boolean;
+  /** Permission `DOCUMENT_CREATE_ALL_DEPARTMENTS` — xem `canCreateInDepartment`. */
+  canCreateAllDepartments: boolean;
 }
 
 /**

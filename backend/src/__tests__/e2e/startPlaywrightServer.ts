@@ -15,6 +15,7 @@
 // tự tắt sau khi xong — `app.listen()` giữ tiến trình sống để Playwright
 // (`playwright.config.ts::webServer`) tự khởi động/tắt tiến trình này bao
 // quanh vòng đời test suite (spawn trước khi chạy test, kill sau khi xong).
+import "../../config/timezone"; // BR-09 (DEV-097): giờ VN, giống server.ts
 import { startE2EDatabase } from "./setup";
 import { seedRbac, seedUser } from "./seedTestData";
 

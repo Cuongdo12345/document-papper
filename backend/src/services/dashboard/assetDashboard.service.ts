@@ -113,13 +113,15 @@ export const getAssetDashboardSummaryService = async () => {
  * đây là danh sách XEM TOÀN BỘ cho dashboard, không phải danh sách "chưa
  * được thông báo").
  */
+//
+// BR-05 (DEV-094): nhận `page`/`limit` ĐÃ PARSE + CLAMP ở controller
+// (`parsePaginationQuery`, tối đa 100) thay vì `req.query` thô — trước đây
+// `parseInt(limit)` không có trần (`?limit=1000000` tải toàn bộ kèm populate)
+// và `?limit=abc` ra `NaN`.
 export const getWarrantyExpiringListService = async (
   daysAhead = 30,
-  query: any = {},
+  { page: pageNumber, limit: pageSize }: { page: number; limit: number },
 ) => {
-  const { page = 1, limit = 10 } = query;
-  const pageNumber = Math.max(parseInt(page, 10), 1);
-  const pageSize = Math.max(parseInt(limit, 10), 1);
   const skip = (pageNumber - 1) * pageSize;
 
   const threshold = new Date();
@@ -157,13 +159,13 @@ export const getWarrantyExpiringListService = async (
  * `assetAlerts.service.ts`. Kèm `daysInMaintenance` tính sẵn cho FE khỏi
  * phải tự tính lại.
  */
+//
+// BR-05 (DEV-094): `page`/`limit` đã parse + clamp ở controller — xem
+// `getWarrantyExpiringListService`.
 export const getMaintenanceOverdueListService = async (
   daysThreshold = 7,
-  query: any = {},
+  { page: pageNumber, limit: pageSize }: { page: number; limit: number },
 ) => {
-  const { page = 1, limit = 10 } = query;
-  const pageNumber = Math.max(parseInt(page, 10), 1);
-  const pageSize = Math.max(parseInt(limit, 10), 1);
   const skip = (pageNumber - 1) * pageSize;
 
   const threshold = new Date();

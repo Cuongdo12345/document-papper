@@ -22,17 +22,29 @@ import assetCategoryRoutes from "./routes/assets/assetCategory.routes";
 import medicalDeviceRoutes from "./routes/assets/medicalDevice.routes";
 import assetMaintenancePlanRoutes from "./routes/assets/assetMaintenancePlan.routes";
 import assetRoutes from "./routes/assets/asset.routes";
+import operatorCertificateRoutes from "./routes/assets/operatorCertificate.routes";
 import inventoryRoutes from "./routes/inventory/inventory.routes";
 import vendorRoutes from "./routes/vendors/vendor.routes";
 import contractRoutes from "./routes/vendors/contract.routes";
 import systemDesignRoutes from "./routes/systemDesign/systemDesign.routes";
+import projectDocsRoutes from "./routes/projectDocs/projectDocs.routes";
 
 import { performanceMiddleware } from "./middlewares/performance.middleware";
 import { errorHandler } from "./middlewares/error.middleware";
 import { setupSwagger } from "./config/swagger/swagger";
+import { parseTrustProxy } from "./shared/utils/trustProxy.util";
 
 
 const app = express();
+
+/* ===============================
+   🌐 TRUST PROXY
+================================= */
+// BR-08 (DEV-096): khi chạy sau Cloudflare/Nginx, cần tin đúng số lớp proxy
+// để `req.ip` là IP thật của người dùng (rate limit đăng nhập theo IP + IP
+// lưu ở "Phiên đăng nhập"). Đọc từ ENV `TRUST_PROXY`, mặc định TẮT — xem
+// `parseTrustProxy` (giá trị sai → throw ngay lúc khởi động).
+app.set("trust proxy", parseTrustProxy(process.env.TRUST_PROXY));
 
 /* ===============================
    🆔 REQUEST ID
@@ -127,6 +139,10 @@ app.use("/api/assets/medical-devices", medicalDeviceRoutes)
 // con) sẽ "nuốt" mất "/api/assets/maintenance-plans" nếu bị đăng ký trước.
 app.use("/api/assets/maintenance-plans", assetMaintenancePlanRoutes)
 app.use("/api/assets", assetRoutes)
+// DEV-077 — module MỚI, độc lập, không có prefix con nào khác trùng/lồng
+// (KHÁC "/api/assets/*" ở trên — chứng chỉ gắn theo user+danh mục thiết bị,
+// không theo 1 Asset cụ thể, không cần nằm trong namespace "/api/assets").
+app.use("/api/operator-certificates", operatorCertificateRoutes)
 // Roadmap B3 (2026-09-15) — module MỚI, không có prefix con nào khác cần
 // mount trước (không giống các nhánh /api/assets/* ở trên).
 app.use("/api/inventory", inventoryRoutes)
@@ -135,6 +151,7 @@ app.use("/api/inventory", inventoryRoutes)
 app.use("/api/vendors", vendorRoutes)
 app.use("/api/contracts", contractRoutes)
 app.use("/api/system-design", systemDesignRoutes)
+app.use("/api/project-docs", projectDocsRoutes)
 
 /* ===============================
    ❌ GLOBAL ERROR HANDLER

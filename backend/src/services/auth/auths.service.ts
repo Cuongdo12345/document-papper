@@ -31,6 +31,41 @@ const OTP_EXPIRES_MINUTES = 10;
 /** Chặn brute-force mã 6 số (1 triệu khả năng) — quá 5 lần sai phải đăng nhập/yêu cầu lại từ đầu. */
 const OTP_MAX_ATTEMPTS = 5;
 
+type OtpCheckResult = "ok" | "wrong" | "unavailable";
+
+/**
+ * BR-14 (DEV-102, 2026-09-30) — kiểm tra 1 mã OTP theo kiểu ATOMIC.
+ *
+ * Trước đây mỗi nơi tự làm "đọc `attempts` → so mã → `attempts += 1` → save()":
+ *   (a) N request song song cùng đọc `attempts=0` rồi cùng ghi `1` → chỉ đếm 1
+ *       lần, vượt được giới hạn 5;
+ *   (b) 2 request song song cùng mã ĐÚNG cùng thấy `used=false` → 1 mã dùng
+ *       được 2 lần (2 phiên đăng nhập).
+ *
+ * Nay 2 bước, mỗi bước là 1 thao tác duy nhất phía MongoDB:
+ *   1. GIÀNH lượt thử: `findOneAndUpdate` với điều kiện `attempts < MAX` +
+ *      `used=false` + chưa hết hạn, cộng `attempts` bằng `$inc`. Chỉ tối đa
+ *      `OTP_MAX_ATTEMPTS` request giành được, bất kể song song bao nhiêu —
+ *      nên tối đa chừng đó lần so mã.
+ *   2. GIÀNH quyền dùng mã: `updateOne` `used:false → true`; chỉ 1 request
+ *      thấy `modifiedCount=1`.
+ * `unavailable` = mã đã dùng/hết hạn/hết lượt (kể cả vừa bị request khác chiếm).
+ */
+const checkOtpAtomically = async (otpId: any, code: string): Promise<OtpCheckResult> => {
+  const reserved = await TwoFactorOtp.findOneAndUpdate(
+    { _id: otpId, used: false, expiresAt: { $gt: new Date() }, attempts: { $lt: OTP_MAX_ATTEMPTS } },
+    { $inc: { attempts: 1 } },
+    { new: true },
+  );
+  if (!reserved) return "unavailable";
+
+  const isMatch = await bcrypt.compare(code, reserved.codeHash);
+  if (!isMatch) return "wrong";
+
+  const claimed = await TwoFactorOtp.updateOne({ _id: otpId, used: false }, { $set: { used: true } });
+  return claimed.modifiedCount === 1 ? "ok" : "unavailable";
+};
+
 // ⚠️ ĐÃ XÁC NHẬN qua `role.model.ts`: `Role` là NAMED export
 // (`export const Role = model<IRole>(...)`), KHÔNG PHẢI default export — bản
 // trước đó của file này dùng `import Role from ...` (sai, sẽ lỗi runtime/type
@@ -77,11 +112,10 @@ const DUMMY_PASSWORD_HASH =
  * quyết định sau trước khi coi là hoàn chỉnh, vì đây đều là quyết định
  * nghiệp vụ/bảo mật, không phải lỗi kỹ thuật đơn thuần:
  *
- *   1. **Cho phép tự đăng ký công khai** (không cần admin duyệt trước).
- *      Nếu hệ thống của bạn chỉ nên tạo user qua Admin (UserService riêng,
- *      có kiểm soát role/department chặt hơn), route "/register" này
- *      KHÔNG NÊN mở public — cân nhắc bỏ hẳn hoặc giới hạn `authorizePermission`
- *      (chỉ Admin gọi được) thay vì để ai cũng tự đăng ký.
+ *   1. **Cho phép tự đăng ký công khai** — [ĐÃ QUYẾT 2026-09-29, BR-01]
+ *      route "/register" mặc định TẮT, chỉ bật khi ENV
+ *      `ALLOW_SELF_REGISTER=true` (gate ở `auth.routes.ts`). Tài khoản bình
+ *      thường tạo qua `POST /users` (Admin).
  *   2. **`isActive: true` ngay khi đăng ký** (không cần xác thực email trước).
  *      Nếu cần bắt buộc verify email trước khi kích hoạt tài khoản, cần
  *      thêm cờ `isActive: false` + luồng gửi email xác thực riêng (không
@@ -324,15 +358,11 @@ export const verifyLoginOtp = async (username: string, code: string, meta: Sessi
     throw ApiError.unauthorized("Đã nhập sai mã quá số lần cho phép, vui lòng đăng nhập lại");
   }
 
-  const isMatch = await bcrypt.compare(code, otp.codeHash);
-  if (!isMatch) {
-    otp.attempts += 1;
-    await otp.save();
-    throw ApiError.unauthorized("Mã xác thực không đúng");
+  const check = await checkOtpAtomically(otp._id, code);
+  if (check === "wrong") throw ApiError.unauthorized("Mã xác thực không đúng");
+  if (check === "unavailable") {
+    throw ApiError.unauthorized("Mã xác thực không hợp lệ hoặc đã hết hạn, vui lòng đăng nhập lại");
   }
-
-  otp.used = true;
-  await otp.save();
 
   return issueLoginTokens(user, meta);
 };
@@ -380,15 +410,11 @@ export const confirmEnableTwoFactor = async (userId: any, code: string) => {
     throw ApiError.badRequest("Đã nhập sai mã quá số lần cho phép, vui lòng yêu cầu lại");
   }
 
-  const isMatch = await bcrypt.compare(code, otp.codeHash);
-  if (!isMatch) {
-    otp.attempts += 1;
-    await otp.save();
-    throw ApiError.badRequest("Mã xác thực không đúng");
+  const check = await checkOtpAtomically(otp._id, code);
+  if (check === "wrong") throw ApiError.badRequest("Mã xác thực không đúng");
+  if (check === "unavailable") {
+    throw ApiError.badRequest("Mã xác thực không hợp lệ hoặc đã hết hạn, vui lòng yêu cầu lại");
   }
-
-  otp.used = true;
-  await otp.save();
 
   user.twoFactorEnabled = true;
   await user.save();

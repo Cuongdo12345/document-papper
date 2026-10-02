@@ -35,15 +35,26 @@ const storage = multer.diskStorage({
   }
 });
 
+/**
+ * BR-15 (DEV-103, 2026-09-30, user chốt 10): số file tối đa mỗi request. Trước
+ * đây chỉ giới hạn dung lượng TỪNG file (10MB), không giới hạn số file, nên 1
+ * request có thể ghi vô số file lên đĩa. Vượt giới hạn → `MulterError`
+ * `LIMIT_FILE_COUNT` → 400 (`error.middleware.ts`), multer tự xoá các file đã
+ * ghi dở của request đó. Frontend dùng cùng con số này (`FilesListPage.tsx`).
+ */
+export const MAX_FILES_PER_REQUEST = 10;
+
 // middleware factory (QUAN TRỌNG)
 export const createUploader = (options?: {
   maxSize?: number;
+  maxFiles?: number;
   allowedTypes?: string[];
 }) => {
   return multer({
     storage,
     limits: {
-      fileSize: options?.maxSize || 10 * 1024 * 1024
+      fileSize: options?.maxSize || 10 * 1024 * 1024,
+      files: options?.maxFiles || MAX_FILES_PER_REQUEST,
     },
     fileFilter: (_, file, cb) => {
       if (!options?.allowedTypes) return cb(null, true);

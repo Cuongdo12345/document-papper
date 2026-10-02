@@ -53,6 +53,42 @@ export const UpdateUserDTO = z.object({
 });
 
 /**
+ * [MỚI DEV-079] Avatar — lưu THẲNG base64 trong document User (xem giải
+ * thích đầy đủ ở `user.interface.ts`), KHÔNG qua multer/file riêng. Chấp
+ * nhận đúng 3 định dạng ảnh phổ biến, giới hạn kích thước GỐC (đã giải mã
+ * base64, KHÔNG tính overhead ~33% của chính base64) để tránh phình
+ * document User — 300KB đủ cho ảnh đại diện vuông nhỏ, không cần resize
+ * server-side (dự án chưa có thư viện xử lý ảnh nào, không thêm dependency
+ * mới chỉ cho tính năng này).
+ */
+const AVATAR_ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
+const AVATAR_MAX_BYTES = 300 * 1024;
+
+// `/` không phải ký tự đặc biệt trong regex (chỉ cần escape khi dùng cú
+// pháp literal `/.../`, KHÔNG cần khi dựng qua `new RegExp(string)`).
+const AVATAR_DATA_URL_REGEX = new RegExp(
+  `^data:(${AVATAR_ALLOWED_MIME.join("|")});base64,([A-Za-z0-9+/]+={0,2})$`,
+);
+
+function isValidAvatarDataUrl(value: string): boolean {
+  const match = AVATAR_DATA_URL_REGEX.exec(value);
+  if (!match) return false;
+  const base64Payload = match[2];
+  const padding = (base64Payload.match(/=+$/) ?? [""])[0].length;
+  const byteLength = (base64Payload.length * 3) / 4 - padding;
+  return byteLength > 0 && byteLength <= AVATAR_MAX_BYTES;
+}
+
+export const UpdateAvatarDTO = z.object({
+  avatar: z
+    .string()
+    .refine(
+      isValidAvatarDataUrl,
+      `Ảnh đại diện không hợp lệ — chỉ chấp nhận JPEG/PNG/WebP, tối đa ${AVATAR_MAX_BYTES / 1024}KB`,
+    ),
+});
+
+/**
  * ASSIGN ROLE (TASK-002, Việc 2) — DTO cho endpoint riêng gán role cho user,
  * wire lại `assignRole()` (users.service.ts) vốn trước đây là dead code.
  */

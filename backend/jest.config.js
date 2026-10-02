@@ -1,3 +1,8 @@
+// BR-09 (DEV-097): cố định giờ VN cho test — giống `src/config/timezone.ts`
+// ở runtime thật. Đặt ở đây (process cha) để mọi worker jest kế thừa, test
+// cho kết quả như nhau dù máy chạy test (CI...) để UTC.
+process.env.TZ = "Asia/Ho_Chi_Minh";
+
 /** @type {import('ts-jest').JestConfigWithTsJest} */
 module.exports = {
   preset: "ts-jest",

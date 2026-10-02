@@ -30,6 +30,19 @@ export enum NotificationType {
   // giống cảnh báo bảo hành" — không phải kiểu nhắc lặp lại như
   // `ASSET_MAINTENANCE_OVERDUE`.
   MEDICAL_DEVICE_CALIBRATION_DUE = "MEDICAL_DEVICE_CALIBRATION_DUE",
+  // [MỚI] Cảnh báo hết hạn giấy phép lưu hành thiết bị y tế
+  // (`licenseExpiredAt`) — trước đây field này được lưu nhưng KHÔNG có cron
+  // nào theo dõi (gap đã ghi nhận trực tiếp trong comment gốc của
+  // `runMedicalDeviceAlertsService`). Cùng pattern `MEDICAL_DEVICE_CALIBRATION_DUE`:
+  // 1 type dùng chung cho cả "sắp hết hạn" và "đã hết hạn", phân biệt qua
+  // title/message, gửi ĐÚNG 1 lần (không nhắc lặp lại).
+  MEDICAL_DEVICE_LICENSE_EXPIRING = "MEDICAL_DEVICE_LICENSE_EXPIRING",
+  // [MỚI, DEV-077] Cảnh báo chứng chỉ vận hành thiết bị y tế sắp/đã hết hạn
+  // — xem trigger tại `checkOperatorCertificateExpiringService`
+  // (`medicalDeviceAlerts.service.ts`, cùng cron). Gửi CẢ role "IT" LẪN
+  // chính người có chứng chỉ (khác 2 type trên chỉ gửi role) — quyết định
+  // đã xác nhận với user qua AskUserQuestion.
+  OPERATOR_CERTIFICATE_EXPIRING = "OPERATOR_CERTIFICATE_EXPIRING",
   // Roadmap B1 (SLA & nhắc việc Workflow, 2026-09-15) — bổ sung thêm, không
   // đổi giá trị cũ. Xem trigger tại `workflowSlaAlerts.service.ts` (cron job
   // hằng ngày). 2 type RIÊNG BIỆT (không dùng chung 1 type như

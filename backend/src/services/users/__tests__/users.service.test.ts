@@ -25,7 +25,7 @@ import UserAudit from "../../../models/users/userAudit.model";
 import { Asset } from "../../../models/assets/asset.model";
 import TwoFactorOtp from "../../../models/auth/twoFactorOtp.model";
 import { getCachedPermissions } from "../../rbac/permission.cache";
-import { resetPassword, resetTwoFactor, listUserSessions, revokeUserSession, listAllSessions, changePassword, getMeService, updateMeService, bulkDisable, bulkRestore, create, update } from "../users.service";
+import { resetPassword, resetTwoFactor, listUserSessions, revokeUserSession, listAllSessions, changePassword, getMeService, updateMeService, bulkDisable, bulkRestore, create, update, setAvatarService, removeAvatarService } from "../users.service";
 
 const mockedUser = User as any;
 const mockedRole = Role as any;
@@ -566,6 +566,73 @@ describe("users.service — updateMeService (DEV note FE-14 #24 — PATCH /users
       { _id: "u1", isActive: true },
       { $set: { fullName: "Tên mới" } },
       expect.anything(),
+    );
+  });
+});
+
+// [MỚI DEV-079] Avatar — dùng CHUNG cho self (/me/avatar, KHÔNG performedBy)
+// VÀ admin sửa hộ user khác (/:id/avatar, LUÔN performedBy).
+describe("users.service — setAvatarService/removeAvatarService (DEV-079)", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("setAvatarService: 404 nếu user không tồn tại hoặc đã bị vô hiệu hoá", async () => {
+    mockedUser.findOneAndUpdate.mockReturnValue(makeQuery(null));
+
+    await expect(setAvatarService("u-khong-ton-tai", "data:image/png;base64,AAAA")).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+
+  it("setAvatarService: self-service (KHÔNG truyền performedBy) — KHÔNG ghi audit", async () => {
+    mockedUser.findOneAndUpdate.mockReturnValue(makeQuery({ _id: "u1", avatar: "data:image/png;base64,AAAA" }));
+
+    const result = (await setAvatarService("u1", "data:image/png;base64,AAAA")) as any;
+
+    expect(result.avatar).toBe("data:image/png;base64,AAAA");
+    expect(mockedUser.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: "u1", isActive: true },
+      { $set: { avatar: "data:image/png;base64,AAAA" } },
+      expect.anything(),
+    );
+    expect(mockedUserAudit.create).not.toHaveBeenCalled();
+  });
+
+  it("setAvatarService: ADMIN sửa hộ user khác (CÓ performedBy) — GHI audit UPDATE", async () => {
+    mockedUser.findOneAndUpdate.mockReturnValue(makeQuery({ _id: "u2", avatar: "data:image/png;base64,BBBB" }));
+
+    await setAvatarService("u2", "data:image/png;base64,BBBB", "admin-1");
+
+    expect(mockedUserAudit.create).toHaveBeenCalledWith(
+      expect.objectContaining({ user: "u2", action: "UPDATE", performedBy: "admin-1", note: "Cập nhật ảnh đại diện" }),
+    );
+  });
+
+  it("removeAvatarService: 404 nếu user không tồn tại hoặc đã bị vô hiệu hoá", async () => {
+    mockedUser.findOneAndUpdate.mockReturnValue(makeQuery(null));
+
+    await expect(removeAvatarService("u-khong-ton-tai")).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("removeAvatarService: $unset đúng field avatar, self-service KHÔNG ghi audit", async () => {
+    mockedUser.findOneAndUpdate.mockReturnValue(makeQuery({ _id: "u1" }));
+
+    await removeAvatarService("u1");
+
+    expect(mockedUser.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: "u1", isActive: true },
+      { $unset: { avatar: "" } },
+      expect.anything(),
+    );
+    expect(mockedUserAudit.create).not.toHaveBeenCalled();
+  });
+
+  it("removeAvatarService: ADMIN xoá hộ user khác (CÓ performedBy) — GHI audit UPDATE", async () => {
+    mockedUser.findOneAndUpdate.mockReturnValue(makeQuery({ _id: "u2" }));
+
+    await removeAvatarService("u2", "admin-1");
+
+    expect(mockedUserAudit.create).toHaveBeenCalledWith(
+      expect.objectContaining({ user: "u2", action: "UPDATE", performedBy: "admin-1", note: "Xoá ảnh đại diện" }),
     );
   });
 });

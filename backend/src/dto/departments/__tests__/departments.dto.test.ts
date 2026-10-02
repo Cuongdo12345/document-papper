@@ -1,4 +1,4 @@
-import { CreateDepartmentDTO, UpdateDepartmentDTO } from "../departments.dto";
+import { CreateDepartmentDTO, UpdateDepartmentDTO, QueryDepartmentDTO } from "../departments.dto";
 
 // DEV-021/SEC-11 — `department.routes.ts` trước đây KHÔNG có validateBody
 // nào. Khi wire lại, phát hiện 2 DTO có sẵn đã LỆCH `department.model.ts`
@@ -50,6 +50,28 @@ describe("departments.dto (DEV-021/SEC-11)", () => {
     it("từ chối code/name rỗng nếu có truyền", () => {
       expect(UpdateDepartmentDTO.safeParse({ name: "" }).success).toBe(false);
       expect(UpdateDepartmentDTO.safeParse({ code: "" }).success).toBe(false);
+    });
+  });
+
+  // [DEV-086] Cùng pattern `QueryAssetCategoryDTO.isActive` — coerce string
+  // "true"/"false" (từ query string HTTP) sang boolean, không truyền -> `undefined`
+  // (để service tự map thành mặc định `true`, KHÔNG áp mặc định ở DTO).
+  describe("QueryDepartmentDTO.isActive", () => {
+    it("không truyền -> undefined (service tự mặc định active-only)", () => {
+      const result = QueryDepartmentDTO.safeParse({});
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.isActive).toBeUndefined();
+    });
+
+    it('"true"/"false" -> boolean tương ứng', () => {
+      const trueResult = QueryDepartmentDTO.safeParse({ isActive: "true" });
+      const falseResult = QueryDepartmentDTO.safeParse({ isActive: "false" });
+      expect(trueResult.success && trueResult.data.isActive).toBe(true);
+      expect(falseResult.success && falseResult.data.isActive).toBe(false);
+    });
+
+    it("giá trị khác 'true'/'false' bị từ chối", () => {
+      expect(QueryDepartmentDTO.safeParse({ isActive: "yes" }).success).toBe(false);
     });
   });
 });

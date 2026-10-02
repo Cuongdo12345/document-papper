@@ -51,7 +51,10 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.DEPARTMENT_VIEW_DETAIL,
     PERMISSIONS.DEPARTMENT_CREATE,
     PERMISSIONS.DEPARTMENT_UPDATE,
-    PERMISSIONS.DEPARTMENT_DELETE, 
+    PERMISSIONS.DEPARTMENT_DELETE,
+    // [DEV-086] IT đã có đủ CREATE/UPDATE/DELETE khoa/phòng — cấp thêm
+    // RESTORE cùng nhóm quyền quản lý khoa/phòng đầy đủ.
+    PERMISSIONS.DEPARTMENT_RESTORE,
     //Quyền về user — IT được XEM danh sách/chi tiết user (hỗ trợ tài khoản),
     // CỐ TÌNH KHÔNG cấp USER_CREATE/UPDATE/DELETE/RESET_PASSWORD (quản lý tài
     // khoản đầy đủ vẫn là đặc quyền ADMIN — xác nhận qua FE-03, 2026-09-05).
@@ -131,6 +134,13 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     // Giai đoạn 3 — chạy tay cảnh báo kiểm định, chỉ IT (cùng nguyên tắc
     // ASSET_ALERTS_TRIGGER).
     PERMISSIONS.MEDICAL_DEVICE_ALERTS_TRIGGER,
+    // [MỚI, DEV-077] Theo dõi chứng chỉ vận hành — IT cấp/quản lý chứng chỉ
+    // (cùng bộ phận quản lý hồ sơ tuân thủ pháp lý thiết bị y tế ở trên).
+    PERMISSIONS.OPERATOR_CERTIFICATE_VIEW,
+    PERMISSIONS.OPERATOR_CERTIFICATE_CREATE,
+    // [MỚI, DEV-078] Sửa/thu hồi/xoá — cùng nhóm được tin cậy tạo mới ở trên.
+    PERMISSIONS.OPERATOR_CERTIFICATE_UPDATE,
+    PERMISSIONS.OPERATOR_CERTIFICATE_REVOKE,
 
     // Dashboard: IT trực tiếp quản lý Document/Asset nên cần xem KPI.
     PERMISSIONS.DASHBOARD_READ,
@@ -218,6 +228,10 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     // Medical Device: user thường chỉ xem hồ sơ tuân thủ (vd: xem thiết bị
     // mình đang vận hành có cần chứng chỉ vận hành riêng không).
     PERMISSIONS.MEDICAL_DEVICE_VIEW,
+    // [MỚI, DEV-077] Xem được ai đủ điều kiện vận hành (vd tự kiểm tra
+    // chứng chỉ của mình còn hạn không) — KHÔNG có CREATE (chỉ IT/Vật
+    // tư-TTB mới cấp chứng chỉ).
+    PERMISSIONS.OPERATOR_CERTIFICATE_VIEW,
 
     // Workflow: user là người khởi tạo đề xuất, cần submit/xem/huỷ/hoàn
     // tất đề xuất CỦA CHÍNH MÌNH — quyền theo từng bản ghi cụ thể vẫn do
@@ -247,6 +261,9 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.ASSET_VIEW,
     PERMISSIONS.ASSET_VIEW_DETAIL,
     PERMISSIONS.MEDICAL_DEVICE_VIEW,
+    // [MỚI, DEV-077] Xem chú thích ở TRUONG_KHOA/khối role Giai đoạn 3 —
+    // cùng logic MEDICAL_DEVICE_VIEW (xem, không tạo).
+    PERMISSIONS.OPERATOR_CERTIFICATE_VIEW,
     PERMISSIONS.WORKFLOW_VIEW,
     PERMISSIONS.WORKFLOW_APPROVE,
     PERMISSIONS.WORKFLOW_REJECT,
@@ -269,6 +286,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.ASSET_VIEW,
     PERMISSIONS.ASSET_VIEW_DETAIL,
     PERMISSIONS.MEDICAL_DEVICE_VIEW,
+    // [MỚI, DEV-077] Xem chú thích ở TRUONG_KHOA — cùng logic.
+    PERMISSIONS.OPERATOR_CERTIFICATE_VIEW,
     PERMISSIONS.WORKFLOW_VIEW,
     PERMISSIONS.WORKFLOW_APPROVE,
     PERMISSIONS.WORKFLOW_REJECT,
@@ -286,6 +305,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.ASSET_VIEW,
     PERMISSIONS.ASSET_VIEW_DETAIL,
     PERMISSIONS.MEDICAL_DEVICE_VIEW,
+    // [MỚI, DEV-077] Xem chú thích ở TRUONG_KHOA — cùng logic.
+    PERMISSIONS.OPERATOR_CERTIFICATE_VIEW,
     PERMISSIONS.WORKFLOW_VIEW,
     PERMISSIONS.WORKFLOW_APPROVE,
     PERMISSIONS.WORKFLOW_REJECT,
@@ -408,6 +429,13 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.MEDICAL_DEVICE_UPDATE,
     PERMISSIONS.MEDICAL_DEVICE_CALIBRATE,
     PERMISSIONS.MEDICAL_DEVICE_ALERTS_TRIGGER,
+    // [MỚI, DEV-077] Cùng lý do đã ghi ở khối IT — Vật tư-TTB cũng trực tiếp
+    // cấp/quản lý chứng chỉ vận hành thiết bị y tế.
+    PERMISSIONS.OPERATOR_CERTIFICATE_VIEW,
+    PERMISSIONS.OPERATOR_CERTIFICATE_CREATE,
+    // [MỚI, DEV-078] Sửa/thu hồi/xoá — cùng nhóm được tin cậy tạo mới ở trên.
+    PERMISSIONS.OPERATOR_CERTIFICATE_UPDATE,
+    PERMISSIONS.OPERATOR_CERTIFICATE_REVOKE,
 
     PERMISSIONS.DASHBOARD_READ,
 

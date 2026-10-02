@@ -5,6 +5,9 @@ import {
   getDepartmentByIdService,
   updateDepartmentService,
   deleteDepartmentService,
+  bulkDeleteDepartmentService,
+  restoreDepartmentService,
+  bulkRestoreDepartmentService,
 } from "../../services/departments/departments.service";
 import { catchAsync } from "../../shared/utils/catchAsync";
 
@@ -77,7 +80,7 @@ export const updateDepartment = catchAsync(
 );
 
 /**
- * DELETE
+ * DELETE (xoá mềm — DEV-086)
  */
 export const deleteDepartment = catchAsync(
   async (req: Request, res: Response) => {
@@ -88,4 +91,40 @@ export const deleteDepartment = catchAsync(
     });
   },
 );
+
+/**
+ * BULK DELETE (xoá mềm hàng loạt — DEV-086)
+ */
+export const bulkDeleteDepartments = catchAsync(async (req: Request, res: Response) => {
+  const result = await bulkDeleteDepartmentService(req.body.ids, req.user?._id);
+
+  res.json({
+    message: `Đã xoá ${result.deletedIds.length}/${req.body.ids.length} khoa/phòng`,
+    data: result,
+  });
+});
+
+/**
+ * RESTORE (khôi phục khoa đã xoá mềm — DEV-086)
+ */
+export const restoreDepartment = catchAsync(async (req: Request, res: Response) => {
+  const department = await restoreDepartmentService(req.params.id, req.user?._id);
+
+  res.json({
+    message: "Khôi phục khoa thành công",
+    data: department,
+  });
+});
+
+/**
+ * BULK RESTORE (khôi phục hàng loạt — DEV-086)
+ */
+export const bulkRestoreDepartments = catchAsync(async (req: Request, res: Response) => {
+  const result = await bulkRestoreDepartmentService(req.body.ids, req.user?._id);
+
+  res.json({
+    message: `Đã khôi phục ${result.deletedIds.length}/${req.body.ids.length} khoa/phòng`,
+    data: result,
+  });
+});
 

@@ -1,4 +1,5 @@
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
+import ApiError from "../../shared/errors/ApiError";
 import {
   register,
   login,
@@ -43,7 +44,20 @@ import {
 //     PUBLIC hay không — xem ghi chú chi tiết ở `AuthService.register()`.
 const router = Router();
 
-router.post("/register", authRateLimiter, validateBody(RegisterDTO), register);
+// BR-01 (docs/31_BACKEND_CODE_REVIEW.md, 2026-09-29): tự đăng ký public tạo
+// ngay tài khoản USER đang hoạt động — frontend không dùng, tài khoản chỉ nên
+// tạo qua `POST /users` (Admin). Mặc định TẮT (404), chỉ bật khi ENV
+// `ALLOW_SELF_REGISTER=true`. Đọc ENV lúc request (không phải lúc load module)
+// để đổi cấu hình/test không cần nạp lại route. Đặt TRƯỚC `authRateLimiter`
+// để request bị chặn không tiêu hao bộ đếm dùng chung với "/login".
+const requireSelfRegisterEnabled = (_req: Request, _res: Response, next: NextFunction) => {
+  if (process.env.ALLOW_SELF_REGISTER !== "true") {
+    return next(ApiError.notFound("Chức năng tự đăng ký tài khoản đang tắt"));
+  }
+  next();
+};
+
+router.post("/register", requireSelfRegisterEnabled, authRateLimiter, validateBody(RegisterDTO), register);
 router.post("/login", authRateLimiter, validateBody(LoginDTO), login);
 router.post("/refresh-token", authRateLimiter, validateBody(RefreshTokenDTO), refreshAccessToken);
 // ⚠️ FIX (2026-09-06): trước đây route này KHÔNG có `validateBody` — controller

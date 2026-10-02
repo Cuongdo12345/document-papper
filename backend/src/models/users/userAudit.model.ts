@@ -75,6 +75,11 @@ const UserAuditSchema = new Schema<IUserAudit>(
  * Thay bằng 3 compound 2-field, khớp đúng pattern "lọc 1 field + sort
  * createdAt" — cho phép MongoDB dùng thẳng thứ tự index, không cần sort
  * trong bộ nhớ:
+ *
+ * BR-19 (DEV-109): DB dev còn sót 4 index CŨ không còn trong schema này
+ * (`performedBy_1`, `action_1`, `user_1`, index kép 4 field `action, performedBy,
+ * user, createdAt`) vì Mongoose không tự xoá index khi sửa schema — đã xoá bằng
+ * `scripts/migrate-drop-redundant-indexes.ts`.
  */
 UserAuditSchema.index({ user: 1, createdAt: -1 });
 UserAuditSchema.index({ performedBy: 1, createdAt: -1 });

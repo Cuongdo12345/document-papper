@@ -2,7 +2,7 @@
 //
 // Roadmap B4 (2026-09-16).
 import { z } from "zod";
-import { objectId } from "../common.dto";
+import { objectId, BulkIdsDTO } from "../common.dto";
 
 const dateRangeRefine = (data: { startDate: Date; endDate: Date }) => data.endDate > data.startDate;
 
@@ -39,6 +39,11 @@ export const UpdateContractDTO = z
   });
 
 export const CancelContractDTO = z.object({
+  cancelReason: z.string().trim().optional(),
+});
+
+/** [DEV-087] Huỷ hàng loạt — `ids` theo `BulkIdsDTO` chung + 1 lý do áp chung (tuỳ chọn). */
+export const BulkCancelContractsDTO = BulkIdsDTO.extend({
   cancelReason: z.string().trim().optional(),
 });
 

@@ -21,6 +21,7 @@
 
 import { MongoMemoryReplSet } from "mongodb-memory-server";
 import mongoose from "mongoose";
+import os from "os";
 
 let replSet: MongoMemoryReplSet | undefined;
 
@@ -47,7 +48,13 @@ export const startE2EDatabase = async (): Promise<void> => {
   process.env.CLIENT_URL ??= "http://localhost:5173";
 
   mongoose.set("strictQuery", false);
-  await mongoose.connect(uri);
+  // DEV-099: driver mongodb 7.6 (kèm mongoose 9.10) nạp `os` bằng
+  // `import('os')` động. Sandbox CommonJS của jest không hỗ trợ import động
+  // (cần --experimental-vm-modules), nên lỗi bị nuốt, metadata handshake
+  // rỗng, và server từ chối với "Missing required sub-document 'driver'".
+  // Truyền sẵn `os` qua option chính thức `runtimeAdapters` để né. Chỉ ảnh
+  // hưởng môi trường jest; app chạy bằng node thường không bị.
+  await mongoose.connect(uri, { runtimeAdapters: { os } });
 };
 
 /** Đóng kết nối + tắt in-memory server. Gọi trong `afterAll`. */

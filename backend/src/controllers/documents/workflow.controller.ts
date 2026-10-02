@@ -42,7 +42,12 @@ export const getTemplates = catchAsync(async (req: Request, res: Response) => {
 export const submit = catchAsync(async (req: Request, res: Response) => {
   const { documentId, templateId } = req.body;
 
-  const wf = await service.submitWorkflow(documentId, templateId);
+  // BR-02 (DEV-091): truyền khoa + cờ Admin để service kiểm tra "cùng khoa
+  // hoặc Admin" — cùng cách suy ra `isAdmin` với `approve`/`reject` bên dưới.
+  const wf = await service.submitWorkflow(documentId, templateId, {
+    callerDepartment: req.user!.department,
+    isAdmin: req.user!.role.isSystemRole === true,
+  });
 
   res.json({
     success: true,

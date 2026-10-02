@@ -60,10 +60,25 @@ describe("systemDesign.service — getSystemDesignService (DEV-073)", () => {
     expect(relationsOf("Document")).toContainEqual({ model: "Document", field: "referenceTo[]", ref: "Document" });
   });
 
-  it("KHÔNG có quan hệ ảo nào bị suy diễn cho model không có ref thật (Department chỉ 2 field, không có ObjectId nào)", () => {
+  // [DEV-086] ĐỔI model mẫu từ Department -> Counter: Department nay có
+  // `deletedBy` (ref thật -> User, xoá mềm) nên KHÔNG còn "0 ObjectId" —
+  // đây là quan hệ THẬT (đúng ý đồ suy diễn của hàm), không phải false-positive
+  // cần assert bằng 0 nữa. Counter (`key`/`seq`, không field nào là ObjectId)
+  // vẫn giữ đúng ý nghĩa gốc của test này.
+  it("KHÔNG có quan hệ ảo nào bị suy diễn cho model không có ref thật (Counter chỉ 2 field, không có ObjectId nào)", () => {
+    const result = getSystemDesignService();
+    const counterRelations = result.relationships.filter((r) => r.model === "Counter");
+
+    expect(counterRelations).toHaveLength(0);
+  });
+
+  // [DEV-086] Department nay có xoá mềm (cùng convention AssetCategory) —
+  // `deletedBy` là quan hệ THẬT tới User, phải xuất hiện đúng trong sơ đồ
+  // System Design (không phải model "mồ côi" như trước).
+  it("Department có quan hệ deletedBy -> User (DEV-086, xoá mềm)", () => {
     const result = getSystemDesignService();
     const departmentRelations = result.relationships.filter((r) => r.model === "Department");
 
-    expect(departmentRelations).toHaveLength(0);
+    expect(departmentRelations).toContainEqual({ model: "Department", field: "deletedBy", ref: "User" });
   });
 });

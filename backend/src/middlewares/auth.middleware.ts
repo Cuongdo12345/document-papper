@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { Types } from "mongoose";
 import { User } from "../models/users/user.model";
+import { Role } from "../models/rbac/role.model";
 import ApiError from "../shared/errors/ApiError";
 
 /**
@@ -40,10 +41,32 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
       throw ApiError.unauthorized("Token không hợp lệ");
     }
 
-    // 3. Load user từ DB (KHÔNG load permission ở đây)
-    const user = await User.findById(decoded.id)
-      .select("_id role department isActive")
-      .populate("role", "name isSystemRole");
+    // 3. Load user + role từ DB (KHÔNG load permission ở đây).
+    // BR-20 (DEV-106, 2026-09-30): trước đây `findById().populate("role")` =
+    // 2 truy vấn (user, rồi role) ở MỌI request đã đăng nhập. Nay 1 truy vấn
+    // duy nhất (`$lookup` phía MongoDB), trả ĐÚNG hình dạng cũ:
+    //   - `role` = { _id, name, isSystemRole } hoặc `null` nếu role không còn
+    //     (như populate);
+    //   - `isSystemRole` mặc định `false` (như default của schema Role khi hydrate).
+    const [user] = await User.aggregate([
+      { $match: { _id: new Types.ObjectId(decoded.id) } },
+      {
+        $lookup: {
+          from: Role.collection.name,
+          localField: "role",
+          foreignField: "_id",
+          pipeline: [{ $project: { name: 1, isSystemRole: { $ifNull: ["$isSystemRole", false] } } }],
+          as: "role",
+        },
+      },
+      {
+        $project: {
+          role: { $ifNull: [{ $arrayElemAt: ["$role", 0] }, null] },
+          department: 1,
+          isActive: 1,
+        },
+      },
+    ]);
 
     if (!user || !user.isActive) {
       throw ApiError.unauthorized("User không hợp lệ");
@@ -63,7 +86,19 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     // Sửa A4: log lỗi GỐC ở server (giúp phân biệt lỗi hạ tầng như DB down/
     // JWT_SECRET bị undefined với lỗi token thật sự sai/hết hạn), nhưng vẫn
     // trả về đúng 1 message chung cho client — không lộ chi tiết lỗi ra ngoài.
-    console.error("[authenticate] Lỗi xác thực:", error);
+    //
+    // BR-20 (DEV-106): trước đây MỌI lỗi đều `console.error` kèm stack, kể cả
+    // token hết hạn/sai chữ ký/không có token — những trường hợp bình thường
+    // (mỗi lần token hết hạn là 1 dòng + stack), làm nhiễu log và che lỗi thật.
+    // Nay bỏ qua log với lỗi XÁC THỰC bình thường (`ApiError` ném ở trên,
+    // `TokenExpiredError`/`NotBeforeError`/token sai — đều là con của
+    // `JsonWebTokenError`), CHỈ log lỗi bất thường: lỗi hạ tầng (DB) và thiếu
+    // `JWT_SECRET` (cũng là `JsonWebTokenError` nhưng là lỗi cấu hình, nên giữ log).
+    const isExpectedAuthFailure =
+      error instanceof ApiError || (error instanceof jwt.JsonWebTokenError && Boolean(process.env.JWT_SECRET));
+    if (!isExpectedAuthFailure) {
+      console.error("[authenticate] Lỗi xác thực:", error);
+    }
     next(ApiError.unauthorized("Token không hợp lệ"));
   }
 };

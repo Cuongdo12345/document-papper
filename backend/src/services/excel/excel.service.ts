@@ -3,6 +3,7 @@ import { Types } from "mongoose";
 import {
   Document,
   DocumentCategory,
+  DocumentSubType,
 } from "../../models/documents/document.model";
 import Department from "../../models/departments/department.model";
 import { Buffer } from "buffer";
@@ -21,6 +22,7 @@ import {
   MAX_IMPORT_ROWS,
   MAX_SYNC_ROWS,
   MAX_STORED_ERRORS,
+  DEPARTMENT_SYNC_HEADERS,
   VALID_PROPOSAL_SUBTYPES,
   ALLOWED_WORKFLOW_STATUSES,
 } from "../../shared/constants/excel.constants";
@@ -28,6 +30,8 @@ import { validateImportHeaderRow } from "../../shared/helpers/importHeaderValida
 import {
   normalizeDepartmentKey,
   findDepartmentsCaseInsensitive,
+  isDepartmentDeleted,
+  deletedDepartmentMessage,
 } from "../../shared/helpers/departmentLookup.helper";
 import { resolveImportStatus } from "../../shared/helpers/importStatus.helper";
 import { withTransaction } from "../../shared/utils/withTransaction";
@@ -153,9 +157,13 @@ export const exportDocumentsExcelPRO = async (query: any, res: any) => {
       { header: "Tiền kiểm tra", key: "reportTotal", width: 15 },
     ];
 
+    // BR-17 (DEV-105): chỉ nạp biên bản của ĐÚNG các đề xuất sẽ được xuất
+    // (cùng `filter` với cursor bên dưới) thay vì mọi biên bản của hệ thống.
+    const proposalIds = (await Document.find(filter).select("_id").lean()).map((d) => d._id);
+
     const [confirmMap, checkDamageMap] = await Promise.all([
-      buildMapFromReports("CONFIRM_STATUS"),
-      buildMapFromReports("CHECK_DAMAGE"),
+      buildMapFromReports(DocumentSubType.CONFIRM_STATUS, proposalIds),
+      buildMapFromReports(DocumentSubType.CHECK_DAMAGE, proposalIds),
     ]);
 
     const cursor = Document.find(filter)
@@ -483,6 +491,9 @@ export const importDocumentsExcel = async (
         result.errors.push({ row: i, message: "Loại giấy không hợp lệ" });
         continue;
       }
+      // Đã kiểm tra thuộc VALID_PROPOSAL_SUBTYPES ở trên — chỉ thu hẹp kiểu cho
+      // query/create (mongoose 9.10 kiểm tra kiểu filter chặt hơn, DEV-099).
+      const proposalSubType = subType as DocumentSubType;
 
       const department = departmentMap.get(
         normalizeDepartmentKey(departmentName),
@@ -492,6 +503,12 @@ export const importDocumentsExcel = async (
           row: i,
           message: `Không tìm thấy khoa: ${departmentName}`,
         });
+        continue;
+      }
+      // BR-06 (DEV-100): khoa đã xoá mềm không nhận tài liệu mới — báo lỗi
+      // đúng dòng (cả khi dryRun) thay vì âm thầm gắn vào khoa đang bị ẩn.
+      if (isDepartmentDeleted(department)) {
+        result.errors.push({ row: i, message: deletedDepartmentMessage(department) });
         continue;
       }
 
@@ -516,7 +533,7 @@ export const importDocumentsExcel = async (
         const txResult = await withTransaction(async (session) => {
           let currentProposal = await Document.findOne({
             category: DocumentCategory.PROPOSAL,
-            subType,
+            subType: proposalSubType,
             department: department._id,
             title,
             createdAt,
@@ -539,7 +556,7 @@ export const importDocumentsExcel = async (
                 {
                   documentCode,
                   category: DocumentCategory.PROPOSAL,
-                  subType,
+                  subType: proposalSubType,
                   department: department._id,
                   title,
                   createdAt,
@@ -568,7 +585,7 @@ export const importDocumentsExcel = async (
 
           if (parsedInspection && parsedInspection.items.length) {
             const reportSubType =
-              subType === "PROPOSE_INK" ? "CONFIRM_STATUS" : "CHECK_DAMAGE";
+              subType === "PROPOSE_INK" ? DocumentSubType.CONFIRM_STATUS : DocumentSubType.CHECK_DAMAGE;
 
             const existingReport = await Document.findOne({
               category: DocumentCategory.REPORT,
@@ -594,7 +611,7 @@ export const importDocumentsExcel = async (
                     createdAt,
                     createdBy: userId,
                     title:
-                      reportSubType === "CONFIRM_STATUS"
+                      reportSubType === DocumentSubType.CONFIRM_STATUS
                         ? "Biên bản xác nhận tình trạng thiết bị"
                         : "Biên bản kiểm tra tình trạng hư hỏng",
                     meta: {
@@ -629,7 +646,7 @@ export const importDocumentsExcel = async (
         // của preview) để xác định action/willCreateReport hiển thị preview.
         proposal = await Document.findOne({
           category: DocumentCategory.PROPOSAL,
-          subType,
+          subType: proposalSubType,
           department: department._id,
           title,
           createdAt,
@@ -640,7 +657,7 @@ export const importDocumentsExcel = async (
         if (parsedInspection && parsedInspection.items.length) {
           if (proposal?._id) {
             const reportSubType =
-              subType === "PROPOSE_INK" ? "CONFIRM_STATUS" : "CHECK_DAMAGE";
+              subType === "PROPOSE_INK" ? DocumentSubType.CONFIRM_STATUS : DocumentSubType.CHECK_DAMAGE;
             const existingReport = await Document.findOne({
               category: DocumentCategory.REPORT,
               subType: reportSubType,
@@ -742,9 +759,38 @@ export const listImportHistory = async (
 };
 
 /* =========================================================================
-   SYNC DEPARTMENT FROM EXCEL (không đổi so với bản trước)
+   SYNC DEPARTMENT FROM EXCEL
+   [DEV-089] Viết lại — bản cũ đọc MÙ cột 3 của file BẤT KỲ và tạo ngay:
+   1 file danh sách tài sản/thiết bị (cột 3 = "Tên tài sản") từng sinh ra 11
+   "khoa" mang tên thiết bị trên DB dev (FE-38 Mục 4). Nay:
+   - Kiểm tra định dạng: dòng 1 PHẢI có cột tiêu đề "Khoa"/"Khoa/Phòng"
+     (`DEPARTMENT_SYNC_HEADERS`, vị trí bất kỳ) — đọc đúng cột đó.
+   - `dryRun` → chỉ trả bản xem trước, KHÔNG ghi DB.
+   - Xác nhận kèm `names` → chỉ tạo đúng các khoa user đã tick.
+   - Phân loại rõ: sẽ tạo mới / đã tồn tại / đang ẩn (xoá mềm DEV-086 — KHÔNG
+     tự khôi phục, user khôi phục ở trang Khoa/Phòng) / không tạo được (mã tự
+     sinh trùng — mã chỉ lấy 10 ký tự đầu nên 2 tên dài giống nhau ra cùng mã,
+     bản cũ lỗi ngầm trong `insertMany`).
+   Bản xác nhận tự phân loại LẠI từ file (không tin danh sách client gửi lên
+   ngoài vai trò bộ lọc) → an toàn nếu dữ liệu đổi giữa lúc xem trước và tạo.
 ========================================================================= */
-export const syncDepartmentFromExcel = async (fileBuffer: Buffer) => {
+export interface DepartmentSyncItem {
+  name: string;
+  code: string;
+}
+
+export interface DepartmentSyncOptions {
+  dryRun?: boolean;
+  /** Chỉ tạo các tên này (so khớp không phân biệt hoa/thường); bỏ trống = tạo tất cả khoa hợp lệ. */
+  names?: string[];
+}
+
+const normalizeSyncHeader = (value: unknown) =>
+  (value?.toString() ?? "").normalize("NFC").trim().toLowerCase().replace(/\s*\/\s*/g, "/").replace(/\s+/g, " ");
+
+export const syncDepartmentFromExcel = async (fileBuffer: Buffer, options: DepartmentSyncOptions = {}) => {
+  const { dryRun = false, names } = options;
+
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(fileBuffer as any);
 
@@ -753,6 +799,21 @@ export const syncDepartmentFromExcel = async (fileBuffer: Buffer) => {
   const worksheet = workbook.worksheets[0];
   if (!worksheet) throw ApiError.badRequest("Không tìm thấy sheet Excel");
 
+  const headerRow = worksheet.getRow(1);
+  let columnIndex = 0;
+  const foundHeaders: string[] = [];
+  headerRow.eachCell((cell, colNumber) => {
+    const text = cell.value?.toString().trim();
+    if (text) foundHeaders.push(text);
+    if (!columnIndex && DEPARTMENT_SYNC_HEADERS.includes(normalizeSyncHeader(cell.value))) columnIndex = colNumber;
+  });
+  if (!columnIndex) {
+    throw ApiError.badRequest(
+      'File không đúng định dạng: dòng 1 phải có cột tiêu đề "Khoa" hoặc "Khoa/Phòng" (VD file mẫu import tài liệu hoặc tài sản).',
+      { foundHeaders: foundHeaders.slice(0, 30) },
+    );
+  }
+
   const totalDataRows = worksheet.rowCount - 1;
   if (totalDataRows > MAX_SYNC_ROWS) {
     throw ApiError.badRequest(
@@ -760,62 +821,85 @@ export const syncDepartmentFromExcel = async (fileBuffer: Buffer) => {
     );
   }
 
-  const departmentSet = new Set<string>();
+  // Gộp tên trùng (không phân biệt hoa/thường) — giữ cách viết xuất hiện đầu tiên.
+  const namesInFile = new Map<string, string>();
   for (let i = 2; i <= worksheet.rowCount; i++) {
-    const departmentName = worksheet
-      .getRow(i)
-      .getCell(3)
-      .value?.toString()
-      .trim();
-    if (departmentName) departmentSet.add(departmentName);
+    const name = worksheet.getRow(i).getCell(columnIndex).value?.toString().trim().replace(/\s+/g, " ");
+    if (name && !namesInFile.has(name.toLowerCase())) namesInFile.set(name.toLowerCase(), name);
   }
 
-  const departmentList = Array.from(departmentSet);
+  const existing = await Department.find({}, { name: 1, code: 1, isActive: 1 }).lean();
+  const existingByName = new Map(existing.map((d: any) => [String(d.name).trim().toLowerCase(), d]));
+  const existingByCode = new Map(existing.map((d: any) => [String(d.code).toUpperCase(), d]));
 
-  const result = { totalInFile: departmentList.length, created: 0, existed: 0 };
-  if (!departmentList.length) return result;
+  const toCreate: DepartmentSyncItem[] = [];
+  const existed: DepartmentSyncItem[] = [];
+  const inactive: DepartmentSyncItem[] = [];
+  const invalid: { name: string; reason: string }[] = [];
+  const codesInFile = new Map<string, string>();
 
-  const existingDepartments = await Department.find({}, { name: 1 }).lean();
-  const existingNameSet = new Set(
-    existingDepartments.map((d: any) => d.name.toLowerCase()),
-  );
-
-  const seenLower = new Set<string>();
-  const toCreate: string[] = [];
-
-  for (const name of departmentList) {
-    const lower = name.toLowerCase();
-
-    if (existingNameSet.has(lower)) {
-      result.existed++;
+  for (const [lower, name] of namesInFile) {
+    const match: any = existingByName.get(lower);
+    if (match) {
+      // `isActive !== false`: khoa cũ có thể thiếu field (xem migration DEV-086) — coi là đang hoạt động.
+      (match.isActive === false ? inactive : existed).push({ name: match.name, code: match.code });
       continue;
     }
 
-    if (seenLower.has(lower)) {
-      result.existed++;
-      continue;
-    }
-
-    seenLower.add(lower);
-    toCreate.push(name);
-  }
-
-  if (toCreate.length) {
+    let code: string;
     try {
-      const inserted = await Department.insertMany(
-        toCreate.map((name) => ({ name, code: generateDepartmentCode(name) })),
-        { ordered: false },
-      );
-      result.created += inserted.length;
+      code = generateDepartmentCode(name);
     } catch (err: any) {
-      const insertedCount = err?.insertedDocs?.length ?? 0;
-      result.created += insertedCount;
-      console.error(
-        "[syncDepartmentFromExcel] Một số department insert lỗi (có thể do trùng tên/race condition):",
-        err,
-      );
+      invalid.push({ name, reason: err?.message ?? "Không sinh được mã khoa/phòng" });
+      continue;
+    }
+
+    const codeOwner: any = existingByCode.get(code);
+    if (codeOwner) {
+      invalid.push({ name, reason: `Mã tự sinh "${code}" trùng với khoa/phòng "${codeOwner.name}" — hãy tạo thủ công với mã khác.` });
+      continue;
+    }
+    const sameCodeInFile = codesInFile.get(code);
+    if (sameCodeInFile) {
+      invalid.push({ name, reason: `Mã tự sinh "${code}" trùng với "${sameCodeInFile}" trong cùng file — hãy tạo thủ công với mã khác.` });
+      continue;
+    }
+    codesInFile.set(code, name);
+    toCreate.push({ name, code });
+  }
+
+  const base = {
+    dryRun,
+    column: { index: columnIndex, header: headerRow.getCell(columnIndex).value?.toString().trim() ?? "" },
+    totalInFile: namesInFile.size,
+    toCreate,
+    existed,
+    inactive,
+    invalid,
+  };
+
+  if (dryRun) return { ...base, created: [] as DepartmentSyncItem[], failed: [] as { name: string; reason: string }[] };
+
+  const selected = names ? new Set(names.map((n) => n.trim().toLowerCase())) : null;
+  const creating = selected ? toCreate.filter((d) => selected.has(d.name.toLowerCase())) : toCreate;
+
+  const created: DepartmentSyncItem[] = [];
+  const failed: { name: string; reason: string }[] = [];
+  if (creating.length) {
+    try {
+      const inserted = await Department.insertMany(creating, { ordered: false });
+      created.push(...inserted.map((d: any) => ({ name: d.name, code: d.code })));
+    } catch (err: any) {
+      // `ordered:false` — các dòng hợp lệ vẫn được chèn; báo rõ dòng nào lỗi thay vì chỉ log.
+      const insertedDocs: any[] = err?.insertedDocs ?? [];
+      created.push(...insertedDocs.map((d) => ({ name: d.name, code: d.code })));
+      const createdNames = new Set(created.map((d) => d.name));
+      for (const d of creating) {
+        if (!createdNames.has(d.name)) failed.push({ name: d.name, reason: "Không lưu được (có thể vừa bị trùng tên/mã)" });
+      }
+      console.error("[syncDepartmentFromExcel] Một số department insert lỗi:", err);
     }
   }
 
-  return result;
+  return { ...base, created, failed };
 };

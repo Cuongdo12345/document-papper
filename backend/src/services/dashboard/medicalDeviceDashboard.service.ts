@@ -17,6 +17,7 @@
 
 import { PipelineStage } from "mongoose";
 import { MedicalDeviceProfile } from "../../models/assets/medicalDeviceProfile.model";
+import { MedicalDeviceClass } from "../../interfaces/assets/medicalDevice.interface";
 import {
   runPaginatedAggregate,
   SortOrder,
@@ -191,6 +192,91 @@ export const getCalibrationDueListService = async (
           _id: "$assetDoc._id",
           name: "$assetDoc.name",
           assetCode: "$assetDoc.assetCode",
+          department: {
+            _id: "$departmentDoc._id",
+            code: "$departmentDoc.code",
+            name: "$departmentDoc.name",
+          },
+        },
+      },
+    },
+  ];
+
+  const { items, pagination } = await runPaginatedAggregate(
+    MedicalDeviceProfile,
+    basePipeline,
+    { page: params.page, limit: params.limit, sortStage },
+  );
+
+  return { data: items, pagination };
+};
+
+// ⚠️ THÊM (DEV-084, 2026-09-24 — user yêu cầu trực tiếp sau khi xem widget
+// "Thiết bị y tế" trên Dashboard): "bấm vào ô Loại B/C/D → xem danh sách
+// thiết bị tương ứng". Trước đây KHÔNG có bất kỳ endpoint nào liệt kê được
+// MedicalDeviceProfile theo `deviceClass` (chỉ có CRUD theo `:assetId` đơn lẻ
+// và danh sách "sắp/đã quá hạn kiểm định" ở trên) — route/hàm MỚI hoàn toàn,
+// mirror ĐÚNG cấu trúc `getCalibrationDueListService` phía trên (cùng
+// `$lookup` asset+department, cùng `runPaginatedAggregate`).
+export const MEDICAL_DEVICES_BY_CLASS_ALLOWED_SORT_BY = [
+  "assetName",
+  "nextCalibrationDueDate",
+] as const;
+
+/**
+ * 📌 DANH SÁCH THIẾT BỊ THEO PHÂN LOẠI (A/B/C/D) — dùng cho modal "Xem danh
+ * sách" khi bấm vào ô loại thiết bị ở `MedicalDeviceSummaryWidget`. Cùng
+ * nguyên tắc "chỉ tính profile có Asset đang active" như
+ * `getMedicalDeviceDashboardSummaryService` — khớp đúng số đếm hiển thị ở
+ * widget (nếu không khớp, user bấm vào số N nhưng danh sách trả về M≠N).
+ */
+export const getMedicalDevicesByClassListService = async (
+  deviceClass: MedicalDeviceClass,
+  params: { page: number; limit: number; sortBy: string; sortOrder: SortOrder },
+) => {
+  const sortBy = MEDICAL_DEVICES_BY_CLASS_ALLOWED_SORT_BY.includes(
+    params.sortBy as (typeof MEDICAL_DEVICES_BY_CLASS_ALLOWED_SORT_BY)[number],
+  )
+    ? params.sortBy
+    : "assetName";
+  const sortStage: Record<string, 1 | -1> = {
+    [sortBy]: params.sortOrder === "asc" ? 1 : -1,
+  };
+
+  const basePipeline: PipelineStage[] = [
+    { $match: { deviceClass } },
+    {
+      $lookup: {
+        from: "assets",
+        localField: "asset",
+        foreignField: "_id",
+        as: "assetDoc",
+      },
+    },
+    { $unwind: "$assetDoc" },
+    { $match: { "assetDoc.isActive": true } },
+    {
+      $lookup: {
+        from: "departments",
+        localField: "assetDoc.department",
+        foreignField: "_id",
+        as: "departmentDoc",
+      },
+    },
+    { $unwind: { path: "$departmentDoc", preserveNullAndEmptyArrays: true } },
+    {
+      $project: {
+        deviceClass: 1,
+        registrationNumber: 1,
+        nextCalibrationDueDate: 1,
+        // Field phẳng CHỈ để `$sort` dùng (mặc định sortBy) — client không
+        // đọc trực tiếp field này, xem `asset.name` bên dưới.
+        assetName: "$assetDoc.name",
+        asset: {
+          _id: "$assetDoc._id",
+          name: "$assetDoc.name",
+          assetCode: "$assetDoc.assetCode",
+          status: "$assetDoc.status",
           department: {
             _id: "$departmentDoc._id",
             code: "$departmentDoc.code",

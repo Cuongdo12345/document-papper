@@ -7,11 +7,16 @@
 
 import { findOverdueWorkflowInstances } from "../documents/workflowSlaAlerts.service";
 
-export const getOverdueApprovalsListService = async (query: any = {}) => {
-  const { page = 1, limit = 10 } = query;
-  const pageNumber = Math.max(parseInt(page, 10) || 1, 1);
-  const pageSize = Math.max(parseInt(limit, 10) || 10, 1);
-
+// BR-05 (DEV-094): `page`/`limit` đã parse + clamp ở controller
+// (`parsePaginationQuery`, tối đa 100) — trước đây nhận `req.query` thô,
+// `limit` không có trần.
+export const getOverdueApprovalsListService = async ({
+  page: pageNumber,
+  limit: pageSize,
+}: {
+  page: number;
+  limit: number;
+}) => {
   const overdue = await findOverdueWorkflowInstances();
   const total = overdue.length;
   const skip = (pageNumber - 1) * pageSize;

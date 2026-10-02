@@ -54,7 +54,41 @@ const basePayload = {
   title: "Đề xuất sửa máy in",
   department: "dept-1",
   relatedAsset: "asset-1",
+  callerDepartment: "dept-1",
+  isAdmin: false,
+  canCreateAllDepartments: false,
 };
+
+describe("createDocumentService — chỉ tạo vào khoa của mình trừ khi có quyền (BR-03/DEV-092)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedWithTransaction.mockImplementation(async (fn: any) => fn(FAKE_SESSION));
+    mockedAsset.findOne.mockResolvedValue({ _id: "asset-1", status: AssetStatus.IN_USE });
+    mockedFindPendingRepairProposalForAsset.mockResolvedValue(null);
+    mockedCreateDocument.mockResolvedValue({ _id: "doc-1", documentCode: "PR-NOI-2026-0001" });
+  });
+
+  it("khoa khác, không phải admin, không có quyền → 403, không truy vấn/ghi gì", async () => {
+    await expect(createDocumentService({ ...basePayload, department: "dept-2" } as any)).rejects.toMatchObject({ status: 403 });
+    expect(mockedAsset.findOne).not.toHaveBeenCalled();
+    expect(mockedCreateDocument).not.toHaveBeenCalled();
+  });
+
+  it("user chưa thuộc khoa nào → 403 (fail-closed)", async () => {
+    await expect(
+      createDocumentService({ ...basePayload, callerDepartment: undefined } as any),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(mockedCreateDocument).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["ADMIN", { isAdmin: true }],
+    ["DOCUMENT_CREATE_ALL_DEPARTMENTS", { canCreateAllDepartments: true }],
+  ])("khoa khác nhưng là %s → tạo được", async (_label, extra) => {
+    await createDocumentService({ ...basePayload, department: "dept-2", ...extra } as any);
+    expect(mockedCreateDocument).toHaveBeenCalledWith(expect.objectContaining({ department: "dept-2" }), FAKE_SESSION);
+  });
+});
 
 describe("createDocumentService — dò trùng lặp đề xuất sửa chữa trong transaction (DEV-045/RV05-07 TOCTOU)", () => {
   beforeEach(() => {

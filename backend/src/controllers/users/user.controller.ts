@@ -23,6 +23,8 @@ import {
   listAllSessions,
   changePassword,
   assignRole,
+  setAvatarService,
+  removeAvatarService,
 } from "../../services/users/users.service";
 
 // CONTROLLER LÀ NƠI XỬ LÝ LOGIC LIÊN QUAN ĐẾN REQUEST/RESPONSE
@@ -188,5 +190,29 @@ export const updateMe = catchAsync(async (req: Request, res: Response) => {
     message: "Cập nhật thông tin cá nhân thành công",
     data: updatedUser,
   });
+});
+
+// [MỚI DEV-079] AVATAR — self-service (KHÔNG truyền performedBy → service
+// không ghi audit, mirror updateMe ở trên).
+export const updateMyAvatar = catchAsync(async (req: Request, res: Response) => {
+  const updated = await setAvatarService(req.user!._id, req.body.avatar);
+  res.json({ message: "Cập nhật ảnh đại diện thành công", data: updated });
+});
+
+export const deleteMyAvatar = catchAsync(async (req: Request, res: Response) => {
+  const updated = await removeAvatarService(req.user!._id);
+  res.json({ message: "Đã xoá ảnh đại diện", data: updated });
+});
+
+// [MỚI DEV-079] AVATAR — ADMIN sửa/xoá hộ user khác (permission USER_UPDATE,
+// LUÔN truyền performedBy → service ghi audit "UPDATE").
+export const updateUserAvatarByAdmin = catchAsync(async (req: Request, res: Response) => {
+  const updated = await setAvatarService(req.params.id, req.body.avatar, req.user!._id);
+  res.json({ message: "Cập nhật ảnh đại diện user thành công", data: updated });
+});
+
+export const deleteUserAvatarByAdmin = catchAsync(async (req: Request, res: Response) => {
+  const updated = await removeAvatarService(req.params.id, req.user!._id);
+  res.json({ message: "Đã xoá ảnh đại diện user", data: updated });
 });
 

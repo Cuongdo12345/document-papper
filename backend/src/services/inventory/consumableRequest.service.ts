@@ -12,6 +12,7 @@ import { ConsumableItem } from "../../models/inventory/consumableItem.model";
 import { ConsumableRequest } from "../../models/inventory/consumableRequest.model";
 import { ConsumableRequestStatus } from "../../interfaces/inventory/consumableRequest.interface";
 import ApiError from "../../shared/errors/ApiError";
+import { assertDepartmentNotDeleted } from "../../shared/helpers/departmentLookup.helper";
 
 const REQUEST_POPULATE = [
   { path: "department", select: "code name" },
@@ -64,6 +65,8 @@ export const createConsumableRequestService = async (payload: any, userId?: any)
   if (!department) {
     throw ApiError.notFound("Không tìm thấy phòng ban");
   }
+  // BR-06 (DEV-100): khoa đã xoá mềm không nhận dữ liệu mới.
+  assertDepartmentNotDeleted(department);
 
   const { items, totalAmount } = await buildItemsWithTotals(payload.items, payload.department);
 

@@ -36,6 +36,9 @@ const AssetCategorySchema = new Schema<IAssetCategory>(
 
 AssetCategorySchema.index({ code: 1 }, { unique: true });
 AssetCategorySchema.index({ name: "text" });
+// DEV-080: cây danh mục — tra con (`assertLeafCategory`, chặn xoá cha còn con).
+// Cùng index đã có ở `ConsumableCategory`.
+AssetCategorySchema.index({ parentCategory: 1 });
 
 export const AssetCategory = model<IAssetCategory>(
   "AssetCategory",

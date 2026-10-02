@@ -21,16 +21,18 @@ export const registerMedicalDeviceAlertsCron = () => {
   cron.schedule(
     MEDICAL_DEVICE_ALERTS_CRON_SCHEDULE,
     async () => {
-      console.log("[cron] Bắt đầu kiểm tra cảnh báo kiểm định Thiết bị Y tế...");
+      console.log("[cron] Bắt đầu kiểm tra cảnh báo kiểm định/giấy phép lưu hành Thiết bị Y tế...");
       try {
         const result = await runMedicalDeviceAlertsService();
         console.log(
-          `[cron] Hoàn tất — kiểm định: kiểm tra ${result.calibration.checked}, gửi ${result.calibration.notified}.`,
+          `[cron] Hoàn tất — kiểm định: kiểm tra ${result.calibration.checked}, gửi ${result.calibration.notified}. ` +
+            `Giấy phép lưu hành: kiểm tra ${result.license.checked}, gửi ${result.license.notified}. ` +
+            `Chứng chỉ vận hành: kiểm tra ${result.operatorCertificate.checked}, gửi ${result.operatorCertificate.notified}.`,
         );
       } catch (err) {
         // KHÔNG throw — cùng lý do đã giải thích ở assetAlerts.cron.ts:
         // 1 lần cron lỗi không được làm crash cả server.
-        console.error("[cron] Lỗi khi chạy cảnh báo kiểm định Thiết bị Y tế:", err);
+        console.error("[cron] Lỗi khi chạy cảnh báo kiểm định/giấy phép lưu hành Thiết bị Y tế:", err);
       }
     },
     {

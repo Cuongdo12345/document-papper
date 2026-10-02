@@ -1,6 +1,8 @@
 import ExcelJS from "exceljs";
 import UserAudit from "../../models/users/userAudit.model";
 import ApiError from "../../shared/errors/ApiError";
+import { APP_TIMEZONE } from "../../shared/constants/timezone.constant";
+import { parseDateRangeBound } from "../../shared/utils/Queryparsing.util";
 
 //Định nghĩa interface cho filter của audit logs
 interface AuditFilter {
@@ -51,8 +53,8 @@ const buildAuditFilter = ({
 
   if (fromDate || toDate) {
     filter.createdAt = {};
-    if (fromDate) filter.createdAt.$gte = new Date(fromDate);
-    if (toDate) filter.createdAt.$lte = new Date(toDate);
+    if (fromDate) filter.createdAt.$gte = parseDateRangeBound(fromDate, "start");
+    if (toDate) filter.createdAt.$lte = parseDateRangeBound(toDate, "end");
   }
 
   return filter;
@@ -105,8 +107,8 @@ export const getAuditDashboardService = async (
 
   if (fromDate || toDate) {
     match.createdAt = {};
-    if (fromDate) match.createdAt.$gte = new Date(fromDate);
-    if (toDate) match.createdAt.$lte = new Date(toDate);
+    if (fromDate) match.createdAt.$gte = parseDateRangeBound(fromDate, "start");
+    if (toDate) match.createdAt.$lte = parseDateRangeBound(toDate, "end");
   }
 
   // Dùng Promise.all để chạy song song 3 query thống kê theo action, theo ngày và đếm tổng số logs
@@ -133,6 +135,9 @@ export const getAuditDashboardService = async (
             $dateToString: {
               format: "%Y-%m-%d",
               date: "$createdAt",
+              // BR-09 (DEV-097): gom theo NGÀY giờ VN — mặc định UTC khiến
+              // audit 0h–7h sáng bị tính vào ngày hôm trước.
+              timezone: APP_TIMEZONE,
             },
           },
           count: { $sum: 1 },

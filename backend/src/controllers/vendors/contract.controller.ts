@@ -10,6 +10,8 @@ import {
   updateContractService,
   cancelContractService,
   restoreContractService,
+  bulkCancelContractService,
+  bulkRestoreContractService,
 } from "../../services/vendors/contract.service";
 import { runContractAlertsService } from "../../services/vendors/contractAlerts.service";
 import { catchAsync } from "../../shared/utils/catchAsync";
@@ -74,6 +76,26 @@ export const restoreContract = catchAsync(async (req: Request, res: Response) =>
   res.json({
     message: "Khôi phục hợp đồng thành công",
     data: contract,
+  });
+});
+
+/** [DEV-087] Huỷ hàng loạt ("xoá nhiều" của Contract). */
+export const bulkCancelContracts = catchAsync(async (req: Request, res: Response) => {
+  const result = await bulkCancelContractService(req.body.ids, req.user?._id, req.body.cancelReason);
+
+  res.json({
+    message: `Đã huỷ ${result.deletedIds.length}/${req.body.ids.length} hợp đồng`,
+    data: result,
+  });
+});
+
+/** [DEV-087] Khôi phục hàng loạt. */
+export const bulkRestoreContracts = catchAsync(async (req: Request, res: Response) => {
+  const result = await bulkRestoreContractService(req.body.ids, req.user?._id);
+
+  res.json({
+    message: `Đã khôi phục ${result.deletedIds.length}/${req.body.ids.length} hợp đồng`,
+    data: result,
   });
 });
 

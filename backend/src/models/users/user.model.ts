@@ -110,6 +110,15 @@ const UserSchema = new Schema<IUser>(
       default: false,
     },
 
+    // [MỚI DEV-079] Ảnh đại diện — xem giải thích đầy đủ ở `user.interface.ts`.
+    // `select: false` cùng vai trò với `password` ở trên — loại khỏi MỌI
+    // query mặc định (kể cả `GET /users` list), chỉ trả về khi tường minh
+    // `.select("+avatar")`.
+    avatar: {
+      type: String,
+      select: false,
+    },
+
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
   },

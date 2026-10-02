@@ -1,6 +1,7 @@
 // shared/utils/queryParsing.util.ts
 import ApiError from "../errors/ApiError";
 import { Model } from "mongoose";
+import { APP_UTC_OFFSET } from "../constants/timezone.constant";
 
 export type SortOrder = "asc" | "desc";
 
@@ -66,19 +67,57 @@ export const parsePaginationQuery = (
   return { page, limit, sortBy, sortOrder };
 };
 
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * BR-09 (DEV-097, 2026-09-29) — đổi 1 mốc của khoảng ngày ("Từ ngày"/"Đến
+ * ngày") thành `Date`.
+ *
+ * Vì sao cần: ô `<input type="date">` ở frontend gửi chuỗi `YYYY-MM-DD`, và
+ * `new Date("2026-09-29")` theo chuẩn JS là 00:00 **UTC** = 07:00 sáng giờ VN
+ * (bất kể TZ của process). Hệ quả trước đây: "Đến ngày 29/9" (`$lte`) chỉ lấy
+ * tới 07:00 sáng 29/9 → bỏ sót gần hết dữ liệu của chính ngày đó; "Từ ngày"
+ * bỏ sót 0h–7h của ngày đầu.
+ *
+ * Quy ước mới — chỉ áp cho chuỗi CHỈ CÓ NGÀY `YYYY-MM-DD`:
+ *   - `start` → 00:00:00.000 giờ VN của ngày đó;
+ *   - `end`   → 23:59:59.999 giờ VN của ngày đó (bao trọn cả ngày, dùng với `$lte`).
+ * Chuỗi có giờ đầy đủ (ISO datetime, vd client gửi `toISOString()`) giữ
+ * nguyên như cũ — client đã chỉ định chính xác thời điểm.
+ *
+ * KHÔNG validate — giá trị sai trả `Invalid Date` y như `new Date(...)` cũ
+ * (các call site có DTO riêng validate trước). Cần throw 400 thì dùng
+ * `parseOptionalDate`.
+ */
+export const parseDateRangeBound = (value: unknown, bound: "start" | "end"): Date => {
+  const raw = String(value).trim();
+  if (DATE_ONLY_PATTERN.test(raw)) {
+    const time = bound === "start" ? "00:00:00.000" : "23:59:59.999";
+    return new Date(`${raw}T${time}${APP_UTC_OFFSET}`);
+  }
+  return new Date(raw);
+};
+
 /**
  * Parse 1 query param dạng ngày (fromDate/toDate) — throw 400 rõ ràng nếu
  * client truyền giá trị không parse được thành Date, thay vì âm thầm tạo ra
  * `Invalid Date` (trước đây `new Date(String(fromDate))` không được validate,
  * `Invalid Date` lọt vào `$match.createdAt.$gte` khiến Mongo trả kết quả
  * không như mong đợi mà không báo lỗi gì).
+ *
+ * BR-09 (DEV-097): thêm `bound` — chuỗi `YYYY-MM-DD` hiểu theo ngày giờ VN,
+ * xem `parseDateRangeBound`.
  */
-export const parseOptionalDate = (value: unknown, fieldName: string): Date | undefined => {
+export const parseOptionalDate = (
+  value: unknown,
+  fieldName: string,
+  bound: "start" | "end",
+): Date | undefined => {
   if (value === undefined || value === null || value === "") {
     return undefined;
   }
 
-  const date = new Date(String(value));
+  const date = parseDateRangeBound(value, bound);
   if (Number.isNaN(date.getTime())) {
     throw ApiError.badRequest(`${fieldName} không hợp lệ`);
   }

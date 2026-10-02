@@ -58,16 +58,16 @@ export const updateMedicalDeviceProfile = catchAsync(
 );
 
 /**
- * GIAI ĐOẠN 3 — chạy tay cảnh báo kiểm định (ngoài lịch cron), dùng để
- * test/kiểm tra thủ công. Mirror đúng `runAssetAlerts`
- * (`asset.controller.ts`).
+ * GIAI ĐOẠN 3 — chạy tay cảnh báo kiểm định + [MỚI] giấy phép lưu hành
+ * (ngoài lịch cron), dùng để test/kiểm tra thủ công. Mirror đúng
+ * `runAssetAlerts` (`asset.controller.ts`).
  */
 export const runMedicalDeviceAlerts = catchAsync(
   async (req: Request, res: Response) => {
     const result = await runMedicalDeviceAlertsService();
 
     res.json({
-      message: "Chạy kiểm tra cảnh báo kiểm định Thiết bị Y tế thành công",
+      message: "Chạy kiểm tra cảnh báo kiểm định/giấy phép lưu hành Thiết bị Y tế thành công",
       data: result,
     });
   },

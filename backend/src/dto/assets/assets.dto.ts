@@ -16,7 +16,8 @@ export const CreateAssetCategoryDTO = z.object({
 
 export const UpdateAssetCategoryDTO = z.object({
   name: z.string().trim().min(1).optional(),
-  parentCategory: objectId("parentCategory không hợp lệ").optional(),
+  // DEV-080: `null` = gỡ danh mục cha (đưa lên cấp gốc) — xem `updateAssetCategoryService`.
+  parentCategory: objectId("parentCategory không hợp lệ").nullable().optional(),
   defaultWarrantyMonths: z.coerce.number().int().min(0).optional(),
   isActive: z.boolean().optional(),
 });
@@ -34,6 +35,11 @@ export const QueryAssetCategoryDTO = z.object({
     .enum(["true", "false"])
     .optional()
     .transform((v) => (v === undefined ? undefined : v === "true")),
+  // DEV-081: lọc theo cây — `group` = chỉ danh mục thuộc nhánh của nhóm này
+  // (mọi cấp con cháu, không gồm chính nó); `level` = chỉ danh mục lá
+  // (không có con active) hoặc chỉ danh mục nhóm. Không truyền → như cũ.
+  group: objectId("group không hợp lệ").optional(),
+  level: z.enum(["leaf", "group"]).optional(),
 });
 
 /* =====================================================================

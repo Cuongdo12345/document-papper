@@ -27,6 +27,15 @@ export const ALLOWED_WORKFLOW_STATUSES = ["pending", "approved", "rejected", "ca
  * Document import) — cột này chỉ hiển thị trong template cho user dễ hình
  * dung, KHÔNG dùng để match/update bản ghi đã tồn tại.
  */
+/**
+ * [DEV-089] Tiêu đề cột (dòng 1) được chấp nhận cho "Đồng bộ khoa/phòng từ
+ * Excel" — so khớp sau khi chuẩn hoá (chữ thường, gộp khoảng trắng, bỏ khoảng
+ * trắng quanh "/"). Khớp cả file mẫu import tài liệu ("Khoa", cột 3) lẫn file
+ * mẫu import tài sản ("Khoa/phòng", cột 4 — trước đây bị đọc nhầm cột 3 "Tên
+ * tài sản", tạo ra khoa mang tên thiết bị).
+ */
+export const DEPARTMENT_SYNC_HEADERS = ["khoa", "khoa/phòng"];
+
 export const ASSET_IMPORT_COLUMNS: { index: number; header: string }[] = [
   { index: 1, header: "Mã tài sản" },
   { index: 2, header: "Danh mục" },

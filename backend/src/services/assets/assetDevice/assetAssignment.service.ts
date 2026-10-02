@@ -8,6 +8,8 @@ import Department from "../../../models/departments/department.model";
 import { User } from "../../../models/users/user.model";
 import ApiError from "../../../shared/errors/ApiError";
 import { withTransaction } from "../../../shared/utils/withTransaction";
+import { assertOperatorCertifiedIfRequired } from "../medicalDevice/operatorCertificate.service";
+import { assertDepartmentNotDeleted } from "../../../shared/helpers/departmentLookup.helper";
 
 const ASSIGNMENT_HISTORY_POPULATE = [
   { path: "fromDepartment", select: "code name" },
@@ -22,6 +24,8 @@ const assertDepartmentExists = async (id: any) => {
   if (!department) {
     throw ApiError.badRequest("Khoa/phòng không tồn tại");
   }
+  // BR-06 (DEV-100): khoa đã xoá mềm không nhận dữ liệu mới.
+  assertDepartmentNotDeleted(department);
   return department;
 };
 
@@ -105,6 +109,10 @@ export const assignAssetService = async (
   await assertDepartmentExists(payload.toDepartment);
   if (payload.toUser) {
     await assertUserExists(payload.toUser);
+    // [MỚI, DEV-077] Chặn cấp phát cho user không đủ điều kiện vận hành —
+    // no-op nếu thiết bị không yêu cầu chứng chỉ (đa số Asset không phải
+    // thiết bị y tế, hoặc thiết bị y tế không yêu cầu chứng chỉ riêng).
+    await assertOperatorCertifiedIfRequired(asset, payload.toUser);
   }
 
   const fromDepartment = asset.department;
@@ -185,6 +193,8 @@ export const transferAssetService = async (
   }
   if (payload.toUser) {
     await assertUserExists(payload.toUser);
+    // [MỚI, DEV-077] Cùng guard đã thêm ở `assignAssetService` phía trên.
+    await assertOperatorCertifiedIfRequired(asset, payload.toUser);
   }
 
   const fromDepartment = asset.department;

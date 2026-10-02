@@ -58,6 +58,19 @@ export const canViewAcrossDepartments = (actor: DepartmentScopeActor): boolean =
   actor.isAdmin || !!actor.canViewAllDepartments;
 
 /**
+ * BR-03 (DEV-092, 2026-09-29): có được TẠO document vào `department` này
+ * không. ADMIN hoặc permission `DOCUMENT_CREATE_ALL_DEPARTMENTS` → khoa bất
+ * kỳ; còn lại CHỈ khoa của chính mình. Fail-closed: thiếu `callerDepartment`
+ * → `false` (qua `isSameDepartment`). KHÔNG đọc `canViewAllDepartments` — quyền
+ * XEM không kéo theo quyền TẠO.
+ */
+export const canCreateInDepartment = (
+  actor: { isAdmin: boolean; canCreateAllDepartments?: boolean; callerDepartment?: any },
+  department: any,
+): boolean =>
+  actor.isAdmin || !!actor.canCreateAllDepartments || isSameDepartment(department, actor.callerDepartment);
+
+/**
  * Áp `filter.department` cho query danh sách Document — ép về đúng khoa
  * người gọi nếu KHÔNG được xem tất cả phòng ban. Fail-closed: thiếu
  * `callerDepartment` → `null` (KHÔNG khớp document nào), thay vì

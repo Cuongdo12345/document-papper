@@ -9,6 +9,7 @@ import {
   softDeleteDocumentsByFilter,
   getActiveDocumentOrFail,
   findDocumentIncludeDeleted,
+  findProposalIdsWithActiveReports,
 } from "../documents.query";
 import ApiError from "../../../shared/errors/ApiError";
 import {
@@ -69,6 +70,7 @@ const mockedFindDocumentIdsByFilter = findDocumentIdsByFilter as jest.Mock;
 const mockedCountReportsByProposal = countReportsByProposal as jest.Mock;
 const mockedSoftDeleteDocumentsByFilter = softDeleteDocumentsByFilter as jest.Mock;
 const mockedFindDocumentIncludeDeleted = findDocumentIncludeDeleted as jest.Mock;
+const mockedFindProposalIdsWithActiveReports = findProposalIdsWithActiveReports as jest.Mock;
 
 const PROPOSAL_ID = "6a0000000000000000000001";
 const OTHER_DEPARTMENT_ID = "6a0000000000000000000099";
@@ -249,7 +251,10 @@ describe("document.service — deleteDocumentsByMonthService (DEV-044 — guard 
   beforeEach(() => {
     mockedFindDocumentIdsByFilter.mockResolvedValue([]);
     mockedCountReportsByProposal.mockResolvedValue(0);
+    mockedFindProposalIdsWithActiveReports.mockResolvedValue([]);
     mockedSoftDeleteDocumentsByFilter.mockResolvedValue({ modifiedCount: 5 });
+    // BR-11 (DEV-098): đọc + ghi giờ nằm trong 1 transaction.
+    mockedWithTransaction.mockImplementation(async (fn: any) => fn("fake-session"));
   });
 
   it("🔒 role IT (isSystemRole=false): 403, KHÔNG chạm DB (fail sớm trước mọi query)", async () => {
@@ -282,6 +287,53 @@ describe("document.service — deleteDocumentsByMonthService (DEV-044 — guard 
     const result = await deleteDocumentsByMonthService({ ...basePayload, role: "khong-quan-trong", isSystemRole: true });
     expect(result.deletedCount).toBe(5);
     expect(mockedSoftDeleteDocumentsByFilter).toHaveBeenCalled();
+  });
+
+  describe("BR-11 (DEV-098)", () => {
+    const admin = { ...basePayload, role: "ADMIN", isSystemRole: true };
+
+    it("(a)+(c) loại cả đề xuất còn biên bản VÀ tài liệu có workflow chờ duyệt thật; dò biên bản bằng 1 truy vấn, không N+1", async () => {
+      mockedFindDocumentIdsByFilter
+        .mockResolvedValueOnce(["p1", "p2", "p3"]) // PROPOSAL trong phạm vi
+        .mockResolvedValueOnce(["w1"]); // có workflow chờ duyệt thật
+      mockedFindProposalIdsWithActiveReports.mockResolvedValue(["p2"]);
+
+      const result = await deleteDocumentsByMonthService(admin);
+
+      expect(mockedFindProposalIdsWithActiveReports).toHaveBeenCalledTimes(1);
+      expect(mockedFindProposalIdsWithActiveReports).toHaveBeenCalledWith(["p1", "p2", "p3"], "fake-session");
+      expect(mockedCountReportsByProposal).not.toHaveBeenCalled();
+      // Truy vấn thứ 2 dùng đúng điều kiện "workflow chờ duyệt thật".
+      expect(mockedFindDocumentIdsByFilter.mock.calls[1][0]).toMatchObject({
+        workflowStatus: "pending",
+        workflowInstanceId: { $ne: null },
+      });
+      const [finalQuery, deletedBy, session] = mockedSoftDeleteDocumentsByFilter.mock.calls[0];
+      expect(finalQuery._id).toEqual({ $nin: ["p2", "w1"] });
+      expect(deletedBy).toBe("user-1");
+      expect(session).toBe("fake-session");
+      expect(result).toEqual({ deletedCount: 5, skippedCount: 1, skippedPendingWorkflowCount: 1 });
+    });
+
+    it("(b) ghi ĐÚNG 1 dòng audit tổng hợp, cùng session với thao tác xoá", async () => {
+      mockedFindDocumentIdsByFilter.mockResolvedValueOnce([]).mockResolvedValueOnce(["w1", "w2"]);
+      await deleteDocumentsByMonthService({ ...admin, filters: { category: "PROPOSAL" } });
+
+      expect(mockedUserAudit.create).toHaveBeenCalledTimes(1);
+      const [docs, options] = mockedUserAudit.create.mock.calls[0];
+      expect(options).toEqual({ session: "fake-session" });
+      expect(docs).toHaveLength(1);
+      expect(docs[0]).toMatchObject({ user: "user-1", performedBy: "user-1", action: "DELETE" });
+      expect(docs[0].note).toBe(
+        "Xoá theo tháng 09/2026: ẩn 5 tài liệu; bỏ qua 0 đề xuất còn biên bản tham chiếu, 2 tài liệu có workflow chờ duyệt. Bộ lọc: category=PROPOSAL",
+      );
+    });
+
+    it("(b) không ẩn được tài liệu nào → KHÔNG ghi audit", async () => {
+      mockedSoftDeleteDocumentsByFilter.mockResolvedValue({ modifiedCount: 0 });
+      await deleteDocumentsByMonthService(admin);
+      expect(mockedUserAudit.create).not.toHaveBeenCalled();
+    });
   });
 });
 

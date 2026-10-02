@@ -21,6 +21,10 @@ import {
   getMe,
   updateMe,
   assignUserRole,
+  updateMyAvatar,
+  deleteMyAvatar,
+  updateUserAvatarByAdmin,
+  deleteUserAvatarByAdmin,
 } from "../../controllers/users/user.controller";
 import { authenticate } from "../../middlewares/auth.middleware";
 import { authorizePermission } from "../../middlewares/authorizePermission.middleware";
@@ -39,6 +43,7 @@ import {
   ResetPasswordByAdminDTO,
   UserSessionParamDTO,
   GetAllSessionsQueryDTO,
+  UpdateAvatarDTO,
 } from "../../dto/users/users.dto";
 
 const router = Router();
@@ -111,12 +116,41 @@ router.get(
 
 router.patch("/me", authenticate, validateBody(UpdateUserDTO), updateMe);
 
+/**
+ * [MỚI DEV-079] Avatar self-service — PHẢI đăng ký TRƯỚC "PUT /:id"/"PATCH
+ * /:id/avatar" bên dưới, cùng lý do "/bulk-delete"/"/sessions" ở trên: nếu
+ * không, Express sẽ khớp "me" vào tham số `:id` của route admin.
+ */
+router.patch("/me/avatar", authenticate, validateBody(UpdateAvatarDTO), updateMyAvatar);
+router.delete("/me/avatar", authenticate, deleteMyAvatar);
+
 router.put(
   "/:id",
   authenticate,
   authorizePermission("USER_UPDATE"),
   validateBody(UpdateUserDTO),
   updateUser,
+);
+
+/**
+ * [MỚI DEV-079] Avatar — ADMIN sửa/xoá hộ user khác. Dùng LẠI permission
+ * `USER_UPDATE` (không tạo permission riêng) — đây là phần mở rộng tự nhiên
+ * của "admin sửa hồ sơ user khác", cùng permission với `PUT /:id` ở trên.
+ */
+router.patch(
+  "/:id/avatar",
+  authenticate,
+  authorizePermission("USER_UPDATE"),
+  validateParams(IdParamDTO),
+  validateBody(UpdateAvatarDTO),
+  updateUserAvatarByAdmin,
+);
+router.delete(
+  "/:id/avatar",
+  authenticate,
+  authorizePermission("USER_UPDATE"),
+  validateParams(IdParamDTO),
+  deleteUserAvatarByAdmin,
 );
 
 // TASK-002 (Việc 2): endpoint riêng để gán role cho user, wire lại

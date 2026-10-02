@@ -3,6 +3,7 @@ import { Types } from "mongoose";
 import Department from "../../models/departments/department.model";
 import { getNextSequence } from "../utils/getNext";
 import ApiError from "../errors/ApiError";
+import { assertDepartmentNotDeleted } from "./departmentLookup.helper";
 
 /**
  * Sinh `assetCode` an toàn cho nhiều request song song (kể cả khi import
@@ -21,6 +22,8 @@ export const generateAssetCode = async (
   if (!department) {
     throw ApiError.notFound("Không tìm thấy khoa/phòng");
   }
+  // BR-06 (DEV-100): khoa đã xoá mềm không nhận dữ liệu mới.
+  assertDepartmentNotDeleted(department);
 
   const deptCode = department.code.toUpperCase();
 

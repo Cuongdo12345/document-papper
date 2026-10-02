@@ -126,6 +126,15 @@ export const updateMedicalDeviceProfileService = async (
     MEDICAL_DEVICE_PROFILE_UPDATE_WHITELIST,
   );
 
+  // [MỚI] Đổi hạn giấy phép lưu hành thì phải cho phép cron cảnh báo lại từ
+  // đầu cho ngày hạn MỚI, không giữ "đã gửi cảnh báo" của ngày hạn CŨ — cùng
+  // lý do `warrantyAlertSentAt` ở `asset.service.ts::updateAssetService`.
+  // Dùng `null` tường minh (khác `undefined`) để `Object.assign` bên dưới
+  // ghi đè hẳn giá trị cũ, không chỉ bỏ qua key này.
+  if ("licenseExpiredAt" in safePayload) {
+    safePayload.licenseAlertSentAt = null;
+  }
+
   const profile = await MedicalDeviceProfile.findOne({ asset: assetId });
   if (!profile) {
     throw ApiError.notFound(

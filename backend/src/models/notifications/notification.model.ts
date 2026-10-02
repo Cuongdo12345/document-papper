@@ -28,7 +28,9 @@ const NotificationSchema = new Schema<INotification>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      index: true,
+      // BR-19 (DEV-109): KHÔNG khai `index: true` ở đây — index đơn `{recipient}`
+      // là tiền tố của `{recipient, createdAt}`/`{recipient, isRead, createdAt}`
+      // bên dưới, giữ thêm chỉ làm chậm ghi và tốn RAM.
     },
 
     createdBy: {
@@ -91,6 +93,21 @@ NotificationSchema.index({ recipient: 1, isRead: 1, createdAt: -1 });
  * document/workflow X" (ví dụ để debug hoặc hiển thị timeline trên FE).
  */
 NotificationSchema.index({ resourceType: 1, resourceId: 1 });
+
+/**
+ * BR-13 (DEV-110, 2026-09-30) — TTL: tự xoá thông báo cũ hơn 90 ngày (user chốt).
+ * Trước đây không có chính sách lưu giữ nên collection chỉ tăng. Thông báo là dữ
+ * liệu tạm (chuông thông báo/email), không phải log kiểm toán — khác `UserAudit`
+ * (chưa đặt TTL, chờ chốt yêu cầu lưu trữ tuân thủ).
+ *
+ * ⚠️ Tạo index này trên collection ĐÃ CÓ DỮ LIỆU sẽ xoá NGAY các bản ghi cũ hơn
+ * mốc ở lần quét TTL đầu tiên (cùng cảnh báo ở `apiPerformance.model.ts`).
+ */
+export const NOTIFICATION_RETENTION_DAYS = 90;
+NotificationSchema.index(
+  { createdAt: 1 },
+  { expireAfterSeconds: 60 * 60 * 24 * NOTIFICATION_RETENTION_DAYS },
+);
 
 export const Notification = model<INotification>(
   "Notification",

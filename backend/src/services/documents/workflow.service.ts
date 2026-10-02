@@ -18,6 +18,7 @@ import {
   notifyUsersByRoleName,
 } from "../notifications/notification.service";
 import { withTransaction } from "../../shared/utils/withTransaction";
+import { isSameDepartment } from "./documents.scope";
 
 /**
  * ✅ KHÔI PHỤC TRANSACTION (MongoDB đã chuyển sang replica set — xem
@@ -179,7 +180,45 @@ const syncAssetOnDocumentApproved = async (document: any, actorUserId: any) => {
   }
 };
 
-export const submitWorkflow = async (documentId: any, templateId: any) => {
+/**
+ * BR-02 (docs/31_BACKEND_CODE_REVIEW.md, DEV-091, 2026-09-29): trước đây hàm
+ * này KHÔNG kiểm tra gì ngoài template — submit lại được tài liệu đã duyệt
+ * (đưa về "pending" → mở khoá sửa ở `updateDocumentService`, và PROPOSE_REPAIR
+ * chạy lại `startAssetMaintenanceService` khi duyệt lần 2; DB dev có 1 tài
+ * liệu 2 workflow "approved"), submit tài liệu khoa khác, tạo nhiều workflow
+ * "pending" cho 1 tài liệu, hoặc tạo instance mồ côi với `documentId` không
+ * tồn tại. Nay kiểm tra:
+ *   (a) tài liệu tồn tại và còn hoạt động (`isActive`) → 404;
+ *   (b) cùng khoa với tài liệu, hoặc Admin (user xác nhận "Cùng khoa +
+ *       Admin", khớp quy tắc SỬA ở `updateDocumentService`) → 403. KHÁC
+ *       update ở 1 điểm: thiếu `callerDepartment` thì CHẶN (fail-closed),
+ *       không bỏ qua;
+ *   (c) workflow gần nhất của tài liệu phải là "rejected"/"cancelled" (gửi
+ *       duyệt lại) hoặc chưa có workflow nào — khớp nút "Submit"/"Gửi duyệt
+ *       lại" ở `DocumentDetailPage.tsx` → 400.
+ * KHÔNG giới hạn loại tài liệu (user xác nhận) — CHECK_DAMAGE (REPORT) cũng
+ * cần đi qua workflow để `syncAssetOnDocumentApproved` đóng luồng sửa chữa.
+ *
+ * (c) chạy BÊN TRONG transaction: 2 request submit đồng thời cùng ghi
+ * Document → WriteConflict → driver retry lần thua, lần retry đọc lại thấy
+ * workflow "pending" vừa commit → 400, không tạo được 2 instance.
+ */
+const RESUBMITTABLE_WORKFLOW_STATUSES = ["rejected", "cancelled"];
+
+export const submitWorkflow = async (
+  documentId: any,
+  templateId: any,
+  actor: { callerDepartment?: any; isAdmin: boolean },
+) => {
+  const document = await Document.findById(documentId).select("department isActive");
+  if (!document || !document.isActive) {
+    throw ApiError.notFound("Không tìm thấy tài liệu");
+  }
+
+  if (!actor.isAdmin && !isSameDepartment(document.department, actor.callerDepartment)) {
+    throw ApiError.forbidden("Không có quyền gửi duyệt tài liệu của phòng ban khác");
+  }
+
   const template = await WorkflowTemplate.findById(templateId);
   // Sửa Technical Debt #6: dùng `ApiError` thay vì `new Error()` thuần —
   // trước đây lỗi này rơi vào nhánh 500 mặc định của global error handler
@@ -195,6 +234,16 @@ export const submitWorkflow = async (documentId: any, templateId: any) => {
   // Chuỗi ghi cần transaction: tạo WorkflowInstance + update Document
   // (gắn `workflowInstanceId`/`workflowStatus`).
   const workflow = await withTransaction(async (session) => {
+    const latest = await WorkflowInstance.findOne({ documentId })
+      .sort({ createdAt: -1 })
+      .select("status")
+      .session(session);
+    if (latest && !RESUBMITTABLE_WORKFLOW_STATUSES.includes(latest.status)) {
+      throw ApiError.badRequest(
+        `Tài liệu đang có workflow ở trạng thái "${latest.status}", không thể gửi duyệt lại`,
+      );
+    }
+
     const [wf] = await WorkflowInstance.create(
       [
         {
@@ -514,7 +563,7 @@ export const getPendingApprovalsForRole = async (
   const skip = (pageNumber - 1) * pageSize;
 
   const filter = {
-    status: "pending",
+    status: "pending" as const,
     $expr: {
       $eq: [{ $arrayElemAt: ["$steps.role", "$currentStep"] }, role],
     },

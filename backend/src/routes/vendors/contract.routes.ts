@@ -10,17 +10,20 @@ import {
   updateContract,
   cancelContract,
   restoreContract,
+  bulkCancelContracts,
+  bulkRestoreContracts,
   runContractAlerts,
 } from "../../controllers/vendors/contract.controller";
 import { authenticate } from "../../middlewares/auth.middleware";
 import { authorizePermission } from "../../middlewares/authorizePermission.middleware";
 import { validateBody, validateParams, validateQuery } from "../../middlewares/validate.middleware";
-import { IdParamDTO, makeIdParamDTO } from "../../dto/common.dto";
+import { IdParamDTO, makeIdParamDTO, BulkIdsDTO } from "../../dto/common.dto";
 import {
   CreateContractDTO,
   UpdateContractDTO,
   CancelContractDTO,
   QueryContractsDTO,
+  BulkCancelContractsDTO,
 } from "../../dto/vendors/contract.dto";
 
 const router = Router();
@@ -50,6 +53,25 @@ router.get(
   authorizePermission("CONTRACT_VIEW"),
   validateParams(assetIdParam),
   getContractsForAsset,
+);
+
+// [DEV-087] Huỷ hàng loạt — cùng permission CONTRACT_UPDATE với huỷ từng dòng
+// (`PATCH /:id/cancel`). Static path, khai TRƯỚC các route "/:id".
+router.post(
+  "/bulk-cancel",
+  authenticate,
+  authorizePermission("CONTRACT_UPDATE"),
+  validateBody(BulkCancelContractsDTO),
+  bulkCancelContracts,
+);
+
+// [DEV-087] Khôi phục hàng loạt — cùng permission RIÊNG CONTRACT_RESTORE với khôi phục từng dòng.
+router.post(
+  "/bulk-restore",
+  authenticate,
+  authorizePermission("CONTRACT_RESTORE"),
+  validateBody(BulkIdsDTO),
+  bulkRestoreContracts,
 );
 
 router.post(

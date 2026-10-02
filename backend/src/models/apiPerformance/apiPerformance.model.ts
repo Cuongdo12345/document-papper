@@ -87,7 +87,9 @@ const ApiPerformanceSchema = new Schema(
 );
 
 ApiPerformanceSchema.index({ endpoint: 1 });
-ApiPerformanceSchema.index({ createdAt: -1 });
+// BR-19 (DEV-109, RV11-04): đã bỏ `{ createdAt: -1 }` — trùng với index TTL
+// `{ createdAt: 1 }` khai báo ngay dưới (lọc khoảng thời gian và sort đều dùng
+// được index này, quét ngược khi cần sort giảm dần).
 
 /**
  * ⚠️ MỚI (TTL — theo yêu cầu, tự động xoá sau 30 ngày):

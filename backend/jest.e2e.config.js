@@ -9,6 +9,9 @@
 //     thiết cho quy mô test hiện tại (5-10 luồng).
 //   - `testTimeout` cao hơn hẳn unit test — khởi động MongoDB in-memory +
 //     nhiều request HTTP thật/1 test chậm hơn unit test (mock) đáng kể.
+// BR-09 (DEV-097): cố định giờ VN cho test — xem `jest.config.js`.
+process.env.TZ = "Asia/Ho_Chi_Minh";
+
 module.exports = {
   preset: "ts-jest",
   testEnvironment: "node",

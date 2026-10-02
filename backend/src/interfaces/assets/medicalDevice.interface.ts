@@ -43,6 +43,15 @@ export interface IMedicalDeviceProfile {
    */
   calibrationAlertSentAt?: Date;
 
+  /**
+   * [MỚI] Chặn gửi trùng cảnh báo hết hạn giấy phép lưu hành
+   * (`licenseExpiredAt`) — cùng pattern `calibrationAlertSentAt` ở trên.
+   * CHỈ set qua cron/API trigger cảnh báo (`medicalDeviceAlerts.service.ts`)
+   * và reset về `null` khi `licenseExpiredAt` đổi (xem
+   * `updateMedicalDeviceProfileService`) — KHÔNG expose qua UpdateProfileDTO.
+   */
+  licenseAlertSentAt?: Date;
+
   operatorCertificateRequired: boolean; // cần người vận hành có chứng chỉ riêng (VD máy chạy thận)
 
   createdBy?: Types.ObjectId;

@@ -9,6 +9,95 @@ import {
 import { escapeRegex } from "../../../shared/utils/regex.util";
 import { runBulkDelete } from "../../../shared/utils/bulkDelete.util";
 
+/* =====================================================================
+   CÂY DANH MỤC (DEV-080) — quy tắc đã chốt với user:
+   - Cây nhiều cấp (hiện dùng 3 cấp: gốc CNTT/TBYT → nhóm → loại thiết bị).
+   - Tài sản CHỈ gắn vào danh mục LÁ (không có danh mục con active).
+   - Lọc tài sản theo 1 danh mục → gồm toàn bộ danh mục con cháu.
+   Số danh mục nhỏ (vài chục) nên load toàn bộ `{_id, parentCategory}` 1 lần
+   rồi duyệt trong bộ nhớ, không cần `$graphLookup`.
+===================================================================== */
+
+/** Trả về `[id, ...toàn bộ con cháu active]` — dùng cho filter `$in`. */
+export const getCategoryWithDescendantIds = async (id: any) => {
+  const all = await AssetCategory.find({ isActive: true })
+    .select("_id parentCategory")
+    .lean();
+
+  const childrenOf = new Map<string, any[]>();
+  for (const c of all) {
+    if (!c.parentCategory) continue;
+    const key = String(c.parentCategory);
+    childrenOf.set(key, [...(childrenOf.get(key) ?? []), c._id]);
+  }
+
+  const result: any[] = [new mongoose.Types.ObjectId(String(id))];
+  const visited = new Set<string>([String(id)]);
+  for (let i = 0; i < result.length; i++) {
+    for (const childId of childrenOf.get(String(result[i])) ?? []) {
+      if (visited.has(String(childId))) continue;
+      visited.add(String(childId));
+      result.push(childId);
+    }
+  }
+  return result;
+};
+
+/** Chặn gán tài sản vào danh mục nhóm (đang có danh mục con active). */
+export const assertLeafCategory = async (categoryId: any) => {
+  const hasChild = await AssetCategory.exists({
+    parentCategory: categoryId,
+    isActive: true,
+  });
+  if (hasChild) {
+    throw ApiError.badRequest(
+      "Chỉ được gán tài sản vào danh mục cấp cuối (danh mục không có danh mục con)",
+    );
+  }
+};
+
+/**
+ * Validate `parentId` trước khi đặt làm cha của `selfId` (`selfId` rỗng khi
+ * tạo mới): cha phải tồn tại/active, không tạo vòng lặp (A→B→A — trước đây
+ * chỉ chặn trường hợp cha là chính nó), và KHÔNG đang chứa tài sản trực tiếp
+ * (nếu không, sau khi có con nó thành danh mục nhóm mà vẫn giữ tài sản — trái
+ * quy tắc "tài sản chỉ ở danh mục lá").
+ */
+const assertValidParent = async (parentId: any, selfId?: any) => {
+  if (selfId && String(parentId) === String(selfId)) {
+    throw ApiError.badRequest("Danh mục không thể là cha của chính nó");
+  }
+
+  const parent = await AssetCategory.findOne({ _id: parentId, isActive: true });
+  if (!parent) {
+    throw ApiError.badRequest("Danh mục cha không tồn tại");
+  }
+
+  if (selfId) {
+    // Đi ngược lên từ cha mới — gặp lại chính mình tức là đang chọn 1 con
+    // cháu làm cha → vòng lặp.
+    const visited = new Set<string>();
+    let cursor: any = parent.parentCategory;
+    while (cursor && !visited.has(String(cursor))) {
+      if (String(cursor) === String(selfId)) {
+        throw ApiError.badRequest(
+          "Không thể chọn danh mục con/cháu của chính nó làm danh mục cha",
+        );
+      }
+      visited.add(String(cursor));
+      const next = await AssetCategory.findById(cursor).select("parentCategory").lean();
+      cursor = next?.parentCategory;
+    }
+  }
+
+  const parentHasAssets = await Asset.exists({ category: parentId, isActive: true });
+  if (parentHasAssets) {
+    throw ApiError.badRequest(
+      "Danh mục cha đang chứa tài sản trực tiếp — chuyển các tài sản đó sang danh mục con trước",
+    );
+  }
+};
+
 /**
  * 📌 CREATE ASSET CATEGORY
  */
@@ -29,13 +118,7 @@ export const createAssetCategoryService = async (payload: {
   }
 
   if (parentCategory) {
-    const parentExists = await AssetCategory.findOne({
-      _id: parentCategory,
-      isActive: true,
-    });
-    if (!parentExists) {
-      throw ApiError.badRequest("Danh mục cha không tồn tại");
-    }
+    await assertValidParent(parentCategory);
   }
 
   const category = await AssetCategory.create(payload);
@@ -46,7 +129,7 @@ export const createAssetCategoryService = async (payload: {
  * 📌 GET ALL ASSET CATEGORIES
  */
 export const getAllAssetCategoriesService = async (query: any) => {
-  const { keyword, page = 1, limit = 10, isActive } = query;
+  const { keyword, page = 1, limit = 10, isActive, group, level } = query;
 
   // ⚠️ SỬA (Asset Categories UI, 2026-09-09): trước đây `filter.isActive`
   // HARD-CODE `true`, không đọc query — không ai liệt kê lại được danh mục
@@ -64,6 +147,24 @@ export const getAllAssetCategoriesService = async (query: any) => {
       { name: { $regex: safeKeyword, $options: "i" } },
     ];
   }
+
+  // DEV-081: lọc theo cây (trang Danh mục tài sản chỉ liệt kê danh mục con,
+  // có bộ lọc theo nhóm). Gộp các điều kiện `_id` qua `$and` vì có thể cùng
+  // lúc có `$in` (nhánh nhóm) và `$in/$nin` (lá/nhóm).
+  const idConditions: any[] = [];
+  if (group) {
+    const branchIds = await getCategoryWithDescendantIds(group);
+    idConditions.push({ _id: { $in: branchIds.filter((id) => String(id) !== String(group)) } });
+  }
+  if (level) {
+    // Danh mục nhóm = đang là cha của ít nhất 1 danh mục active.
+    const parentIds = await AssetCategory.distinct("parentCategory", {
+      isActive: true,
+      parentCategory: { $exists: true, $ne: null },
+    });
+    idConditions.push({ _id: level === "group" ? { $in: parentIds } : { $nin: parentIds } });
+  }
+  if (idConditions.length) filter.$and = idConditions;
 
   const pageNumber = Math.max(parseInt(page, 10), 1);
   const pageSize = Math.max(parseInt(limit, 10), 1);
@@ -123,21 +224,22 @@ export const updateAssetCategoryService = async (id: any, payload: any) => {
   );
 
   if (safePayload.parentCategory) {
-    if (safePayload.parentCategory === id) {
-      throw ApiError.badRequest("Danh mục không thể là cha của chính nó");
-    }
-    const parentExists = await AssetCategory.findOne({
-      _id: safePayload.parentCategory,
-      isActive: true,
-    });
-    if (!parentExists) {
-      throw ApiError.badRequest("Danh mục cha không tồn tại");
-    }
+    await assertValidParent(safePayload.parentCategory, id);
+  }
+
+  // DEV-080: `parentCategory: null` = gỡ khỏi danh mục cha (đưa lên cấp gốc).
+  // Trước đây DTO không nhận `null` và FE gửi `undefined` khi chọn "Không có"
+  // → một khi đã gán cha thì KHÔNG gỡ ra được qua UI. `$unset` thay vì ghi
+  // `null` để document giữ đúng shape "không có field" như danh mục gốc tạo mới.
+  const update: any = { ...safePayload };
+  if (safePayload.parentCategory === null) {
+    delete update.parentCategory;
+    update.$unset = { parentCategory: "" };
   }
 
   const category = await AssetCategory.findOneAndUpdate(
     { _id: id, isActive: true },
-    safePayload,
+    update,
     { new: true },
   );
 

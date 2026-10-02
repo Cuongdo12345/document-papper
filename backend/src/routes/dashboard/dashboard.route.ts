@@ -12,6 +12,7 @@ import {
     getAssetMaintenanceOverdue,
     getMedicalDeviceDashboardSummary,
     getMedicalDeviceCalibrationDue,
+    getMedicalDevicesByClass,
     getWorkflowOverdueApprovals,
     runWeeklyReport
 } from "../../controllers/dashboard/dashboard.controller";
@@ -39,6 +40,8 @@ router.get("/assets/maintenance-overdue", authenticate, authorizePermission("DAS
 // MEDICAL_DEVICE_VIEW (vốn dùng cho xem CHI TIẾT 1 thiết bị qua :assetId).
 router.get("/medical-devices/summary", authenticate, authorizePermission("DASHBOARD_READ"), getMedicalDeviceDashboardSummary);
 router.get("/medical-devices/calibration-due", authenticate, authorizePermission("DASHBOARD_READ"), getMedicalDeviceCalibrationDue);
+// DEV-084 — danh sách thiết bị theo phân loại A/B/C/D (modal ở Dashboard).
+router.get("/medical-devices/by-class", authenticate, authorizePermission("DASHBOARD_READ"), getMedicalDevicesByClass);
 
 // Roadmap B1 (SLA & nhắc việc Workflow, 2026-09-15) — "Đề xuất trễ hạn",
 // cùng permission DASHBOARD_READ với mọi widget dashboard khác.

@@ -28,7 +28,9 @@ import {
 } from "../../../shared/constants/excel.constants";
 import { ImportHistory } from "../../../models/importAudit/importhistory.model";
 import { resolveImportStatus } from "../../../shared/helpers/importStatus.helper";
+import { getCategoryWithDescendantIds } from "./assetCategory.service";
 import { escapeRegex } from "../../../shared/utils/regex.util";
+import { deletedDepartmentMessage, isDepartmentDeleted } from "../../../shared/helpers/departmentLookup.helper";
 
 export interface AssetImportOptions {
   dryRun?: boolean;
@@ -91,7 +93,8 @@ export const exportAssetsExcelPRO = async (query: any, res: any) => {
       if (!Types.ObjectId.isValid(category)) {
         throw ApiError.badRequest("Category không hợp lệ");
       }
-      filter.category = new Types.ObjectId(category);
+      // DEV-080: cùng quy tắc `getAllAssetsService` — gồm danh mục con cháu.
+      filter.category = { $in: await getCategoryWithDescendantIds(category) };
     }
 
     if (status) {
@@ -328,6 +331,16 @@ export const importAssetsExcel = async (
   ]);
 
   const categoryMap = new Map(categories.map((c: any) => [c.code, c]));
+  // DEV-080: tài sản chỉ gắn vào danh mục lá — gom trước các danh mục đang có
+  // con (1 query) thay vì gọi `assertLeafCategory` cho từng dòng.
+  const parentIdsInFile = new Set(
+    (
+      await AssetCategory.distinct("parentCategory", {
+        parentCategory: { $in: categories.map((c: any) => c._id) },
+        isActive: true,
+      })
+    ).map(String),
+  );
   const departmentMap = new Map(departments.map((d: any) => [d.code, d]));
 
   for (let i = 2; i <= sheet.rowCount; i++) {
@@ -373,6 +386,13 @@ export const importAssetsExcel = async (
         });
         continue;
       }
+      if (parentIdsInFile.has(String(category._id))) {
+        result.errors.push({
+          row: i,
+          message: `Danh mục ${categoryCode} là danh mục nhóm — chỉ được dùng mã danh mục cấp cuối`,
+        });
+        continue;
+      }
 
       const department = departmentMap.get(departmentCode);
       if (!department) {
@@ -380,6 +400,12 @@ export const importAssetsExcel = async (
           row: i,
           message: `Không tìm thấy khoa/phòng với mã: ${departmentCode}`,
         });
+        continue;
+      }
+      // BR-06 (DEV-100): khoa đã xoá mềm không nhận tài sản mới — báo lỗi
+      // đúng dòng thay vì âm thầm gắn vào khoa đang bị ẩn.
+      if (isDepartmentDeleted(department)) {
+        result.errors.push({ row: i, message: deletedDepartmentMessage(department) });
         continue;
       }
 

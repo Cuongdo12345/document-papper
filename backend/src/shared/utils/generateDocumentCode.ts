@@ -5,7 +5,8 @@ import {
   Document,
   DocumentCategory,
 } from "../../models/documents/document.model";
-import ApiError from "../errors/ApiError";
+import ApiError from "../errors/ApiError";
+import { assertDepartmentNotDeleted } from "../helpers/departmentLookup.helper";
 
 /**
  * Sinh `documentCode` an toàn cho nhiều request song song, dùng Counter
@@ -30,6 +31,9 @@ export const generateDocumentCode = async (
   if (!department) {
     throw ApiError.notFound("Không tìm thấy khoa/phòng");
   }
+  // BR-06 (DEV-100): khoa đã xoá mềm không nhận dữ liệu mới. Chặn ở đây là
+  // chặn cho mọi đường tạo tài liệu (API + import Excel).
+  assertDepartmentNotDeleted(department);
 
   const deptCode = department.code.toUpperCase();
 

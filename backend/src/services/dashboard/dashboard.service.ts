@@ -5,6 +5,10 @@ import { Types, PipelineStage } from "mongoose";
 import ApiError from "../../shared/errors/ApiError";
 import { toOptionalObjectId } from "../../shared/utils/Mongoid.util";
 import { SortOrder } from "../../shared/utils/Queryparsing.util";
+// BR-09 (DEV-097): `$month`/`$year` của MongoDB mặc định tính theo UTC (KHÔNG
+// đọc TZ của Node) — tài liệu tạo 0h–7h sáng mùng 1 (giờ VN) từng bị đếm vào
+// tháng trước. Mọi toán tử ngày trong file này truyền `timezone: APP_TIMEZONE`.
+import { APP_TIMEZONE } from "../../shared/constants/timezone.constant";
 
 /* =====================================================================
    GHI CHÚ REFACTOR (đọc trước khi sửa tiếp file này)
@@ -133,7 +137,7 @@ export const adminDashboardSummaryService = async () => {
           createdAt: { $gte: startOfYear },
         },
       },
-      { $group: { _id: { $month: "$createdAt" }, count: { $sum: 1 } } },
+      { $group: { _id: { $month: { date: "$createdAt", timezone: APP_TIMEZONE } }, count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
     ]),
 
@@ -147,7 +151,7 @@ export const adminDashboardSummaryService = async () => {
           createdAt: { $gte: startOfYear },
         },
       },
-      { $group: { _id: { $month: "$createdAt" }, count: { $sum: 1 } } },
+      { $group: { _id: { $month: { date: "$createdAt", timezone: APP_TIMEZONE } }, count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
     ]),
 
@@ -182,7 +186,9 @@ export const adminDashboardSummaryService = async () => {
       .populate("createdBy", "fullName")
       .lean(),
 
-    Department.countDocuments(),
+    // DEV-088: chỉ đếm khoa đang hoạt động — DEV-086 thêm xoá mềm nhưng bỏ sót chỗ này,
+    // khiến KPI lớn hơn danh sách Khoa/Phòng (mặc định chỉ hiện `isActive: true`).
+    Department.countDocuments({ isActive: true }),
 
     // 🧑‍⚕️ TỔNG SỐ USER
     User.countDocuments({ isActive: true }),
@@ -248,7 +254,7 @@ export const departmentDashboardService = async (departmentId: any) => {
           createdAt: { $gte: startOfYear },
         },
       },
-      { $group: { _id: { $month: "$createdAt" }, count: { $sum: 1 } } },
+      { $group: { _id: { $month: { date: "$createdAt", timezone: APP_TIMEZONE } }, count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
     ]),
 
@@ -263,7 +269,7 @@ export const departmentDashboardService = async (departmentId: any) => {
           createdAt: { $gte: startOfYear },
         },
       },
-      { $group: { _id: { $month: "$createdAt" }, count: { $sum: 1 } } },
+      { $group: { _id: { $month: { date: "$createdAt", timezone: APP_TIMEZONE } }, count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
     ]),
 
@@ -293,7 +299,8 @@ export const departmentDashboardService = async (departmentId: any) => {
 
 /* =====================================================================
    📊 KPI: PROPOSAL → REPORT CONVERSION RATE THEO KHOA
-   conversionRate = (số proposal có referenceTo.length > 0) / tổng proposal
+   conversionRate = (số proposal ĐÃ CÓ ít nhất 1 report tham chiếu tới nó) /
+   tổng proposal
 ===================================================================== */
 export const proposalConversionByDepartmentService = async ({
   page = 1,
@@ -308,10 +315,56 @@ export const proposalConversionByDepartmentService = async ({
 }): Promise<PaginationResult<any>> => {
   const basePipeline: PipelineStage[] = [
     { $match: { category: DocumentCategory.PROPOSAL, isActive: true, deletedAt: null } },
+    // ⚠️ SỬA BUG (DEV-085, 2026-09-25 — user báo tỷ lệ chuyển đổi luôn 0%
+    // dù có 190 proposal/81 report trong DB): `referenceTo` CHỈ được set trên
+    // document REPORT, TRỎ NGƯỢC tới PROPOSAL mà nó tham chiếu (xem comment
+    // gốc `document.model.ts` "⛓ CHỈ DÙNG CHO REPORT", và
+    // `countReportsByProposal`/`findReportsByProposal` ở `documents.query.ts`
+    // — cả 2 đều query `{ referenceTo: proposalId, category: "REPORT" }`).
+    // PROPOSAL KHÔNG BAO GIỜ tự có `referenceTo` — bản cũ đọc field này
+    // NGƯỢC HƯỚNG (đọc trên chính proposal) nên luôn rỗng → conversionRate
+    // LUÔN = 0% với MỌI khoa/phòng, bất kể dữ liệu thật. Sửa bằng `$lookup`
+    // join theo hướng ĐÚNG: tìm report nào có `referenceTo` chứa `_id` của
+    // proposal này (MongoDB tự so khớp phần tử mảng khi `foreignField` là
+    // field dạng mảng — không cần viết tay `$expr`/`$in`).
+    {
+      $lookup: {
+        from: "documents",
+        localField: "_id",
+        foreignField: "referenceTo",
+        as: "matchedReports",
+      },
+    },
     {
       $addFields: {
+        // Đếm ĐÃ CHUYỂN ĐỔI khi có ít nhất 1 REPORT còn active tham chiếu
+        // tới — CÙNG điều kiện `countReportsByProposal` (không giới hạn
+        // subType, khác `findReportsByProposal` chỉ lọc CHECK_DAMAGE/
+        // CONFIRM_STATUS cho 1 khu vực UI riêng — "đã chuyển đổi" nên tính
+        // MỌI loại report, không chỉ 2 subType đó).
         hasReport: {
-          $cond: [{ $gt: [{ $size: { $ifNull: ["$referenceTo", []] } }, 0] }, 1, 0],
+          $cond: [
+            {
+              $gt: [
+                {
+                  $size: {
+                    $filter: {
+                      input: "$matchedReports",
+                      cond: {
+                        $and: [
+                          { $eq: ["$$this.category", DocumentCategory.REPORT] },
+                          { $eq: ["$$this.isActive", true] },
+                        ],
+                      },
+                    },
+                  },
+                },
+                0,
+              ],
+            },
+            1,
+            0,
+          ],
         },
       },
     },
@@ -377,7 +430,10 @@ export const deviceDamageTrendByMonthService = async ({
     },
     {
       $group: {
-        _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
+        _id: {
+          year: { $year: { date: "$createdAt", timezone: APP_TIMEZONE } },
+          month: { $month: { date: "$createdAt", timezone: APP_TIMEZONE } },
+        },
         totalReports: { $sum: 1 },
       },
     },

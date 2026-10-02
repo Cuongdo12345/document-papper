@@ -10,6 +10,9 @@ import ApiError from "../../shared/errors/ApiError";
 import { clearPermissionCache, getCachedPermissions } from "../rbac/permission.cache";
 import { runBulkDelete } from "../../shared/utils/bulkDelete.util";
 import { parseUserAgent } from "../../shared/helpers/userAgent.helper";
+import { parseDateRangeBound } from "../../shared/utils/Queryparsing.util";
+import { escapeRegex } from "../../shared/utils/regex.util";
+import { assertDepartmentNotDeleted } from "../../shared/helpers/departmentLookup.helper";
 
 // import { createUserSchema } from "../dtos/users/user.dto";
 
@@ -60,6 +63,14 @@ import { parseUserAgent } from "../../shared/helpers/userAgent.helper";
 
       const dept = await Department.findById(department);
       if (!dept) throw ApiError.notFound("Khoa không tồn tại");
+    }
+
+    // BR-06 (DEV-100): không gán user MỚI vào khoa đã xoá mềm — áp cho MỌI
+    // role có gửi `department` (kiểm tra "không tồn tại" phía trên vẫn chỉ
+    // áp cho role USER như trước).
+    if (department) {
+      const dept = await Department.findById(department);
+      if (dept) assertDepartmentNotDeleted(dept);
     }
 
     // [MỚI 2026-09-18, khắc phục gap DEV-065 Mục 4] Check trùng email TRƯỚC
@@ -128,12 +139,15 @@ import { parseUserAgent } from "../../shared/helpers/userAgent.helper";
 
     if (fromDate || toDate) {
       filter.createdAt = {};
-      if (fromDate) filter.createdAt.$gte = new Date(fromDate);
-      if (toDate) filter.createdAt.$lte = new Date(toDate);
+      if (fromDate) filter.createdAt.$gte = parseDateRangeBound(fromDate, "start");
+      if (toDate) filter.createdAt.$lte = parseDateRangeBound(toDate, "end");
     }
 
+    // BR-12 (DEV-101): escape trước khi đưa vào $regex, cùng pattern
+    // DEV-010/IMP-015 ở các domain khác — keyword như "(" trước đây làm lỗi
+    // truy vấn (500) và mở cửa cho regex injection/ReDoS.
     if (keyword) {
-      filter.username = { $regex: keyword, $options: "i" };
+      filter.username = { $regex: escapeRegex(keyword), $options: "i" };
     }
 
     const skip = (page - 1) * limit;
@@ -171,6 +185,12 @@ import { parseUserAgent } from "../../shared/helpers/userAgent.helper";
    */
   export const getById = async (id: any) => {
     const user = await User.findById(id)
+      // [MỚI DEV-079] `+avatar` — field mặc định `select:false` (xem
+      // `user.model.ts`), phải tường minh mới có trong response chi tiết 1
+      // user (để ADMIN xem/preview trước khi sửa/xoá qua UserAvatarModal).
+      // `GET /users` (list, hàm `getList` bên trên) CỐ TÌNH KHÔNG thêm
+      // `+avatar` — tránh phồng payload danh sách.
+      .select("+avatar")
       .populate("department", "code name");
 
     if (!user) throw ApiError.notFound("User không tồn tại");
@@ -241,6 +261,14 @@ import { parseUserAgent } from "../../shared/helpers/userAgent.helper";
     if (effectiveRole?.name === "USER" && department) {
       const dept = await Department.findById(department);
       if (!dept) throw ApiError.notFound("Khoa không tồn tại");
+    }
+
+    // BR-06 (DEV-100): chặn ĐỔI user sang khoa đã xoá mềm, cho mọi role.
+    // Form sửa user luôn gửi lại khoa hiện tại, nên gửi lại ĐÚNG khoa cũ thì
+    // vẫn cho lưu (user chọn: chỉ chặn khi đổi khoa).
+    if (department && String(department) !== String(user.department ?? "")) {
+      const dept = await Department.findById(department);
+      if (dept) assertDepartmentNotDeleted(dept);
     }
 
     // 6. Validate username trùng nếu có thay đổi username
@@ -380,6 +408,13 @@ import { parseUserAgent } from "../../shared/helpers/userAgent.helper";
     if (!user) throw ApiError.notFound("User không tồn tại");
 
     if (user.isActive) throw ApiError.badRequest("User đã được khôi phục");
+
+    // BR-06 (DEV-100): không khôi phục user vào khoa đã xoá mềm — user sẽ
+    // hoạt động trong khoa đang bị ẩn. Admin đổi khoa hoặc khôi phục khoa trước.
+    if (user.department) {
+      const dept = await Department.findById(user.department);
+      if (dept) assertDepartmentNotDeleted(dept);
+    }
 
     user.isActive = true;
     await user.save();
@@ -639,10 +674,12 @@ import { parseUserAgent } from "../../shared/helpers/userAgent.helper";
     // sách userId khớp trước (giống cách `performedBy`/`user` dropdown filter
     // ở Audit Log hoạt động, chỉ khác input là text thay vì chọn từ dropdown).
     if (search) {
+      // BR-12 (DEV-101): escape — cùng lý do với `getList` phía trên.
+      const safeSearch = escapeRegex(search);
       const matchedUsers = await User.find({
         $or: [
-          { username: { $regex: search, $options: "i" } },
-          { fullName: { $regex: search, $options: "i" } },
+          { username: { $regex: safeSearch, $options: "i" } },
+          { fullName: { $regex: safeSearch, $options: "i" } },
         ],
       }).select("_id");
       filter.user = { $in: matchedUsers.map((u) => u._id) };
@@ -705,7 +742,10 @@ import { parseUserAgent } from "../../shared/helpers/userAgent.helper";
   export const getMeService = async(userId: any) => {
 
     const user = await User.findById(userId)
-      .select("-__v").populate("role", "name isSystemRole")
+      // [MỚI DEV-079] `+avatar` — field mặc định `select:false`, cần tường
+      // minh để avatar hiện được ở Header/ProfilePage (nguồn duy nhất FE
+      // đọc user hiện tại).
+      .select("-__v +avatar").populate("role", "name isSystemRole")
     .populate("department", "code name");
 
     if (!user || !user.isActive) {
@@ -773,6 +813,47 @@ import { parseUserAgent } from "../../shared/helpers/userAgent.helper";
     }
 
     return updatedUser;
+  }
+
+  /**
+   * [MỚI DEV-079] AVATAR — dùng CHUNG cho cả self-service (`PATCH
+   * /users/me/avatar`, KHÔNG truyền `performedBy`) VÀ admin sửa hộ user khác
+   * (`PATCH /users/:id/avatar`, permission `USER_UPDATE`, LUÔN truyền
+   * `performedBy`). Chỉ ghi audit khi có `performedBy` — mirror đúng
+   * asymmetry đã có sẵn của `updateMeService` (self /me KHÔNG audit) vs
+   * `update()` (ADMIN sửa user khác CÓ audit).
+   */
+  export const setAvatarService = async (userId: any, avatar: string, performedBy?: any) => {
+    const updated = await User.findOneAndUpdate(
+      { _id: userId, isActive: true },
+      { $set: { avatar } },
+      { new: true, runValidators: true },
+    ).select("-__v +avatar").populate("department", "code name");
+
+    if (!updated) throw ApiError.notFound("User không tồn tại hoặc đã bị vô hiệu hóa");
+
+    if (performedBy) {
+      await UserAudit.create({ user: updated._id, action: "UPDATE", performedBy, note: "Cập nhật ảnh đại diện" });
+    }
+
+    return updated;
+  }
+
+  /** [MỚI DEV-079] Xoá avatar — cùng nguyên tắc audit như `setAvatarService` ở trên. */
+  export const removeAvatarService = async (userId: any, performedBy?: any) => {
+    const updated = await User.findOneAndUpdate(
+      { _id: userId, isActive: true },
+      { $unset: { avatar: "" } },
+      { new: true },
+    ).select("-__v").populate("department", "code name");
+
+    if (!updated) throw ApiError.notFound("User không tồn tại hoặc đã bị vô hiệu hóa");
+
+    if (performedBy) {
+      await UserAudit.create({ user: updated._id, action: "UPDATE", performedBy, note: "Xoá ảnh đại diện" });
+    }
+
+    return updated;
   }
 
   /**

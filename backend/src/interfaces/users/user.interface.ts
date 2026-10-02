@@ -28,6 +28,20 @@ export interface IUser {
    * và CHỈ bật được nếu user đã có `email` (cần để gửi OTP).
    */
   twoFactorEnabled?: boolean;
+  /**
+   * [MỚI DEV-079] Ảnh đại diện — lưu THẲNG dạng data URI đầy đủ
+   * (`data:image/<jpeg|png|webp>;base64,<...>`), KHÔNG lưu file riêng trên
+   * đĩa/DB `Upload` — quyết định đã xác nhận qua AskUserQuestion: dự án
+   * KHÔNG có route serving file public/static (mọi file khác đều qua
+   * endpoint `/download` xác thực), nên ảnh nhỏ (giới hạn 300KB gốc, xem
+   * `AVATAR_MAX_BYTES` ở `users.dto.ts`) encode thẳng base64 là cách đơn
+   * giản nhất để `<img src>` dùng được ngay từ response đã xác thực sẵn
+   * (`GET /users/me`, `GET /users/:id`), không cần thêm request/route nào.
+   * `select: false` ở schema (giống `password`) — KHÔNG trả về mặc định ở
+   * `GET /users` (list) để tránh payload phồng to, chỉ trả khi gọi tường
+   * minh `.select("+avatar")` (đúng 2 nơi: `getMeService`, `getById`).
+   */
+  avatar?: string;
   createdAt: Date;
   updatedAt: Date;
 }

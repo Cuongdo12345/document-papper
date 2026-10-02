@@ -83,6 +83,13 @@ export const PERMISSIONS = {
   // reports) — CỐ TÌNH không đụng update/delete/restore (không phải điều
   // user yêu cầu, tránh leo thang quyền ngoài ý muốn).
   DOCUMENT_VIEW_ALL_DEPARTMENTS: "DOCUMENT_VIEW_ALL_DEPARTMENTS",
+  // MỚI (BR-03/DEV-092, 2026-09-29): CỜ RIÊNG cho phép TẠO tài liệu cho khoa
+  // KHÁC khoa của mình (vẫn cần DOCUMENT_CREATE để vào route). Không có cờ
+  // này (và không phải ADMIN) thì `department` gửi lên PHẢI trùng khoa của
+  // người tạo — xem `createDocumentService`. Tách khỏi
+  // DOCUMENT_VIEW_ALL_DEPARTMENTS (chỉ XEM) và DEPARTMENT_VIEW (chỉ xem danh
+  // mục khoa) theo quyết định của user — gán cho role nào qua UI "Phân quyền".
+  DOCUMENT_CREATE_ALL_DEPARTMENTS: "DOCUMENT_CREATE_ALL_DEPARTMENTS",
 
   // DOCUMENT — EXCEL (import/export/sync hàng loạt)
   // ⚠️ MỚI: `routes/excel/excel.route.ts` (5 route) đã có
@@ -118,6 +125,9 @@ export const PERMISSIONS = {
   DEPARTMENT_CREATE: "DEPARTMENT_CREATE",
   DEPARTMENT_UPDATE: "DEPARTMENT_UPDATE",
   DEPARTMENT_DELETE: "DEPARTMENT_DELETE",
+  // [DEV-086] Quyền RIÊNG cho khôi phục (không dùng lại DEPARTMENT_UPDATE) —
+  // user chọn tách quyền, cùng cách USER_RESTORE/CONTRACT_RESTORE đã làm.
+  DEPARTMENT_RESTORE: "DEPARTMENT_RESTORE",
 
   // AUDIT
   AUDIT_VIEW: "AUDIT_VIEW",
@@ -190,6 +200,18 @@ export const PERMISSIONS = {
   // Giai đoạn 3 — chạy tay cảnh báo kiểm định ngoài lịch cron
   // (POST /api/medical-devices/alerts/run). Mirror đúng ASSET_ALERTS_TRIGGER.
   MEDICAL_DEVICE_ALERTS_TRIGGER: "MEDICAL_DEVICE_ALERTS_TRIGGER",
+
+  // [MỚI, DEV-077] Theo dõi chứng chỉ vận hành thiết bị y tế — domain RIÊNG
+  // (`OperatorCertificate`, gắn user+danh mục thiết bị, KHÔNG theo từng
+  // Asset) nhưng cùng nhóm nghiệp vụ Thiết bị Y tế nên đặt permission cạnh
+  // đây. VIEW cấp rộng hơn (cùng nhóm role có MEDICAL_DEVICE_VIEW), CREATE
+  // chỉ IT/Vật tư-TTB (cùng nhóm role có MEDICAL_DEVICE_CREATE) — xem
+  // `rolePermission.map.ts`.
+  OPERATOR_CERTIFICATE_VIEW: "OPERATOR_CERTIFICATE_VIEW",
+  OPERATOR_CERTIFICATE_CREATE: "OPERATOR_CERTIFICATE_CREATE",
+  // [MỚI DEV-078] Sửa (chỉ certificateNumber) / Thu hồi+Xoá mềm (gộp 1 permission — quyết định user).
+  OPERATOR_CERTIFICATE_UPDATE: "OPERATOR_CERTIFICATE_UPDATE",
+  OPERATOR_CERTIFICATE_REVOKE: "OPERATOR_CERTIFICATE_REVOKE",
 
   // UPLOAD
   UPLOAD_FILES: "UPLOAD_FILES",

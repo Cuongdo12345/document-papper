@@ -19,7 +19,10 @@ import {
   getMedicalDeviceDashboardSummaryService,
   getCalibrationDueListService,
   CALIBRATION_DUE_ALLOWED_SORT_BY,
+  getMedicalDevicesByClassListService,
+  MEDICAL_DEVICES_BY_CLASS_ALLOWED_SORT_BY,
 } from "../../services/dashboard/medicalDeviceDashboard.service";
+import { MedicalDeviceClass } from "../../interfaces/assets/medicalDevice.interface";
 
 import { getOverdueApprovalsListService } from "../../services/dashboard/workflowDashboard.service";
 
@@ -169,8 +172,8 @@ export const getTopDamagedDevices = catchAsync(async (req: Request, res: Respons
     maxLimit: 100,
   });
 
-  const parsedFromDate = parseOptionalDate(fromDate, "fromDate");
-  const parsedToDate = parseOptionalDate(toDate, "toDate");
+  const parsedFromDate = parseOptionalDate(fromDate, "fromDate", "start");
+  const parsedToDate = parseOptionalDate(toDate, "toDate", "end");
 
   const data = await getOrSetCache(
     `dashboard:topDamagedDevices:${department ?? ""}:${parsedFromDate?.toISOString() ?? ""}:${parsedToDate?.toISOString() ?? ""}:${page}:${limit}:${sortBy}:${sortOrder}`,
@@ -200,8 +203,8 @@ export const getTopDamagedInk = catchAsync(async (req: Request, res: Response) =
     maxLimit: 100,
   });
 
-  const parsedFromDate = parseOptionalDate(fromDate, "fromDate");
-  const parsedToDate = parseOptionalDate(toDate, "toDate");
+  const parsedFromDate = parseOptionalDate(fromDate, "fromDate", "start");
+  const parsedToDate = parseOptionalDate(toDate, "toDate", "end");
 
   const data = await getOrSetCache(
     `dashboard:topDamagedInk:${department ?? ""}:${parsedFromDate?.toISOString() ?? ""}:${parsedToDate?.toISOString() ?? ""}:${page}:${limit}:${sortBy}:${sortOrder}`,
@@ -270,10 +273,21 @@ export const getAssetWarrantyExpiring = catchAsync(async (req: Request, res: Res
   const parsedDaysAhead = Number(req.query.daysAhead);
   const daysAhead = Number.isFinite(parsedDaysAhead) && parsedDaysAhead >= 0 ? parsedDaysAhead : 30;
 
+  // BR-05 (DEV-094): trước đây khoá cache chứa `JSON.stringify(req.query)`
+  // (thêm `?x=<ngẫu nhiên>` là thêm 1 mục cache) và truyền thẳng `req.query`
+  // (limit không có trần). Nay chỉ dùng tham số đã parse. Service sắp xếp cố
+  // định theo `warrantyExpiredAt` — `sortBy`/`sortOrder` không dùng.
+  const { page, limit } = parsePaginationQuery(req.query, {
+    allowedSortBy: ["warrantyExpiredAt"],
+    defaultSortBy: "warrantyExpiredAt",
+    defaultLimit: 10,
+    maxLimit: 100,
+  });
+
   const data = await getOrSetCache(
-    `dashboard:warrantyExpiring:${daysAhead}:${JSON.stringify(req.query)}`,
+    `dashboard:warrantyExpiring:${daysAhead}:${page}:${limit}`,
     DASHBOARD_CACHE_TTL_MS,
-    () => getWarrantyExpiringListService(daysAhead, req.query),
+    () => getWarrantyExpiringListService(daysAhead, { page, limit }),
   );
 
   res.json({ success: true, ...data });
@@ -284,10 +298,19 @@ export const getAssetMaintenanceOverdue = catchAsync(async (req: Request, res: R
   const parsedDaysThreshold = Number(req.query.daysThreshold);
   const daysThreshold = Number.isFinite(parsedDaysThreshold) && parsedDaysThreshold >= 0 ? parsedDaysThreshold : 7;
 
+  // BR-05 (DEV-094) — xem `getAssetWarrantyExpiring`. Sắp xếp cố định theo
+  // `maintenanceStartedAt`.
+  const { page, limit } = parsePaginationQuery(req.query, {
+    allowedSortBy: ["maintenanceStartedAt"],
+    defaultSortBy: "maintenanceStartedAt",
+    defaultLimit: 10,
+    maxLimit: 100,
+  });
+
   const data = await getOrSetCache(
-    `dashboard:maintenanceOverdue:${daysThreshold}:${JSON.stringify(req.query)}`,
+    `dashboard:maintenanceOverdue:${daysThreshold}:${page}:${limit}`,
     DASHBOARD_CACHE_TTL_MS,
-    () => getMaintenanceOverdueListService(daysThreshold, req.query),
+    () => getMaintenanceOverdueListService(daysThreshold, { page, limit }),
   );
 
   res.json({ success: true, ...data });
@@ -336,14 +359,59 @@ export const getMedicalDeviceCalibrationDue = catchAsync(async (req: Request, re
   res.json({ success: true, ...data });
 });
 
+// ⚠️ THÊM (DEV-084) — danh sách thiết bị theo phân loại A/B/C/D, dùng cho
+// modal "Xem danh sách" khi bấm vào ô loại thiết bị ở Dashboard. `deviceClass`
+// BẮT BUỘC (khác `daysAhead`/`daysThreshold` ở trên đều có default) — không
+// có class hợp lệ thì không biết liệt kê gì, trả 400 rõ ràng thay vì âm thầm
+// trả toàn bộ thiết bị (sai với kỳ vọng "chỉ đúng loại đã bấm").
+export const getMedicalDevicesByClass = catchAsync(async (req: Request, res: Response) => {
+  const deviceClass = req.query.deviceClass;
+  if (!Object.values(MedicalDeviceClass).includes(deviceClass as MedicalDeviceClass)) {
+    throw ApiError.badRequest(
+      `deviceClass không hợp lệ, chỉ chấp nhận: ${Object.values(MedicalDeviceClass).join(", ")}`,
+    );
+  }
+
+  const { page, limit, sortBy, sortOrder } = parsePaginationQuery(req.query, {
+    allowedSortBy: MEDICAL_DEVICES_BY_CLASS_ALLOWED_SORT_BY,
+    defaultSortBy: "assetName",
+    defaultSortOrder: "asc",
+    defaultLimit: 10,
+    maxLimit: 100,
+  });
+
+  const data = await getOrSetCache(
+    `dashboard:medicalDevicesByClass:${deviceClass}:${page}:${limit}:${sortBy}:${sortOrder}`,
+    DASHBOARD_CACHE_TTL_MS,
+    () =>
+      getMedicalDevicesByClassListService(deviceClass as MedicalDeviceClass, {
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+      }),
+  );
+
+  res.json({ success: true, ...data });
+});
+
 /* =====================================================================
    Roadmap B1 (SLA & nhắc việc Workflow) — "Đề xuất trễ hạn"
 ===================================================================== */
 export const getWorkflowOverdueApprovals = catchAsync(async (req: Request, res: Response) => {
+  // BR-05 (DEV-094) — xem `getAssetWarrantyExpiring`. Thứ tự do
+  // `findOverdueWorkflowInstances()` quyết định, `sortBy` không dùng.
+  const { page, limit } = parsePaginationQuery(req.query, {
+    allowedSortBy: ["overdue"],
+    defaultSortBy: "overdue",
+    defaultLimit: 10,
+    maxLimit: 100,
+  });
+
   const data = await getOrSetCache(
-    `dashboard:workflowOverdueApprovals:${JSON.stringify(req.query)}`,
+    `dashboard:workflowOverdueApprovals:${page}:${limit}`,
     DASHBOARD_CACHE_TTL_MS,
-    () => getOverdueApprovalsListService(req.query),
+    () => getOverdueApprovalsListService({ page, limit }),
   );
 
   res.json({ success: true, ...data });

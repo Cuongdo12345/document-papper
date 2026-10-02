@@ -4,6 +4,8 @@ import { Upload } from "../../models/uploadFiles/upload.model";
 import { Request, Response } from "express";
 import { buildPaginationMeta } from "../../shared/utils/Queryparsing.util";
 import { resolveUploadedFilePath } from "../../shared/utils/uploadStorage.util";
+import { catchAsync } from "../../shared/utils/catchAsync";
+import ApiError from "../../shared/errors/ApiError";
 
 // DEV-007/IMP-008..010 — mọi guard/scope dưới đây dùng chung 1 điều kiện
 // ADMIN-bypass, đồng bộ pattern đã dùng xuyên suốt codebase. 🔒 DEV-001A
@@ -13,29 +15,28 @@ const isAdminCaller = (req: Request): boolean =>
   req.user?.role.isSystemRole === true;
 
 // upload
-export const uploadFiles = async (req: Request, res: Response) => {
-  try {
-    const files = req.files as Express.Multer.File[];
-
-    const result = await saveFilesToDB(files, req.user!._id);
-
-    // DEV-025/ARCH-23: thêm `success: true` — đồng bộ theo convention chung
-    // `{success, message?, data?}` dùng ở hầu hết controller khác (vd
-    // `document.controller.ts`), trước đây domain Upload thiếu field này.
-    return res.json({
-      success: true,
-      message: "Upload success",
-      data: result,
-    });
-  } catch (err: any) {
-    // DEV-021/SEC-23: trước đây trả thẳng `err.message` gốc ra client — nhánh
-    // catch riêng lẻ này không đi qua `errorHandler` tập trung (đồng bộ hoá
-    // toàn bộ pattern error-handling của domain Upload là ARCH-09, ngoài
-    // phạm vi task này). Log chi tiết ở server, chỉ trả message generic.
-    console.error("[uploadFiles] Lỗi khi upload file:", err);
-    res.status(500).json({ message: "Đã có lỗi xảy ra khi upload file, vui lòng thử lại sau" });
+// BR-22 (DEV-108, 2026-09-30): trước đây tự try/catch và trả `{ message }` (không
+// có `success`/`errorCode`) — lệch format lỗi chung của `errorHandler`. Nay bọc
+// `catchAsync`, lỗi đi qua `errorHandler` (log có cấu trúc + không lộ chi tiết nội
+// bộ, đã làm ở DEV-021/SEC-23). Không kèm file -> 400 (trước đây `files.map` trên
+// `undefined` văng TypeError -> 500).
+export const uploadFiles = catchAsync(async (req: Request, res: Response) => {
+  const files = req.files as Express.Multer.File[] | undefined;
+  if (!files || files.length === 0) {
+    throw ApiError.badRequest("Vui lòng chọn ít nhất 1 file để tải lên");
   }
-};
+
+  const result = await saveFilesToDB(files, req.user!._id);
+
+  // DEV-025/ARCH-23: thêm `success: true` — đồng bộ theo convention chung
+  // `{success, message?, data?}` dùng ở hầu hết controller khác (vd
+  // `document.controller.ts`), trước đây domain Upload thiếu field này.
+  return res.json({
+    success: true,
+    message: "Upload success",
+    data: result,
+  });
+});
 
 // list files
 // DEV-007/IMP-009 (H-09c=SEC-32=RV09-03, quyết định nghiệp vụ đã xác nhận
@@ -51,7 +52,7 @@ export const uploadFiles = async (req: Request, res: Response) => {
 // query + format response, đúng flow chuẩn Controller → Service → Model
 // (trước đây domain Upload là NGOẠI LỆ duy nhất tự làm việc này thẳng
 // trong controller, xem comment cũ đã xoá + `upload.service.ts` đầu file).
-export const getFiles = async (req: Request, res: Response) => {
+export const getFiles = catchAsync(async (req: Request, res: Response) => {
   const { page, limit, sortBy, order } = req.query as unknown as ListFilesParams;
 
   const { items, total } = await getFilesService(req.query as unknown as ListFilesParams, {
@@ -65,7 +66,7 @@ export const getFiles = async (req: Request, res: Response) => {
     data: items,
     pagination: buildPaginationMeta(page, limit, total),
   });
-};
+});
 
 // file detail
 // DEV-007/IMP-010 (H-09d=SEC-33=RV09-04): IDOR đầy đủ trước đây — bất kỳ
@@ -74,25 +75,25 @@ export const getFiles = async (req: Request, res: Response) => {
 // dùng ở `documents.validator.ts:validateRestorePermission` cho ownership
 // mismatch (không phải 404 — endpoint này đã yêu cầu permission
 // `VIEW_FILE_DETAIL` nên không cần obscure sự tồn tại của resource).
-export const getFileDetail = async (req: Request, res: Response) => {
+export const getFileDetail = catchAsync(async (req: Request, res: Response) => {
   const file = await Upload.findById(req.params.id);
 
   if (!file) {
-    return res.status(404).json({ message: "Không timg thấy file" });
+    throw ApiError.notFound("Không tìm thấy file");
   }
-  if(file.isDeleted === true ) {
-    return res.status(404).json({ message: "File đã được xóa rồi" });
+  if (file.isDeleted === true) {
+    throw ApiError.notFound("File đã được xóa rồi");
   }
 
   if (!isAdminCaller(req) && file.uploadedBy?.toString() !== req.user?._id?.toString()) {
-    return res.status(403).json({ message: "Bạn không có quyền xem file này" });
+    throw ApiError.forbidden("Bạn không có quyền xem file này");
   }
 
   // DEV-025/ARCH-23: trước đây trả THẲNG document Mongoose (`res.json(file)`,
   // không wrapper) — lệch convention chung `{success, message?, data?}` dùng
   // ở hầu hết controller khác. Bọc lại, KHÔNG đổi field bên trong `file`.
   res.json({ success: true, data: file });
-};
+});
 
 // download file (nội dung file thật, KHÔNG phải metadata)
 // [FE-15] MỚI — trước đây `fileUrl` (`/uploads/<filename>`) trả về ở
@@ -105,17 +106,17 @@ export const getFileDetail = async (req: Request, res: Response) => {
 // đang chặn (DEV-007/IMP-010: chỉ chủ sở hữu/ADMIN xem được) trở nên public
 // với bất kỳ ai đoán/biết được URL. Route này tái dùng ĐÚNG guard đó trước
 // khi `res.download()`.
-export const downloadFile = async (req: Request, res: Response) => {
+export const downloadFile = catchAsync(async (req: Request, res: Response) => {
   const file = await Upload.findById(req.params.id);
 
   if (!file) {
-    return res.status(404).json({ message: "Không tìm thấy file" });
+    throw ApiError.notFound("Không tìm thấy file");
   }
   if (file.isDeleted === true) {
-    return res.status(404).json({ message: "File đã được xóa rồi" });
+    throw ApiError.notFound("File đã được xóa rồi");
   }
   if (!isAdminCaller(req) && file.uploadedBy?.toString() !== req.user?._id?.toString()) {
-    return res.status(403).json({ message: "Bạn không có quyền tải file này" });
+    throw ApiError.forbidden("Bạn không có quyền tải file này");
   }
 
   // Schema `Upload` khai `fileUrl`/`fileName` là `String` thường (không
@@ -123,7 +124,7 @@ export const downloadFile = async (req: Request, res: Response) => {
   // guard tường minh thay vì ép kiểu `!`, dữ liệu rác (thiếu field) trả 404
   // rõ ràng thay vì để `path.join`/`res.download` nhận `undefined`.
   if (!file.fileUrl || !file.fileName) {
-    return res.status(404).json({ message: "File thiếu dữ liệu, không thể tải" });
+    throw ApiError.notFound("File thiếu dữ liệu, không thể tải");
   }
 
   // (A2, 2026-09-15) tách sang `resolveUploadedFilePath()` dùng chung —
@@ -132,30 +133,28 @@ export const downloadFile = async (req: Request, res: Response) => {
   const filePath = resolveUploadedFilePath(file.fileUrl);
 
   if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ message: "File không còn tồn tại trên server" });
+    throw ApiError.notFound("File không còn tồn tại trên server");
   }
 
   res.download(filePath, file.fileName);
-};
+});
 
 // delete file (soft delete)
 // DEV-007/IMP-010 — cùng guard ownership/ADMIN với getFileDetail ở trên.
-export const deleteFile = async (req: Request, res: Response) => {
+export const deleteFile = catchAsync(async (req: Request, res: Response) => {
   const file = await Upload.findById(req.params.id);
 
   if (!file) {
-    return res.status(404).json({ message: "File not found" });
+    throw ApiError.notFound("Không tìm thấy file");
   }
 
   if (!isAdminCaller(req) && file.uploadedBy?.toString() !== req.user?._id?.toString()) {
-    return res.status(403).json({ message: "Bạn không có quyền xoá file này" });
+    throw ApiError.forbidden("Bạn không có quyền xoá file này");
   }
 
   file.isDeleted = true;
   await file.save();
 
   // DEV-025/ARCH-23: thêm `success: true` cho đồng bộ convention chung.
-  res.json({ success: true, message: "File deleted" });
-};
-
-
+  res.json({ success: true, message: "Đã xoá file" });
+});

@@ -1,4 +1,4 @@
-import { Document, DocumentSubType } from "../../models/documents/document.model";
+import { Document, DocumentCategory, DocumentSubType } from "../../models/documents/document.model";
 import ApiError from "../../shared/errors/ApiError";
 import type { ClientSession } from "mongoose";
 
@@ -92,10 +92,50 @@ export const findDocuments = (filter: any, options: any) => {
  * trong DB nên các reference trên KHÔNG còn dangling (populate vẫn trả về
  * document, chỉ `isActive=false` thay vì null).
  */
-export const softDeleteDocumentsByFilter = (query: any, deletedBy: any) => {
-  return Document.updateMany(query, {
-    $set: { isActive: false, deletedAt: new Date(), deletedBy },
-  });
+// BR-11 (DEV-098): thêm `session` (optional) để xoá theo tháng ghi Document +
+// UserAudit trong CÙNG 1 transaction.
+export const softDeleteDocumentsByFilter = (query: any, deletedBy: any, session?: ClientSession) => {
+  return Document.updateMany(
+    query,
+    { $set: { isActive: false, deletedAt: new Date(), deletedBy } },
+    { session },
+  );
+};
+
+/**
+ * BR-11 (DEV-098, 2026-09-29) — "tài liệu đang có workflow CHỜ DUYỆT THẬT".
+ *
+ * ⚠️ KHÔNG dùng riêng `workflowStatus === "pending"`: field này có
+ * `default: "pending"` trong schema nên tài liệu CHƯA TỪNG gửi duyệt cũng là
+ * "pending" (DB dev: 270/278 tài liệu, không cái nào có workflow thật). Trước
+ * đây xoá đơn lẻ dùng điều kiện đó nên MỌI tài liệu chưa gửi duyệt đều bị
+ * chặn xoá với thông báo sai. Chỉ tài liệu ĐÃ gửi duyệt mới có
+ * `workflowInstanceId` (`submitWorkflow` gán cùng transaction với việc tạo
+ * WorkflowInstance; approve/reject/cancel/complete cập nhật `workflowStatus`
+ * cùng transaction) → 2 field này đủ xác định, không cần query WorkflowInstance.
+ */
+export const PENDING_WORKFLOW_FILTER = {
+  workflowStatus: "pending",
+  workflowInstanceId: { $ne: null },
+} as const;
+
+export const hasPendingWorkflow = (document: { workflowStatus?: string; workflowInstanceId?: unknown }) =>
+  document.workflowStatus === "pending" && document.workflowInstanceId != null;
+
+/**
+ * BR-11 (DEV-098): trong số `proposalIds`, trả về các đề xuất đang có ÍT NHẤT
+ * 1 REPORT active tham chiếu — 1 truy vấn `distinct` duy nhất thay vì gọi
+ * `countReportsByProposal` tuần tự cho từng đề xuất (N+1). Cùng điều kiện với
+ * `countReportsByProposal` (REPORT, isActive, `referenceTo` chứa proposal).
+ */
+export const findProposalIdsWithActiveReports = async (proposalIds: any[], session?: ClientSession) => {
+  if (proposalIds.length === 0) return [];
+  const referenced = await Document.distinct(
+    "referenceTo",
+    { category: DocumentCategory.REPORT, isActive: true, referenceTo: { $in: proposalIds } },
+  ).session(session ?? null);
+  const inScope = new Set(proposalIds.map(String));
+  return referenced.filter((id: any) => inScope.has(String(id)));
 };
 
 /**
@@ -103,8 +143,8 @@ export const softDeleteDocumentsByFilter = (query: any, deletedBy: any) => {
  * batch "xoá theo tháng" cần loại trừ (xem `findProposalIdsWithActiveReports`
  * ở `document.service.ts`).
  */
-export const findDocumentIdsByFilter = (query: any) => {
-  return Document.distinct("_id", query);
+export const findDocumentIdsByFilter = (query: any, session?: ClientSession) => {
+  return Document.distinct("_id", query).session(session ?? null);
 };
 
 /* ===============================
@@ -113,7 +153,7 @@ export const findDocumentIdsByFilter = (query: any) => {
 export const findProposalById = (id: any) => {
   return Document.findOne({
     _id: id,
-    category: "PROPOSAL",
+    category: DocumentCategory.PROPOSAL,
     isActive: true,
   })
     .populate("department", "name code")
@@ -127,8 +167,8 @@ export const findProposalById = (id: any) => {
 export const findReportsByProposal = (proposalId: any) => {
   return Document.find({
     referenceTo: proposalId,
-    category: "REPORT",
-    subType: { $in: ["CHECK_DAMAGE", "CONFIRM_STATUS"] }, // bỏ hardcode 1 giá trị
+    category: DocumentCategory.REPORT,
+    subType: { $in: [DocumentSubType.CHECK_DAMAGE, DocumentSubType.CONFIRM_STATUS] }, // bỏ hardcode 1 giá trị
     isActive: true,
   })
     .populate("department", "name code")
@@ -146,7 +186,7 @@ export const findReportsByProposal = (proposalId: any) => {
 export const countReportsByProposal = (proposalId: any) => {
   return Document.countDocuments({
     referenceTo: proposalId,
-    category: "REPORT",
+    category: DocumentCategory.REPORT,
     isActive: true,
   });
 };

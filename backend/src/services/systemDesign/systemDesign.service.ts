@@ -1,6 +1,8 @@
 import fs from "fs";
 import path from "path";
 import mongoose from "mongoose";
+import { MODULE_DESCRIPTIONS } from "./moduleDescriptions";
+import { buildRelatedDocsMap, type RelatedDoc } from "./relatedDocs";
 
 /**
  * DEV-073 (2026-09-21) — `GET /api/system-design`. Introspect TRỰC TIẾP
@@ -15,6 +17,12 @@ import mongoose from "mongoose";
 export interface SystemDesignModule {
   name: string;
   models: string[];
+  /** DEV-074 — tuỳ chọn: chỉ có khi `moduleDescriptions.ts` có entry cho module này (xem CLAUDE.md §36 bước 8b). */
+  description?: string;
+  /** DEV-074 — tuỳ chọn, cùng điều kiện với `description`. */
+  features?: string[];
+  /** DEV-074 — luôn có (mảng rỗng nếu không tìm thấy task nào nhắc module này). */
+  relatedDocs: RelatedDoc[];
 }
 
 export interface SystemDesignModel {
@@ -166,9 +174,17 @@ export function getSystemDesignService(): SystemDesignResult {
     modulesMap.get(moduleName)!.push(name);
   }
 
+  const moduleNames = [...modulesMap.keys()];
+  const relatedDocsMap = buildRelatedDocsMap(moduleNames);
+
   const modules: SystemDesignModule[] = [...modulesMap.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([name, modelsInModule]) => ({ name, models: modelsInModule.sort() }));
+    .map(([name, modelsInModule]) => ({
+      name,
+      models: modelsInModule.sort(),
+      ...MODULE_DESCRIPTIONS[name],
+      relatedDocs: relatedDocsMap.get(name) ?? [],
+    }));
 
   return {
     totalModels: modelNames.length,

@@ -36,6 +36,10 @@ const MedicalDeviceProfileSchema = new Schema<IMedicalDeviceProfile>(
     nextCalibrationDueDate: { type: Date },
     calibrationAlertSentAt: { type: Date },
 
+    // [MỚI] Cảnh báo hết hạn giấy phép lưu hành — xem giải thích đầy đủ ở
+    // `IMedicalDeviceProfile.licenseAlertSentAt`.
+    licenseAlertSentAt: { type: Date },
+
     operatorCertificateRequired: { type: Boolean, default: false },
 
     createdBy: { type: Schema.Types.ObjectId, ref: "User" },
@@ -49,6 +53,13 @@ MedicalDeviceProfileSchema.index({ asset: 1 }, { unique: true });
 MedicalDeviceProfileSchema.index({
   requiresCalibration: 1,
   nextCalibrationDueDate: 1,
+});
+// [MỚI] Phục vụ cron cảnh báo hết hạn giấy phép lưu hành — cùng lý do/pattern
+// với index kiểm định ở trên (equality trước — `licenseAlertSentAt` — rồi
+// range `licenseExpiredAt`).
+MedicalDeviceProfileSchema.index({
+  licenseAlertSentAt: 1,
+  licenseExpiredAt: 1,
 });
 
 export const MedicalDeviceProfile = model<IMedicalDeviceProfile>(

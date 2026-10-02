@@ -11,6 +11,7 @@
 // từng xảy ra với module Asset).
 
 import { MedicalDeviceProfile } from "../../../models/assets/medicalDeviceProfile.model";
+import { OperatorCertificate } from "../../../models/assets/operatorCertificate.model";
 import {
   NotificationType,
   NotificationResourceType,
@@ -18,10 +19,27 @@ import {
 } from "../../../models/notifications/notification.model";
 import { Role } from "../../../models/rbac/role.model";
 import { User } from "../../../models/users/user.model";
-import { notifyUsersByRoleName } from "../../notifications/notification.service";
+import {
+  notifyUsersByRoleName,
+  createNotification,
+} from "../../notifications/notification.service";
 
 /** Số ngày trước hạn kiểm định để bắt đầu cảnh báo — đúng §3 tài liệu thiết kế. */
 const CALIBRATION_ALERT_DAYS_BEFORE = 30;
+
+/**
+ * [MỚI] Số ngày trước hạn giấy phép lưu hành để bắt đầu cảnh báo — tách
+ * constant RIÊNG (không dùng chung `CALIBRATION_ALERT_DAYS_BEFORE`) dù cùng
+ * giá trị 30 hiện tại, để có thể tinh chỉnh độc lập sau này mà không ảnh
+ * hưởng cảnh báo kiểm định (2 loại hạn khác bản chất pháp lý).
+ */
+const LICENSE_ALERT_DAYS_BEFORE = 30;
+
+/**
+ * [MỚI, DEV-077] Số ngày trước hạn chứng chỉ vận hành để bắt đầu cảnh báo —
+ * tách constant riêng, cùng lý do `LICENSE_ALERT_DAYS_BEFORE`.
+ */
+const OPERATOR_CERTIFICATE_ALERT_DAYS_BEFORE = 30;
 
 /**
  * Role nhận cảnh báo. ĐÃ CHỐT ở §9.3 tài liệu thiết kế: dùng lại role "IT"
@@ -141,16 +159,165 @@ export const checkCalibrationDueService = async () => {
 };
 
 /**
+ * 📌 CẢNH BÁO SẮP/ĐÃ HẾT HẠN GIẤY PHÉP LƯU HÀNH
+ *
+ * [MỚI] Đóng gap đã ghi nhận: `licenseExpiredAt` được lưu trên profile
+ * nhưng trước đây KHÔNG có cron nào theo dõi. Mirror ĐÚNG logic
+ * `checkCalibrationDueService` ở trên (gửi 1 lần khi còn ≤30 ngày, kể cả đã
+ * quá hạn; dùng `licenseAlertSentAt` chống gửi trùng) — chỉ khác điều kiện
+ * quét: KHÔNG có cờ `requiresCalibration`-tương-đương, chỉ cần
+ * `licenseExpiredAt` có giá trị (không phải mọi thiết bị đều có giấy phép
+ * lưu hành cần theo dõi — field này optional ở model).
+ */
+export const checkLicenseExpiringService = async () => {
+  if (!(await hasValidRecipients(ALERT_RECIPIENT_ROLE))) {
+    return { checked: 0, notified: 0 };
+  }
+
+  const now = new Date();
+  const threshold = new Date(now);
+  threshold.setDate(threshold.getDate() + LICENSE_ALERT_DAYS_BEFORE);
+
+  const profiles = await MedicalDeviceProfile.find({
+    licenseExpiredAt: { $ne: null, $lte: threshold },
+    licenseAlertSentAt: null,
+  }).populate({
+    path: "asset",
+    select: "name assetCode department isActive",
+    populate: { path: "department", select: "code name" },
+  });
+
+  let notified = 0;
+
+  for (const profile of profiles) {
+    const asset = profile.asset as any;
+
+    // Cùng lý do bỏ qua asset inactive như `checkCalibrationDueService` —
+    // KHÔNG đánh dấu `licenseAlertSentAt` (không phải "đã xử lý", chỉ là
+    // "không còn liên quan"), để cron xét lại nếu asset được restore.
+    if (!asset || asset.isActive === false) {
+      continue;
+    }
+
+    const isAlreadyExpired = profile.licenseExpiredAt! < now;
+    const departmentName = asset.department?.name ?? "";
+
+    await notifyUsersByRoleName(ALERT_RECIPIENT_ROLE, {
+      type: NotificationType.MEDICAL_DEVICE_LICENSE_EXPIRING,
+      title: isAlreadyExpired
+        ? "Thiết bị y tế đã hết hạn giấy phép lưu hành"
+        : "Thiết bị y tế sắp hết hạn giấy phép lưu hành",
+      message: isAlreadyExpired
+        ? `Thiết bị "${asset.name}" (${asset.assetCode}, ${departmentName}) đã hết hạn giấy phép lưu hành từ ${profile.licenseExpiredAt!.toLocaleDateString("vi-VN")}.`
+        : `Thiết bị "${asset.name}" (${asset.assetCode}, ${departmentName}) sẽ hết hạn giấy phép lưu hành vào ${profile.licenseExpiredAt!.toLocaleDateString("vi-VN")}.`,
+      resourceType: NotificationResourceType.ASSET,
+      resourceId: asset._id,
+      priority: NotificationPriority.HIGH,
+      sendEmail: true,
+    });
+
+    profile.licenseAlertSentAt = now;
+    await profile.save();
+    notified++;
+  }
+
+  return { checked: profiles.length, notified };
+};
+
+/**
+ * 📌 CẢNH BÁO SẮP/ĐÃ HẾT HẠN CHỨNG CHỈ VẬN HÀNH (DEV-077)
+ *
+ * KHÁC 2 hàm trên: gửi CẢ role "IT" (`notifyUsersByRoleName`, giữ đúng kênh
+ * hiện có) LẪN chính người có chứng chỉ (`createNotification` trực tiếp
+ * theo `cert.user._id`) — quyết định đã xác nhận với user qua
+ * AskUserQuestion ("Cả IT/Vật tư-TTB VÀ chính người có chứng chỉ"). Bỏ qua
+ * (không gửi, không đánh dấu) nếu user liên kết đã bị vô hiệu hoá — cùng lý
+ * do bỏ qua asset inactive ở 2 hàm trên.
+ */
+export const checkOperatorCertificateExpiringService = async () => {
+  if (!(await hasValidRecipients(ALERT_RECIPIENT_ROLE))) {
+    return { checked: 0, notified: 0 };
+  }
+
+  const now = new Date();
+  const threshold = new Date(now);
+  threshold.setDate(threshold.getDate() + OPERATOR_CERTIFICATE_ALERT_DAYS_BEFORE);
+
+  const certificates = await OperatorCertificate.find({
+    expiresAt: { $lte: threshold },
+    alertSentAt: null,
+    isActive: true, // [MỚI DEV-078] bỏ qua bản ghi đã bị thu hồi/xoá — không còn liên quan để cảnh báo
+  }).populate([
+    { path: "user", select: "username fullName isActive" },
+    { path: "deviceCategory", select: "name" },
+  ]);
+
+  let notified = 0;
+
+  for (const cert of certificates) {
+    const user = cert.user as any;
+    const category = cert.deviceCategory as any;
+
+    // Cùng lý do bỏ qua asset inactive ở checkCalibrationDueService/
+    // checkLicenseExpiringService — KHÔNG đánh dấu `alertSentAt` (không
+    // phải "đã xử lý", chỉ là "không còn liên quan").
+    if (!user || user.isActive === false || !category) {
+      continue;
+    }
+
+    const isAlreadyExpired = cert.expiresAt < now;
+    const categoryName = category.name ?? "";
+
+    const title = isAlreadyExpired
+      ? "Chứng chỉ vận hành đã hết hạn"
+      : "Chứng chỉ vận hành sắp hết hạn";
+    const message = isAlreadyExpired
+      ? `Chứng chỉ vận hành thiết bị "${categoryName}" của ${user.fullName} (${user.username}) đã hết hạn từ ${cert.expiresAt.toLocaleDateString("vi-VN")}.`
+      : `Chứng chỉ vận hành thiết bị "${categoryName}" của ${user.fullName} (${user.username}) sẽ hết hạn vào ${cert.expiresAt.toLocaleDateString("vi-VN")}.`;
+
+    await Promise.allSettled([
+      notifyUsersByRoleName(ALERT_RECIPIENT_ROLE, {
+        type: NotificationType.OPERATOR_CERTIFICATE_EXPIRING,
+        title,
+        message,
+        priority: NotificationPriority.HIGH,
+        sendEmail: true,
+      }),
+      createNotification({
+        recipient: user._id,
+        type: NotificationType.OPERATOR_CERTIFICATE_EXPIRING,
+        title,
+        message: isAlreadyExpired
+          ? `Chứng chỉ vận hành thiết bị "${categoryName}" của bạn đã hết hạn từ ${cert.expiresAt.toLocaleDateString("vi-VN")} — liên hệ IT/Vật tư-TTB để được cấp lại.`
+          : `Chứng chỉ vận hành thiết bị "${categoryName}" của bạn sẽ hết hạn vào ${cert.expiresAt.toLocaleDateString("vi-VN")} — liên hệ IT/Vật tư-TTB để được gia hạn.`,
+        priority: NotificationPriority.HIGH,
+        sendEmail: true,
+      }),
+    ]);
+
+    cert.alertSentAt = now;
+    await cert.save();
+    notified++;
+  }
+
+  return { checked: certificates.length, notified };
+};
+
+/**
  * 📌 CHẠY CẢNH BÁO — dùng cho cron job và cho API trigger tay
  * (`POST /api/medical-devices/alerts/run`).
  *
  * Đặt tên `run...Service` (không phải gọi thẳng `checkCalibrationDueService`
- * ở nơi dùng) để khớp naming convention với `runAssetAlertsService` — và để
- * dễ mở rộng thêm loại cảnh báo khác cho module này sau này (VD cảnh báo
- * hết hạn giấy phép lưu hành — `licenseExpiredAt` — nếu có nhu cầu) mà
- * không phải đổi chữ ký hàm ở cron/controller.
+ * ở nơi dùng) để khớp naming convention với `runAssetAlertsService`. [CẬP
+ * NHẬT DEV-077] Nay chạy SONG SONG cả 3 loại cảnh báo (`Promise.all`, cùng
+ * pattern `runAssetAlertsService`) — kiểm định, giấy phép lưu hành, và
+ * chứng chỉ vận hành là 3 việc độc lập, không phụ thuộc nhau.
  */
 export const runMedicalDeviceAlertsService = async () => {
-  const calibration = await checkCalibrationDueService();
-  return { calibration };
+  const [calibration, license, operatorCertificate] = await Promise.all([
+    checkCalibrationDueService(),
+    checkLicenseExpiringService(),
+    checkOperatorCertificateExpiringService(),
+  ]);
+  return { calibration, license, operatorCertificate };
 };

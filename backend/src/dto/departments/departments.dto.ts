@@ -32,4 +32,11 @@ export const QueryDepartmentDTO = z.object({
   page: z.coerce.number().default(1),
   limit: z.coerce.number().default(10),
   keyword: z.string().optional(),
+  // [DEV-086] Cùng pattern CHÍNH XÁC với `QueryAssetCategoryDTO.isActive` —
+  // không truyền → mặc định chỉ khoa/phòng đang hoạt động (`getAllDepartmentsService`
+  // tự map `undefined` -> `true`); `false` để xem danh sách đã xoá mềm (phục vụ khôi phục).
+  isActive: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === "true")),
 });

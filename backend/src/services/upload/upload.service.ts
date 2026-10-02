@@ -1,5 +1,6 @@
 import { Upload } from "../../models/uploadFiles/upload.model";
 import { escapeRegex } from "../../shared/utils/regex.util";
+import { parseDateRangeBound } from "../../shared/utils/Queryparsing.util";
 
 // DEV-007/IMP-008 (H-09b=SEC-31=RV09-02): trước đây KHÔNG gán `uploadedBy`
 // dù schema `Upload` đã có sẵn field này — file "vô chủ", là tiền đề trực
@@ -104,8 +105,8 @@ export const buildFilesFilter = (
   // trước khi tới đây (cùng pattern `getAllDocumentsService`).
   if (fromDate || toDate) {
     filter.createdAt = {};
-    if (fromDate) filter.createdAt.$gte = new Date(fromDate);
-    if (toDate) filter.createdAt.$lte = new Date(toDate);
+    if (fromDate) filter.createdAt.$gte = parseDateRangeBound(fromDate, "start");
+    if (toDate) filter.createdAt.$lte = parseDateRangeBound(toDate, "end");
   }
 
   return filter;

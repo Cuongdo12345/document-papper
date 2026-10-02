@@ -161,3 +161,46 @@ describe("importDocumentsExcel — dò trùng lặp Proposal trong transaction (
     expect(mockedDocument.create).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("importDocumentsExcel — khoa đã xoá mềm (BR-06/DEV-100)", () => {
+  const rowInput = {
+    subType: "PROPOSE_REPAIR",
+    department: "Khoa Nội",
+    title: "Đề xuất sửa máy X",
+    deviceName: "Máy X",
+    createdAt: new Date("2026-01-15T00:00:00.000Z"),
+    quantity: 1,
+    unitPrice: 100000,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedWithTransaction.mockImplementation(async (fn: any) => fn(FAKE_SESSION));
+  });
+
+  it("tên khoa chỉ khớp khoa ĐÃ XOÁ → lỗi \"đã bị xoá\" theo dòng, KHÔNG tạo tài liệu", async () => {
+    mockedDepartment.find.mockResolvedValue([{ _id: "dept-noi", name: "Khoa Nội", code: "NOI", isActive: false }]);
+
+    const result = await importDocumentsExcel(await buildImportWorkbook(rowInput), "user-1", { fileName: "test.xlsx" });
+
+    expect(result.created).toBe(0);
+    expect(result.errors).toEqual([{ row: 2, message: `Khoa/phòng "Khoa Nội" đã bị xoá (ngừng hoạt động)` }]);
+    expect(mockedDocument.create).not.toHaveBeenCalled();
+  });
+
+  it("tên khoa trùng 1 khoa đã xoá VÀ 1 khoa đang hoạt động → dùng khoa đang hoạt động", async () => {
+    // Khoa đang hoạt động đứng TRƯỚC trong kết quả query: nếu map ghi đè theo thứ tự, khoa đã xoá sẽ thắng.
+    mockedDepartment.find.mockResolvedValue([
+      { _id: "dept-noi-moi", name: "Khoa Nội", code: "NOI2", isActive: true },
+      { _id: "dept-noi-cu", name: "khoa nội", code: "NOI", isActive: false },
+    ]);
+    mockedDocument.findOne.mockReturnValue({ session: jest.fn().mockResolvedValue(null) });
+    mockedDocument.create.mockResolvedValue([{ _id: "doc-1", meta: { items: [], totalAmount: 0 } }]);
+
+    const result = await importDocumentsExcel(await buildImportWorkbook(rowInput), "user-1", { fileName: "test.xlsx" });
+
+    expect(result.errors).toEqual([]);
+    expect(result.created).toBe(1);
+    expect(mockedDocument.create.mock.calls[0][0][0].department).toBe("dept-noi-moi");
+  });
+});
