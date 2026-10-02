@@ -18,7 +18,7 @@
 
 | Endpoint | Request | Response 200 | Ghi chú |
 |---|---|---|---|
-| `POST /api/auths/register` | `{username, email, password, confirmPassword, fullName}` | `{message, data:{...}}` (theo route, không có accessToken tự động — cần login riêng sau khi đăng ký, xem OpenAPI) | `password`≥8, `email` bắt buộc (cần cho forgot-password sau này). Public. |
+| `POST /api/auths/register` | `{username, email, password, confirmPassword, fullName}` | `{message, data:{...}}` (theo route, không có accessToken tự động — cần login riêng sau khi đăng ký, xem OpenAPI) | `password`≥8, `email` bắt buộc (cần cho forgot-password sau này). Public. **[2026-09-29, DEV-090] Mặc định TẮT (404) trừ khi ENV `ALLOW_SELF_REGISTER=true`.** |
 | `POST /api/auths/login` | `{username, password}` | `{message, data:{accessToken, refreshToken, user}}` | `password`≥5 (KHÔNG nâng — xác thực mật khẩu cũ). Public, có `authRateLimiter`. |
 | `POST /api/auths/refresh-token` | `{refreshToken}` | `{accessToken}` | Response CHỈ có `accessToken` — KHÔNG trả `refreshToken` mới (backend hiện KHÔNG rotate refresh token, xem Mục 1.4). Public (không cần accessToken cũ), có `authRateLimiter`. |
 | `POST /api/auths/logout` | (không body, cần `Authorization` header) | `{message}` | Yêu cầu `authenticate`. Revoke refresh token phía server (đánh dấu `revoked:true`). |

@@ -1,10 +1,9 @@
 # UI_DESIGN_SYSTEM.md
 
-**Trạng thái:** PROPOSAL cho phần LỚN tài liệu (đổi màu trang cụ thể theo Mục 2, rollout Mục 4 ra ngoài
-Dashboard) — vẫn CHƯA đụng code, chờ duyệt. **NGOẠI LỆ đã triển khai thật**: Mục 6 (hạ tầng test
-WCAG/visual regression) — DONE, `FE-17.md`. Mục 3/4 — DONE THÍ ĐIỂM CHỈ trên `DashboardPage` (`FE-18.md`,
-2026-09-19), CHỜ user xem kết quả trên trình duyệt thật + duyệt trước khi có Pass 3 (rollout sang trang
-khác, xem Mục 9). Mục 2 — DONE HOÀN TOÀN (`FE-19.md`, 2026-09-19→20): audit 23/36 trang dùng `--primary`
+**Trạng thái:** PROPOSAL cho phần rollout Mục 4 ra ngoài Dashboard — Pass 3 **ĐÃ MỞ KHOÁ** (user duyệt
+bản thí điểm 2026-09-23, xem `FE-18.md`), implementation ở `FE-27.md`. **NGOẠI LỆ đã triển khai thật**:
+Mục 6 (hạ tầng test WCAG/visual regression) — DONE, `FE-17.md`. Mục 3/4 — DONE THÍ ĐIỂM CHỈ trên
+`DashboardPage` (`FE-18.md`, 2026-09-19, **user duyệt 2026-09-23**). Mục 2 — DONE HOÀN TOÀN (`FE-19.md`, 2026-09-19→20): audit 23/36 trang dùng `--primary`
 cho >1 action (số liệu đã sửa lại) + đổi default `ConfirmDialog`/`WorkflowActionModal` (primary→secondary
 khi không `danger`, root cause đa số vi phạm) + xử lý lần lượt 14 trang GROUP C (call site không thể fix
 bằng default) — chỉ 2/14 trang có vi phạm THẬT cần sửa (`AssetDetailPage`/`MedicalDeviceSection.tsx`,
@@ -99,8 +98,14 @@ chính = "Tổng tài liệu" (`size="display"`, `KpiCard.tsx`), 4 KPI phụ g�
 Người dùng) — KHÔNG rollout sang 2 tab "Tài sản"/"Thiết bị y tế" (cùng Dashboard nhưng khác widget, chưa
 audit) hay bất kỳ trang nào khác. CHỜ user duyệt trên trình duyệt thật trước khi làm dòng dưới đây.
 
-Áp dụng tương tự khi rollout sang các trang `DataTable` (Pass 3, CHƯA làm, CHƯA có task): tiêu đề trang
-dùng `h1`, tách bậc rõ với filter/action bar bên dưới thay vì để ngang hàng.
+Áp dụng tương tự khi rollout sang các trang `DataTable`: tiêu đề trang dùng `h1`, tách bậc rõ với
+filter/action bar bên dưới thay vì để ngang hàng. **[DONE THÍ ĐIỂM 2026-09-23, `FE-27.md`]** Đã implement
+CHỈ trên `UsersListPage`: `FilterBar`+`DataTable` gộp vào 1 khung viền ngoài duy nhất (`FilterBar` thêm
+`variant="embedded"`, backward-compatible), `BatchActionBar` dời lên trước khung gộp. User đã duyệt qua
+screenshot thật trên dev server. **[DONE ROLLOUT 2026-09-23, `FE-28.md`]** Pass 3b — áp dụng ra 17 trang/
+component còn lại dùng cả `FilterBar`+`DataTable` (KHÔNG PHẢI 31 — số thật xác định bằng grep, xem
+`FE-28.md` danh sách đầy đủ). `DocumentsListPage.tsx` KHÔNG áp dụng được (không dùng `FilterBar`, tự custom
+filter box riêng) — vẫn để nguyên, cần quyết định riêng nếu muốn đồng bộ sau này.
 
 ## 5. Chuyển động — giữ nguyên, không thêm
 

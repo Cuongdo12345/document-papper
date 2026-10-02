@@ -1,5 +1,13 @@
 # ĐỀ XUẤT LỘ TRÌNH PHÁT TRIỂN TÍNH NĂNG MỚI
 
+> **[CẬP NHẬT 2026-09-30]** File `ROADMAP_TOI_GO_LIVE.md` được nhắc ở tài liệu này (đoạn mở đầu và mục "Cách tôi đề xuất tiếp cận") **KHÔNG tồn tại trong repo và chưa từng được commit** (đã kiểm tra `git log --all`). Tài liệu có vai trò tương đương:
+> - vá lỗi / hoàn thiện: `docs/development/00_DEVELOPMENT_ROADMAP.md` (lịch sử, DEV-001→025) và `docs/31_BACKEND_CODE_REVIEW.md` (lỗi còn mở);
+> - go-live: `docs/development/PRODUCTION_DEPLOYMENT_PLAN.md` (PLANNED, chưa triển khai).
+>
+> Tình trạng các nhóm: Nhóm A, B và C đều đã có task (xem CLAUDE.md §41). Nhóm D chưa làm. Có 2 mục làm KHÁC bản gốc theo lựa chọn của user:
+> - **B8** không có luồng duyệt (DEV-067);
+> - **C3** làm thành giám sát phiên toàn hệ thống (DEV-070). Phần "xuất audit theo mẫu thanh tra" chưa làm, vì chưa có mẫu cụ thể.
+
 > Đây là đề xuất **tính năng nghiệp vụ**, khác với `ROADMAP_TOI_GO_LIVE.md` (vốn tập trung vá lỗi/
 > hoàn thiện những gì đã xây). Một số mục dưới đây suy ra trực tiếp từ gap đã ghi nhận trong memory
 > (đánh dấu 📋 — có bằng chứng cụ thể), số còn lại là đề xuất dựa trên đặc thù nghiệp vụ quản lý

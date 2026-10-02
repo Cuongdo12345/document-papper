@@ -11,10 +11,11 @@
 - Project name: `document-manager` (theo `backend/package.json`).
 - Đây là hệ thống **Document & Medical Device Manager** — quản lý tài liệu + tài sản/thiết bị y tế nội bộ, có workflow duyệt đa cấp, RBAC+ABAC (ABAC thực chất KHÔNG hoạt động — xem Phase 07/09), dashboard.
 - Repo hiện tại **chỉ có backend**, không có frontend. Toàn bộ code nằm trong `backend/`.
+  - **[CẬP NHẬT 2026-09-30] KHÔNG CÒN ĐÚNG**: `frontend/` đã có từ FE-00 (2026-09-05), gồm React + Vite + Tailwind, vitest và Playwright. Kiến thức frontend nằm ở `docs/frontend/FRONTEND_MEMORY.md`.
 - Stack backend: Node.js + TypeScript, Express 5, MongoDB + Mongoose, JWT auth, Zod validate, Swagger/OpenAPI docs.
 - Kiến trúc: layered theo domain — routes → middlewares → controllers → services → models.
 - Entry point chính: `backend/server.ts` → `backend/src/app.ts`.
-- Có **31 Mongoose model** (SỬA DEV-071, 2026-09-21 — trước ghi "21", lỗi thời từ `DEV-057`→`070`, xem
+- **[CẬP NHẬT 2026-09-30] Có 32 Mongoose model** trong 12 thư mục domain `backend/src/models/` (đếm file `*.model.ts`). DEV-071 ghi 31; model thứ 32 được thêm sau đó (`OperatorCertificate`, DEV-077). Dòng cũ: có **31 Mongoose model** (SỬA DEV-071, 2026-09-21 — trước ghi "21", lỗi thời từ `DEV-057`→`070`, xem
   `docs/04_DATABASE_ANALYSIS.md` Mục 4). Route file/dòng/endpoint count KHÔNG được xác minh lại ở DEV-071
   (ngoài phạm vi task — chỉ sửa model count), có thể cũng lỗi thời, thư mục `services/` lớn nhất (468K).
 - **[CẬP NHẬT 2026-08-30]** `backend/tsconfig.test.json` có khai báo `"types": ["node", "jest"]`, nhưng xác minh lại `backend/package.json` và `package-lock.json` hiện tại **KHÔNG có** `jest`/`ts-jest`/`@types/jest` trong dependencies/devDependencies (chỉ có 1 thư mục mồ côi `node_modules/@jest` không đi kèm core `jest`). Vẫn **chưa có bất kỳ file `.test.ts` nào** trong `backend/src`. Kết luận: hiện tại project **không có khả năng chạy Jest** dù có config trỏ tới jest types — cần cài `jest`/`ts-jest` trước khi viết test, không chỉ thêm file test.
@@ -187,6 +188,81 @@ Nếu cần tiếp tục làm việc trên project này ở phiên sau, các hư
   nhận) — 7 permission mới có trong DB (89 đã tồn tại, 0 role bị đồng bộ lại). Vẫn cần gán tay qua UI
   "Phân quyền" cho IT/PHONG_VAT_TU_TTB.
   **Nhóm B5-B7 và Nhóm C/D VẪN CHƯA được duyệt/implement.**
+- **[CẬP NHẬT 2026-09-30] Dòng trên KHÔNG CÒN ĐÚNG.** B5 (DEV-064), B6 (DEV-063), B7 (DEV-065), B8 (DEV-067), C1 (DEV-068), C2 (DEV-069) và C3 (DEV-070) đều đã DONE. Riêng B8 không có luồng duyệt, và C3 làm thành giám sát phiên (phần xuất audit theo mẫu thanh tra chưa làm vì chưa có mẫu). Chỉ **Nhóm D** còn chưa làm. Chi tiết từng mục: CLAUDE.md §41 và file task tương ứng.
+
+## Chỉ mục task DEV-037 → DEV-110 — [BỔ SUNG 2026-09-30]
+
+Các task này chưa từng được ghi vào PROJECT_MEMORY (mục chi tiết theo từng task chỉ có tới DEV-036, ở cuối file; DEV-050→057 có trong mục Feature Roadmap phía trên). Mỗi dòng dưới đây lấy từ tiêu đề file task thật. Chi tiết đầy đủ nằm ở `docs/development/tasks/DEV-XXX.md`, không chép lại ở đây (§5).
+
+- **Sửa lỗi / RBAC / hạ tầng test (2026-09-10 → 12):**
+  - DEV-037: lỗi E11000 trùng username trả 500 → lỗi rõ nghĩa.
+  - DEV-038: "Lịch sử duyệt" (Workflow History) + review kiến trúc Workflow.
+  - DEV-039: 403 khi xem chi tiết tài liệu từ tab "Lịch sử duyệt".
+  - DEV-040: IT không xem được tài liệu khoa khác dù đã gán permission.
+  - DEV-041: review RBAC toàn diện (đề xuất hướng đi).
+  - DEV-042: kiểm tra 4 điểm nghi vấn Frontend.
+  - DEV-043: dashboard IT hiện toàn số 0 (root cause, không phải bug kỹ thuật).
+  - DEV-044: xoá theo tháng chỉ cho ADMIN.
+  - DEV-045: TOCTOU dò trùng đề xuất sửa chữa Asset.
+  - DEV-046: test cho `syncAssetOnDocumentApproved`.
+  - DEV-047: DEV-001A Phase B, bỏ so khớp literal "ADMIN", chỉ dùng `isSystemRole`.
+  - DEV-048: **khung E2E test đầu tiên** (supertest + MongoMemoryReplSet).
+  - DEV-049: tìm kiếm/lọc cho File Upload.
+- **Feature Roadmap A1→B4 (DEV-050→057):** xem mục "Feature Roadmap" phía trên.
+- **Thao tác hàng loạt / RBAC hiển thị (2026-09-16 → 17):**
+  - DEV-058: cập nhật/huỷ/khôi phục hợp đồng bảo trì.
+  - DEV-059: hiển thị tên permission tiếng Việt.
+  - DEV-060, DEV-061, DEV-062: chọn nhiều + xoá mềm/khôi phục hàng loạt cho các trang danh sách.
+- **Feature Roadmap B5→C3 (2026-09-18 → 19):**
+  - DEV-063: B6, full-text search Document.
+  - DEV-064: B5, xuất PDF chính thức (ký NỘI BỘ, không phải chữ ký số CA).
+  - DEV-065: B7, báo cáo tuần qua email.
+  - DEV-066: ADMIN sửa được `email` user.
+  - DEV-067: B8, dự trù vật tư tiêu hao (domain `ConsumableRequest`).
+  - DEV-068: C1, 2FA email OTP.
+  - DEV-069: C2, quản lý phiên đăng nhập.
+  - DEV-070: C3, giám sát phiên toàn hệ thống.
+- **System Design / tài liệu dự án (2026-09-21):**
+  - DEV-071: cập nhật doc Database/Architecture (31 model).
+  - DEV-072: permission `SYSTEM_DESIGN_VIEW`.
+  - DEV-073: `GET /api/system-design` introspect schema thật.
+  - DEV-074: mô tả module (`moduleDescriptions.ts`, xem CLAUDE.md §36 bước 9) + tài liệu liên quan.
+  - DEV-075: `GET /api/project-docs`.
+- **Thiết bị y tế / tài sản / khoa phòng (2026-09-24 → 28):**
+  - DEV-076: cảnh báo hết hạn giấy phép lưu hành.
+  - DEV-077: chứng chỉ vận hành (model mới `OperatorCertificate`).
+  - DEV-078: sửa/thu hồi/xoá chứng chỉ.
+  - DEV-079: avatar user.
+  - DEV-080, DEV-081, DEV-082: cây danh mục tài sản cha/con.
+  - DEV-083, DEV-084: dashboard tài sản / thiết bị y tế bấm xem danh sách.
+  - DEV-085: sửa tỷ lệ chuyển đổi Đề xuất → Báo cáo luôn 0%.
+  - DEV-086: xoá mềm/khôi phục khoa phòng (kèm migration backfill).
+  - DEV-087: huỷ/khôi phục hàng loạt hợp đồng.
+  - DEV-088: KPI khoa đếm cả khoa đã xoá mềm.
+  - DEV-089: đồng bộ khoa từ Excel có xem trước.
+- **Sửa theo `docs/31_BACKEND_CODE_REVIEW.md` (2026-09-29 → 30):**
+  - DEV-090: BR-01, tắt tự đăng ký (ENV `ALLOW_SELF_REGISTER`).
+  - DEV-091: BR-02, guard `submitWorkflow`.
+  - DEV-092: BR-03, permission mới `DOCUMENT_CREATE_ALL_DEPARTMENTS`.
+  - DEV-093: BR-04, audit `ADMIN_BYPASS` chỉ khi bypass có tác dụng (+ migration đổi nhãn).
+  - DEV-094: BR-05, giới hạn `memoryCache`.
+  - DEV-095: BR-07, index `WorkflowInstance.documentId`.
+  - DEV-096: BR-08, ENV `TRUST_PROXY`.
+  - DEV-097: BR-09, múi giờ VN (`APP_TIMEZONE`, `parseDateRangeBound`).
+  - DEV-098: BR-11, xoá theo tháng.
+  - DEV-099: BR-10, npm audit (mongoose 9.10.3 / driver 7.6; 3 moderate được chấp nhận).
+  - DEV-100: BR-06, khoa đã xoá mềm không nhận dữ liệu mới. Kèm: không xoá được khoa còn vật tư/dự trù PENDING, và chặn khôi phục user/vật tư vào khoa đã xoá.
+  - DEV-101: BR-12, escape regex ở tìm kiếm user / phiên đăng nhập.
+  - DEV-102: BR-14, kiểm tra OTP 2FA atomic (chống vượt 5 lần thử và dùng 1 mã nhiều lần dưới request song song).
+  - DEV-103: BR-15 (phần số file), `createUploader` giới hạn 10 file/request; kiểm tra nội dung file chưa làm.
+  - DEV-104: BR-18, `/api-docs` mặc định tắt (bật ở dev hoặc `ENABLE_API_DOCS=true`).
+  - DEV-105: BR-17, export Excel tài liệu chỉ nạp biên bản của đúng các đề xuất được xuất.
+  - DEV-106: BR-20, `authenticate` 1 truy vấn `$lookup` + bỏ nhiễu log token hết hạn.
+  - DEV-107: BR-21, System Design cache kết quả quét file task 60 giây (`getOrSetCacheSync`).
+  - DEV-108: BR-22, upload controller dùng `catchAsync`/`ApiError` (lỗi cùng format chung; không kèm file → 400).
+  - DEV-109: BR-19, bỏ index thừa (schema + xoá 7 index cũ trên DB dev bằng script; production cần chạy `migrate-drop-redundant-indexes.ts` khi deploy).
+  - DEV-110: BR-13, TTL cho `RefreshToken` (hết hạn là xoá) và `Notification` (90 ngày); `UserAudit` user chốt không đặt TTL (giữ vô hạn).
+  - Còn mở: BR-16 (LOW). Câu hỏi nghiệp vụ Q1 → Q3 (duyệt/tài sản/vật tư/Dashboard không theo khoa): user quyết định GIỮ NGUYÊN, chỉnh sau khi quy trình được xác định lại (2026-10-01). Đã hết mục MEDIUM.
 
 ## Security fix — 2026-08-30: ISS-01/SEC-05/SEC-08 RESOLVED
 

@@ -79,7 +79,7 @@ backend/src/
 | `/api/notifications` | Thông báo trong hệ thống |
 | `/api/performances` | Theo dõi hiệu năng API |
 
-Chi tiết đầy đủ từng endpoint xem tại Swagger UI khi chạy server (thường tại `/api-docs`).
+Chi tiết đầy đủ từng endpoint xem tại Swagger UI khi chạy server (`/api-docs`). Trang này **mặc định tắt**: chỉ có khi `NODE_ENV=development`, hoặc đặt `ENABLE_API_DOCS=true` (xem `backend/.env.example`, BR-18).
 
 ## Lưu ý vận hành
 

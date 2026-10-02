@@ -6,6 +6,12 @@
 
 ## 1. Current FE status (2026-09-03)
 
+> **[CẬP NHẬT 2026-09-30] Mục này là ảnh chụp ngày 2026-09-03, KHÔNG CÒN ĐÚNG.**
+> - `frontend/` đã tồn tại từ FE-00 (2026-09-05): React 18 + Vite + Tailwind 4, vitest, Playwright (axe-core + visual regression từ FE-17).
+> - Task mới nhất là **FE-40** (2026-09-29).
+> - Trạng thái thật theo từng task: xem §11 "Task log". Con trỏ việc hiện tại: `docs/SESSION_HANDOFF.md`.
+> - Các dòng bên dưới giữ nguyên làm lịch sử.
+
 - **Frontend CHƯA TỒN TẠI trên đĩa** — chưa có thư mục `frontend/`, chưa cài dependency nào, chưa viết dòng code FE nào.
 - Đã hoàn thành: **UI-00** (phân tích + lập roadmap ban đầu) và **Frontend Knowledge Base task hiện tại** (bộ 13 tài liệu `docs/frontend/`) — cả 2 đều CHỈ phân tích/tài liệu, KHÔNG code.
 - **Ghi chú lịch sử**: 4 file tạo ở UI-00 (00_FRONTEND_ROADMAP.md, UI_DESIGN_SYSTEM.md, API_LAYER_SPEC.md, FRONTEND_MEMORY.md bản cũ) đã bị user chủ động xoá để làm lại phân tích từ đầu (xác nhận trực tiếp từ user) — không phải sự cố/lỗi hệ thống. Nội dung của 4 file đó (roadmap FE-00→18, design token màu/typography) KHÔNG nằm trong bộ tài liệu hiện tại (phạm vi task Frontend Knowledge Base không yêu cầu 2 loại tài liệu này) — nếu cần roadmap theo giai đoạn (FE-00→FE-18) hoặc design system (màu/typography/component visual spec), cần yêu cầu 1 task riêng, không tự suy đoán đã tồn tại.
@@ -124,7 +130,7 @@ Type generation từ OpenAPI (`openapi-typescript`) — vẫn viết tay đến 
 
 1. Response shape KHÔNG đồng nhất 100% giữa domain (xem `ERROR_HANDLING.md`, `API_REFERENCE.md`) — cần lớp `unwrapResponse`/`parseApiError` xử lý nhiều shape.
 2. ~~`GET /api/users`/`GET /api/users/:id` hiện 403 với MỌI non-ADMIN~~ — **ĐÃ QUYẾT ĐỊNH (DEV-027, 2026-09-05)**: role `IT` được cấp thêm `USER_VIEW`+`USER_VIEW_DETAIL` (chỉ xem), các role khác vẫn không có. Không còn pending.
-3. Domain Upload: 2 nhánh lỗi (404/403) không qua `error.middleware.ts` chuẩn, shape lỗi khác biệt (chỉ `{message}`, không `success`/`errorCode`).
+3. ~~Domain Upload: 2 nhánh lỗi (404/403) không qua `error.middleware.ts` chuẩn, shape lỗi khác biệt (chỉ `{message}`, không `success`/`errorCode`).~~ — **ĐÃ SỬA (BR-22/DEV-108, 2026-09-30)**: Upload dùng `catchAsync` + `ApiError`, lỗi cùng format chung.
 4. Dashboard: 12 endpoint KHÔNG có `validateQuery`/Zod DTO — FE phải tự validate `month`/`year`/`daysAhead`/`daysThreshold` phía client, backend có thể trả kết quả sai/rỗng âm thầm thay vì 400.
 5. `refreshToken` trả trong JSON body (không phải httpOnly cookie) — buộc FE lưu `localStorage`, tăng bề mặt XSS so với thiết kế cookie lý tưởng (không tự sửa backend).
 6. `DELETE /documents/delete-by-month` thiếu ADMIN-only guard ở backend (role `IT` cũng có `DOCUMENT_DELETE`) — `FRONTEND_RECOMMENDATION`: tự giới hạn hiển thị UI cho ADMIN dù backend chưa chặn.
@@ -384,8 +390,49 @@ Xem đầy đủ `docs/30_DEVELOPMENT_COMPLETION_AUDIT.md` Mục 8-9. Đáng ch�
   `masterEdges`. Token màu dùng lại toàn bộ (`border-primary`/`bg-muted`/...) — KHÔNG thêm màu riêng cho 12
   domain (không đủ token dataviz sẵn có, tránh phá restraint principle của `UI_DESIGN_SYSTEM.md`), phân
   biệt Module/Model qua HÌNH DẠNG. Route/nav permission GIỮ NGUYÊN `SYSTEM_DESIGN_VIEW` từ DEV-072, không
-  đổi gì ở `navigation.ts`. Build/lint/tsc/vitest PASS — CHƯA tự verify trực quan (Claude không có phiên
-  trình duyệt tương tác), user tự kiểm tra tiếp.
+  đổi gì ở `navigation.ts`. Build/lint/tsc/vitest PASS — user đã tự browser-verify xong toàn bộ ngày
+  2026-09-21 ("đã xem qua chạy được"), sau đó yêu cầu thêm 5 vòng tinh chỉnh UI (transition chọn node,
+  `animated:true`, edge type `step`, **fix bug thật thiếu `<Handle>` khiến edge không render**, nhãn
+  cardinality 1/N tô màu xanh/đỏ cho path+marker+label) — chi tiết đầy đủ ở `FE-24.md` Mục 10→16.
+- `docs/frontend/tasks/FE-25.md` (+ `docs/development/tasks/DEV-074.md`, 2026-09-21) — mở rộng Drawer đã có
+  ở FE-24 (KHÔNG trang mới): click Module giờ hiện thêm mô tả + tính năng chính + danh sách "Tài liệu liên
+  quan" (link GitHub thật, mở tab mới). Dữ liệu đến từ `GET /api/system-design` mở rộng ở `DEV-074`
+  (`modules[].description`/`features` từ file cấu hình tĩnh `moduleDescriptions.ts`, `relatedDocs` quét
+  ĐỘNG `docs/development/tasks/*.md`+`docs/frontend/tasks/*.md` tìm file nhắc `models/<module>/`/
+  `features/<module>/`, KHÔNG hard-code). FE chỉ thêm 1 biến thể Drawer state mới (`kind: "module"`) +
+  `onModuleClick` (click Module vừa `fitView` như cũ vừa mở Drawer). KHÔNG markdown renderer — feature/mô tả
+  vốn đã là string/array thuần từ backend. Build/lint/tsc/vitest PASS — CHƯA tự verify trực quan, user tự
+  kiểm tra tiếp.
+- `docs/frontend/tasks/FE-26.md` (+ `docs/development/tasks/DEV-075.md`, 2026-09-21) — trang MỚI "Tài liệu
+  dự án" (`/app/project-docs`, KHÁC các task gần đây — đây LÀ trang/route/nav item mới, không mở rộng trang
+  có sẵn), dùng lại permission `SYSTEM_DESIGN_VIEW`. Hiển thị 12 tài liệu phân tích tổng quan gốc 01-13 (đọc
+  thẳng file `.md` thật qua `GET /api/project-docs`, KHÔNG copy nội dung sang chỗ khác). **Lần đầu tiên dự án
+  có markdown renderer**: cài `react-markdown@10.1.0` + `remark-gfm@4.0.1` (2 dependency, đã hỏi rõ + xác
+  nhận version mới nhất trước khi cài — cả 12 file đều dùng bảng GFM nên bắt buộc cần `remark-gfm`, không chỉ
+  CommonMark thuần). Style markdown map thủ công sang token màu sẵn có (KHÔNG cài `@tailwindcss/typography`
+  — dependency thứ 3 ngoài phạm vi đã duyệt). Code-split qua `React.lazy` (`ProjectDocsPage.lazy.tsx`, cùng
+  pattern FE-24) — verify build: chunk 158KB tách riêng, bundle chính không đổi. Build/lint/tsc/vitest PASS
+  — CHƯA tự verify trực quan, user tự kiểm tra tiếp.
+- **[BỔ SUNG 2026-09-30] FE-27 → FE-40** (trước đây chưa được ghi vào log này). Mỗi dòng lấy từ tiêu đề file task thật; chi tiết nằm ở `docs/frontend/tasks/FE-XX.md`.
+  - **Phân cấp thị giác / contrast (2026-09-23):**
+    - FE-27: Pass 3a, thí điểm gộp FilterBar + DataTable trên `UsersListPage`.
+    - FE-28: đóng nợ contrast `StatusBadge`, Pass 3b (gộp khung cho 17 trang).
+    - FE-29: audit contrast 8 file success-color, verify dark mode `--success-strong`.
+    - FE-31: gộp khung `DocumentsListPage`.
+  - FE-30 (2026-09-23): **Dark mode**, toggle Light/Dark thật, không có chế độ "System".
+  - **Sidebar / System Design (2026-09-25):**
+    - FE-32: màu icon theo module.
+    - FE-33: icon "Quản trị hệ thống" màu xanh lá.
+    - FE-34: panel "Lọc theo module" / "Chú giải" thu gọn được, kéo-thả được.
+  - **Tương tác (2026-09-27 → 28):**
+    - FE-35: thanh chọn nhiều chỉ hiện hành động áp dụng được.
+    - FE-36: kéo-thả sắp xếp nhóm quyền ở trang Phân quyền.
+    - FE-37: Dashboard, sửa lỗi UI và thêm hiệu ứng.
+    - FE-38: ô "Gán cho người dùng" trống khi Cấp phát/Luân chuyển tài sản.
+  - **Đi kèm review backend (2026-09-29):**
+    - FE-39: ẩn nút "Submit vào workflow" với tài liệu khoa khác (đi kèm DEV-091).
+    - FE-40: ô "Khoa/Phòng" khi tạo tài liệu theo permission mới `DOCUMENT_CREATE_ALL_DEPARTMENTS` (đi kèm DEV-092).
+    - FE-41 (2026-09-30): `FileUpload` thêm prop `maxFiles`; "Tải file lên" giới hạn 10 file/lần (đi kèm DEV-103).
 
 ## 12. Liên kết toàn bộ tài liệu FE
 

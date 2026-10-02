@@ -1,5 +1,11 @@
 # 00 — DEVELOPMENT ROADMAP
 
+> **[CẬP NHẬT 2026-09-30] Tài liệu LỊCH SỬ.** Roadmap này lập ngày 2026-08-31 và chỉ bao gồm DEV-001 → DEV-025 (P0 → P3). Cả 25 task đều đã DONE (xem `docs/30_DEVELOPMENT_COMPLETION_AUDIT.md`). Các task từ DEV-026 trở đi phát sinh theo yêu cầu trực tiếp của user, không theo roadmap này. Muốn biết việc hiện tại và việc tiếp theo, xem:
+> - `docs/SESSION_HANDOFF.md`: con trỏ task hiện tại / Next Task;
+> - `docs/31_BACKEND_CODE_REVIEW.md`: các lỗi backend còn mở (BR-xx);
+> - `docs/development/FEATURE_DEVELOPMENT_ROADMAP.md`: tính năng mới (hiện còn Nhóm D);
+> - `docs/00_PROJECT_MEMORY.md`, mục "Chỉ mục task DEV-037 → DEV-099".
+
 > Loại: Chuyển giao từ POST-ANALYSIS sang DEVELOPMENT STAGE (KHÔNG phải review mới, KHÔNG implement) | Ngày: 2026-08-31.
 >
 > **Nguồn đã đọc**: `CLAUDE.md`, `docs/00_PROJECT_MEMORY.md`, `docs/23_CODE_REVIEW_ROADMAP.md` (toàn văn — bản tổng hợp CUỐI CÙNG xuyên toàn bộ 17 module review + `docs/20/21/22` đã dedup sẵn), `docs/19_IMPROVEMENT_ROADMAP.md` (đối chiếu task candidate đã có, không lặp). Không đọc lại toàn bộ 17 module review, không đọc lại `docs/20/21/22` toàn văn (đã dùng qua bản dedup ở `docs/23`, đúng SKILL.md Rule 04/07). Không đọc lại repository, không chạy lại Phase 01→13.

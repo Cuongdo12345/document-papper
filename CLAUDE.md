@@ -1,6 +1,6 @@
 # CLAUDE.md — PROJECT DEVELOPMENT RULES
 
-> **Rulebook đã rà soát khớp thực tế project đến: DEV-056 / FE-16 (2026-09-16). [CẬP NHẬT 2026-09-19] Nếu task mới nhất trong docs/development/tasks/ hoặc docs/frontend/tasks/ lệch quá ~15 task so với 2 mốc này, DỪNG lại và báo cho user: rulebook có thể đã lệch thực tế trở lại (đúng mô hình đã xảy ra trước đây), nên audit lại §4/§9/§36/§41 trước khi tiếp tục nhận task mới — không tự ý coi rulebook là đúng tuyệt đối chỉ vì nó đang được auto-load.
+> **Rulebook đã rà soát khớp thực tế project đến: DEV-099 / FE-40 (2026-09-30; lần trước: DEV-056 / FE-16, 2026-09-16). [CẬP NHẬT 2026-09-19] Nếu task mới nhất trong docs/development/tasks/ hoặc docs/frontend/tasks/ lệch quá ~15 task so với 2 mốc này, DỪNG lại và báo cho user: rulebook có thể đã lệch thực tế trở lại (đúng mô hình đã xảy ra trước đây), nên audit lại §4/§9/§36/§41 trước khi tiếp tục nhận task mới — không tự ý coi rulebook là đúng tuyệt đối chỉ vì nó đang được auto-load.
 
 ## 1. PROJECT IDENTITY
 
@@ -167,6 +167,7 @@ docs/
 ├── 22_GLOBAL_TESTING_REVIEW.md
 ├── 23_CODE_REVIEW_ROADMAP.md
 ├── 30_DEVELOPMENT_COMPLETION_AUDIT.md
+├── 31_BACKEND_CODE_REVIEW.md   # [2026-09-29] review toàn bộ backend (lỗi + hiệu năng), BR-01→BR-22 + 3 câu hỏi nghiệp vụ; mới nhất, thay trạng thái OPEN cũ của review-index/ — đọc trước khi sửa lỗi backend
 ├── module-reviews/      # review chi tiết theo domain (Auth, RBAC, Documents, Assets...), xem index tại review-index/
 ├── review-index/        # CODE_REVIEW_INDEX.md, CODE_REVIEW_SUMMARY.md
 └── SESSION_HANDOFF.md
@@ -176,9 +177,12 @@ docs/
 
 ```text
 docs/development/
-├── 00_DEVELOPMENT_ROADMAP.md         # nguồn sự thật cho Stage/P0→P3 và thứ tự thực thi — đọc trước khi nhận task mới không rõ ưu tiên
+├── 00_DEVELOPMENT_ROADMAP.md         # [CẬP NHẬT 2026-09-30] LỊCH SỬ — roadmap P0→P3 gốc, chỉ gồm DEV-001→025 (đã DONE hết). KHÔNG còn là nguồn sự thật cho thứ tự task: việc hiện tại/tiếp theo xem SESSION_HANDOFF.md + 31_BACKEND_CODE_REVIEW.md
 ├── 00_PRE_DEV_PREFLIGHT.md
 ├── FEATURE_DEVELOPMENT_ROADMAP.md     # xem §41 — một phần ĐÃ implement, không còn "toàn bộ chưa duyệt"
+├── PRODUCTION_DEPLOYMENT_PLAN.md      # [MỚI 2026-09-22] kế hoạch deploy production (hạ tầng free, single-instance) — trạng thái PLANNED, CHƯA triển khai, không tự ý bắt đầu Giai đoạn nào khi chưa được user chỉ định
+├── DEV-001A_SUPER_ADMIN_IDENTITY_PLAN.md  # [2026-09-30] kế hoạch Super-Admin (`role.isSystemRole`) — ĐÃ HOÀN TẤT (DEV-001A + DEV-047), giữ làm lịch sử quyết định
+├── changes/, decisions/               # [2026-09-30] hiện RỖNG — chưa dùng
 └── tasks/DEV-XXX.md                   # task backend thật — xem §9
 ```
 
@@ -188,6 +192,7 @@ docs/development/
 docs/frontend/
 ├── FRONTEND_MEMORY.md   # index kiến thức frontend — tương đương vai trò PROJECT_MEMORY nhưng cho frontend
 ├── FE_ARCHITECTURE.md, FE_CONTEXT.md, FE_FOUNDATION_SPEC.md, API_REFERENCE.md, ...
+├── phases/               # [2026-09-30] ghi chú theo phase nhỏ, hiện có 1 file (FE-01_MICRO_FIX_SESSION_RESTORE.md)
 └── tasks/FE-XX.md        # task frontend thật — xem §9
 ```
 
@@ -373,7 +378,7 @@ docs/development/tasks/DEV-XXX.md   # task backend, VD: DEV-029.md, DEV-056.md
 docs/frontend/tasks/FE-XX.md        # task frontend, VD: FE-05.md, FE-16.md
 ```
 
-`DEV-XXX` và `FE-XX` đánh số độc lập, tăng dần theo thời gian thực hiện thực tế (không nhất thiết theo thứ tự roadmap gốc — task phát sinh ngoài roadmap vẫn lấy số tiếp theo). Tài liệu legacy (không dùng tiếp):
+`DEV-XXX` và `FE-XX` đánh số độc lập, tăng dần theo thời gian thực hiện thực tế (không nhất thiết theo thứ tự roadmap gốc — task phát sinh ngoài roadmap vẫn lấy số tiếp theo). **[CẬP NHẬT 2026-09-30]** Có 2 ngoại lệ hậu tố chữ: `DEV-001A.md`, `DEV-009A.md` — task con/kế thừa của task gốc cùng số (`DEV-001`, `DEV-009`), không phải số mới. Tài liệu legacy (không dùng tiếp):
 
 ```text
 docs/tasks/TASK-001.md
@@ -800,6 +805,28 @@ Khi phát triển frontend:
 Khi thay đổi frontend behavior, kiểm tra backend contract.
 
 Khi thay đổi API, kiểm tra frontend consumers.
+
+**[CẬP NHẬT 2026-09-23] Áp dụng design skill (nếu user cung cấp 1 skill thiết kế UI dạng "design
+director", vd nhấn mạnh bản sắc hình ảnh riêng biệt/mạo hiểm thẩm mỹ) — áp dụng CÓ CHỌN LỌC, không
+wholesale:**
+
+- **DÙNG**: checklist chất lượng (kỷ luật type scale, tiết chế — 1 điểm nhấn/task, tránh sáo rỗng AI
+  như eyebrow viết hoa toàn bộ, card-soup giống hệt nhau, "→" cuối link, chuỗi meta nối dấu chấm vô
+  nghĩa), hướng dẫn viết copy (thể chủ động, tên nút khớp thông báo xác nhận sau đó, error/empty state
+  trung thực không xin lỗi), và tiêu chuẩn nền tảng (responsive, keyboard focus, reduced motion, a11y).
+- **KHÔNG DÙNG mặc định**: phần "tự do chọn bảng màu/kiểu chữ/bố cục mới, mạo hiểm thẩm mỹ". Project
+  đã có hệ thống design token được quyết định và ghi lý do rõ ràng (`frontend/src/index.css` — hướng
+  "Modern Healthcare Enterprise": xanh dương-teal/slate, KHÔNG neon/gradient/glassmorphism, 1 font
+  Inter, màu chart đã validate qua `dataviz` skill). Đây KHÔNG PHẢI mặc định AI rập khuôn mà skill đó
+  cảnh báo — là quyết định có chủ đích từ FE-01/FE-09. Đổi token màu/font là quyết định thương hiệu,
+  chỉ làm khi user yêu cầu rõ ràng (theo đúng pattern comment `FE_DECISION` đã dùng ở file đó), không
+  tự ý đổi dưới danh nghĩa "áp dụng design skill".
+- Không áp dụng hướng dẫn "hero section" — đây là app quản trị nội bộ sau đăng nhập, không phải trang
+  marketing.
+- Vận hành: khi làm 1 task FE-XX có đụng UI, có thể thêm bước "tự phê bình theo lăng kính skill" (kế
+  hoạch → đối chiếu → build → tự phê bình) nhưng vẫn nằm TRONG luồng task-based bình thường — vẫn tái
+  sử dụng component/token hiện có (đúng §11/§12 ở trên), vẫn ghi task DEV-XXX/FE-XX, vẫn qua đủ
+  build/lint/test. Không biến đây thành 1 đợt "rebrand" toàn app.
 
 ---
 
@@ -1303,6 +1330,25 @@ Authentication
 RBAC
 ```
 
+**[CẬP NHẬT 2026-09-30]** Danh sách trên là bản gốc, đã thiếu nhiều domain. Thực tế hiện có 12 thư mục domain ở `backend/src/models/` (32 model), khớp 1-1 với các key trong `moduleDescriptions.ts`:
+
+```text
+auth           — RefreshToken, PasswordResetToken, TwoFactorOtp
+users          — User, UserAudit
+departments    — Department
+rbac           — Role, Permission, Policy (ABAC)
+documents      — Document, DocumentVersion, DocumentPdfExport, WorkflowTemplate, WorkflowInstance, Counter
+assets         — Asset, AssetCategory, AssetAssignmentHistory, AssetMaintenancePlan, MedicalDeviceProfile, CalibrationRecord, OperatorCertificate
+inventory      — ConsumableCategory, ConsumableItem, ConsumableTransaction, ConsumableRequest
+vendors        — Vendor, Contract
+notifications  — Notification
+uploadFiles    — Upload
+importAudit    — ImportHistory
+apiPerformance — ApiPerformance
+```
+
+Dashboard và Export không có model riêng: chúng đọc từ các domain trên (`services/dashboard/`, `services/excel/`). Khi đếm lại, lấy nguồn từ `backend/src/models/`, không lấy từ danh sách này.
+
 Khi thêm module mới:
 
 1. Xác định module boundary.
@@ -1313,7 +1359,8 @@ Khi thêm module mới:
 6. Xác định frontend consumer.
 7. Xác định testing strategy.
 8. Cập nhật documentation. Nếu module mới tạo ra thư mục/file doc MỚI ở cấp cao (vd: docs/<domain-mới>/), PHẢI thêm dòng trỏ vào CLAUDE.md §4 và SKILL.md §3 NGAY trong task đó — không để dồn lại. Đây chính xác là nguyên nhân đã khiến docs/frontend/, docs/development/, module-reviews/ từng không được rulebook biết tới trong nhiều tuần.
-9. Cập nhật PROJECT_MEMORY nếu quan trọng.
+9. **[CẬP NHẬT DEV-074, 2026-09-21]** Cập nhật `backend/src/services/systemDesign/moduleDescriptions.ts` — thêm 1 entry mới (key = ĐÚNG tên thư mục domain vừa tạo ở `backend/src/models/<domain-mới>/`) với `description` (1-2 câu) + `features` (bullet). Đây là dữ liệu hiển thị ở trang "System Design" (`GET /api/system-design`, chỉ dev/admin) — module không có entry ở đây vẫn hoạt động bình thường (chỉ thiếu phần mô tả trong Drawer, không lỗi), nhưng bỏ sót sẽ khiến trang đó dần lệch thực tế giống lịch sử "21 model" đã xảy ra ở DEV-071 với tài liệu tĩnh cũ.
+10. Cập nhật PROJECT_MEMORY nếu quan trọng.
 
 Không nhồi module mới vào module cũ chỉ vì tiện.
 
@@ -1331,7 +1378,7 @@ docs/03_BACKEND_ANALYSIS.md
 docs/04_DATABASE_ANALYSIS.md
 docs/05_API_ANALYSIS.md
 docs/frontend/FRONTEND_MEMORY.md          # [CẬP NHẬT 2026-09-16] thay cho 06_FRONTEND_ANALYSIS.md (không tồn tại) — xem §4
-docs/development/00_DEVELOPMENT_ROADMAP.md # [CẬP NHẬT 2026-09-16] trạng thái Stage/P0→P3 hiện tại — xem §4
+docs/development/00_DEVELOPMENT_ROADMAP.md # [CẬP NHẬT 2026-09-30] LỊCH SỬ (DEV-001→025, đã DONE) — trạng thái hiện tại xem docs/SESSION_HANDOFF.md, xem §4
 ```
 
 Khi documentation không còn khớp source code:
@@ -1493,7 +1540,7 @@ Tài liệu tổng hợp đề xuất tính năng phát triển tương lai (ngh
 docs/development/FEATURE_DEVELOPMENT_ROADMAP.md
 ```
 
-> **[CẬP NHẬT 2026-09-18] — SỬA CLAIM SAI**: dòng gốc phía trên từng ghi "chưa cái nào được duyệt/implement" — KHÔNG còn đúng. NHÓM A (A1→A4) và NHÓM B1→B3 trong tài liệu này **ĐÃ được duyệt và implement xong** (`docs/development/tasks/DEV-050.md`→`DEV-056.md`), **B4** cũng ĐÃ xong (`DEV-057.md`, Vendor & Contract), **B6** cũng ĐÃ xong (`DEV-063.md`, Tìm kiếm toàn văn Document), **B5** cũng ĐÃ xong (`DEV-064.md`, Xuất PDF chính thức — "ký" là NỘI BỘ hệ thống, KHÔNG PHẢI chữ ký số CA hợp lệ pháp lý, user đã xác nhận sau khi được cảnh báo rủi ro), **B7** cũng ĐÃ xong (`DEV-065.md`, Báo cáo tuần tự động gửi email — opt-in THẬT qua `User.subscribedToWeeklyReport`, phát hiện gap ngoài phạm vi: hiện không có đường nào sửa `email` user đã tồn tại — **gap này ĐÃ ĐƯỢC KHẮC PHỤC ở `DEV-066.md`** (2026-09-18, mở `email` cho `CreateUserDTO`/`UpdateUserDTO`, chỉ ADMIN qua `PUT /users/:id`/tạo mới, CỐ TÌNH không mở self-service)). **B8** cũng ĐÃ xong (`DEV-067.md`, 2026-09-18, Dự trù/đề xuất mua vật tư tiêu hao hàng tháng — domain MỚI `ConsumableRequest`, KHÔNG có luồng duyệt, trạng thái riêng PENDING/FULFILLED/CANCELLED, KHÔNG tự sinh `ConsumableTransaction` khi đánh dấu đã mua; **CẦN gán permission `CONSUMABLE_REQUEST_*` qua UI "Phân quyền" mới dùng được trên DB hiện tại**, cùng pattern DEV-058). **C1** (NHÓM C) cũng ĐÃ xong (`DEV-068.md`, 2026-09-19, Xác thực 2 lớp qua email OTP cho ADMIN + 3 role duyệt cấp cao — opt-in tự chọn, KHÔNG có backup codes (chỉ ADMIN reset thủ công qua `USER_RESET_2FA`); phát hiện và sửa 2 bug thật: (1) `UserAudit.action` enum thiếu action mới qua smoke test, (2) `Permission` catalog trong DB dev thiếu 6 permission mới của DEV-065/067/068 khiến UI "Phân quyền" cắt mất cả nhóm WORKFLOW_* — đã seed lại + nâng `limit:100→300`. User đã tự gán `USER_RESET_2FA` cho ADMIN qua UI + verify UI trình duyệt thật thành công — C1 DONE hoàn toàn). **C2** cũng ĐÃ xong (`DEV-069.md`, 2026-09-19, Quản lý phiên đăng nhập — self-service cho MỌI role (`SessionsSection.tsx`) + ADMIN hỗ trợ xem/thu hồi phiên user khác (permission MỚI `SESSION_VIEW_ALL`/`SESSION_REVOKE_ALL`, mirror `USER_RESET_2FA`); `RefreshToken` thêm `userAgent`/`ip`; **tuân thủ CLAUDE.md Mục 18 MỚI** — viết E2E test thật (supertest+MongoDB in-memory) verify 403 cho route RBAC mới thay vì chỉ giả định; đã chủ động seed Permission catalog + thêm audit enum trước (rút kinh nghiệm DEV-068). **C3** cũng ĐÃ xong (`DEV-070.md`, 2026-09-19, Giám sát phiên đăng nhập toàn hệ thống — GỘP với ý tưởng user đề xuất "trang admin xem phiên của toàn bộ user", KHÁC hướng gốc "export mẫu thanh tra" vì user xác nhận chưa có mẫu cụ thể để bám vào): trang riêng `/app/sessions` (`SessionsMonitorPage.tsx`) cho ADMIN xem + thu hồi phiên của TẤT CẢ user, route mới `GET /users/sessions` DÙNG LẠI permission `SESSION_VIEW_ALL`/`SESSION_REVOKE_ALL` (không tạo permission mới); phần export audit chỉ cải thiện filter "Hành động" từ chọn 1 sang chọn nhiều (gap từ FE-11). **CẦN gán `SESSION_VIEW_ALL`/`SESSION_REVOKE_ALL` cho ADMIN qua UI "Phân quyền"** (đã làm xong — user tự gán từ DEV-069) và `CONSUMABLE_REQUEST_*` cho USER/IT/PHONG_VAT_TU_TTB (DEV-067) nếu chưa làm. Còn lại CHƯA làm: NHÓM D. Trước khi dùng tài liệu này để lập kế hoạch hoặc đối chiếu trùng lặp đề xuất, PHẢI kiểm tra mục nào đã có task `DEV-0XX` tương ứng (xem `docs/00_PROJECT_MEMORY.md`) — không mặc định cả tài liệu là "chưa làm gì".
+> **[CẬP NHẬT 2026-09-18] — SỬA CLAIM SAI**: dòng gốc phía trên từng ghi "chưa cái nào được duyệt/implement" — KHÔNG còn đúng. NHÓM A (A1→A4) và NHÓM B1→B3 trong tài liệu này **ĐÃ được duyệt và implement xong** (`docs/development/tasks/DEV-050.md`→`DEV-056.md`), **B4** cũng ĐÃ xong (`DEV-057.md`, Vendor & Contract), **B6** cũng ĐÃ xong (`DEV-063.md`, Tìm kiếm toàn văn Document), **B5** cũng ĐÃ xong (`DEV-064.md`, Xuất PDF chính thức — "ký" là NỘI BỘ hệ thống, KHÔNG PHẢI chữ ký số CA hợp lệ pháp lý, user đã xác nhận sau khi được cảnh báo rủi ro), **B7** cũng ĐÃ xong (`DEV-065.md`, Báo cáo tuần tự động gửi email — opt-in THẬT qua `User.subscribedToWeeklyReport`, phát hiện gap ngoài phạm vi: hiện không có đường nào sửa `email` user đã tồn tại — **gap này ĐÃ ĐƯỢC KHẮC PHỤC ở `DEV-066.md`** (2026-09-18, mở `email` cho `CreateUserDTO`/`UpdateUserDTO`, chỉ ADMIN qua `PUT /users/:id`/tạo mới, CỐ TÌNH không mở self-service)). **B8** cũng ĐÃ xong (`DEV-067.md`, 2026-09-18, Dự trù/đề xuất mua vật tư tiêu hao hàng tháng — domain MỚI `ConsumableRequest`, KHÔNG có luồng duyệt, trạng thái riêng PENDING/FULFILLED/CANCELLED, KHÔNG tự sinh `ConsumableTransaction` khi đánh dấu đã mua; **CẦN gán permission `CONSUMABLE_REQUEST_*` qua UI "Phân quyền" mới dùng được trên DB hiện tại**, cùng pattern DEV-058). **C1** (NHÓM C) cũng ĐÃ xong (`DEV-068.md`, 2026-09-19, Xác thực 2 lớp qua email OTP cho ADMIN + 3 role duyệt cấp cao — opt-in tự chọn, KHÔNG có backup codes (chỉ ADMIN reset thủ công qua `USER_RESET_2FA`); phát hiện và sửa 2 bug thật: (1) `UserAudit.action` enum thiếu action mới qua smoke test, (2) `Permission` catalog trong DB dev thiếu 6 permission mới của DEV-065/067/068 khiến UI "Phân quyền" cắt mất cả nhóm WORKFLOW_* — đã seed lại + nâng `limit:100→300`. User đã tự gán `USER_RESET_2FA` cho ADMIN qua UI + verify UI trình duyệt thật thành công — C1 DONE hoàn toàn). **C2** cũng ĐÃ xong (`DEV-069.md`, 2026-09-19, Quản lý phiên đăng nhập — self-service cho MỌI role (`SessionsSection.tsx`) + ADMIN hỗ trợ xem/thu hồi phiên user khác (permission MỚI `SESSION_VIEW_ALL`/`SESSION_REVOKE_ALL`, mirror `USER_RESET_2FA`); `RefreshToken` thêm `userAgent`/`ip`; **tuân thủ CLAUDE.md Mục 18 MỚI** — viết E2E test thật (supertest+MongoDB in-memory) verify 403 cho route RBAC mới thay vì chỉ giả định; đã chủ động seed Permission catalog + thêm audit enum trước (rút kinh nghiệm DEV-068). **C3** cũng ĐÃ xong (`DEV-070.md`, 2026-09-19, Giám sát phiên đăng nhập toàn hệ thống — GỘP với ý tưởng user đề xuất "trang admin xem phiên của toàn bộ user", KHÁC hướng gốc "export mẫu thanh tra" vì user xác nhận chưa có mẫu cụ thể để bám vào): trang riêng `/app/sessions` (`SessionsMonitorPage.tsx`) cho ADMIN xem + thu hồi phiên của TẤT CẢ user, route mới `GET /users/sessions` DÙNG LẠI permission `SESSION_VIEW_ALL`/`SESSION_REVOKE_ALL` (không tạo permission mới); phần export audit chỉ cải thiện filter "Hành động" từ chọn 1 sang chọn nhiều (gap từ FE-11). **CẦN gán `SESSION_VIEW_ALL`/`SESSION_REVOKE_ALL` cho ADMIN qua UI "Phân quyền"** (đã làm xong — user tự gán từ DEV-069) và `CONSUMABLE_REQUEST_*` cho USER/IT/PHONG_VAT_TU_TTB (DEV-067) — **[CẬP NHẬT 2026-09-22] ĐÃ XONG**: verify trực tiếp DB dev phát hiện role `IT`/`USER`/`PHONG_VAT_TU_TTB` đều CHƯA có (chỉ `ADMIN` có, do được cấp mọi permission mặc định) — đã gán thật qua `assignPermissionsToRoleService` (đúng flow API `POST /roles/:id/assign-permissions`, có clear cache + notify user, không chỉnh DB thô): `IT`/`PHONG_VAT_TU_TTB` nhận đủ VIEW/CREATE/UPDATE/FULFILL, `USER` chỉ nhận VIEW/CREATE/UPDATE (đúng thiết kế DEV-067 — FULFILL là việc của Phòng Vật tư-TTB/IT sau khi mua thực tế). Còn lại CHƯA làm: NHÓM D. Trước khi dùng tài liệu này để lập kế hoạch hoặc đối chiếu trùng lặp đề xuất, PHẢI kiểm tra mục nào đã có task `DEV-0XX` tương ứng (xem `docs/00_PROJECT_MEMORY.md`) — không mặc định cả tài liệu là "chưa làm gì".
 
 Đây là NGUỒN THAM KHẢO khi cần lên kế hoạch nâng cấp/mở rộng tính năng cho phần CÒN LẠI, KHÔNG phải toàn bộ đang chờ thực hiện.
 

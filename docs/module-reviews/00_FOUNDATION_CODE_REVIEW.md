@@ -60,6 +60,8 @@ Phase 02/03 đã phân tích khu vực này khá kỹ ở commit `f4ce8e9` — r
 ---
 
 ### RV00-03 — Swagger UI (`/api-docs`) public hoàn toàn, không có bất kỳ authentication/authorization nào
+
+> **[ĐÃ SỬA 2026-09-30, `DEV-104.md`]** `/api-docs` nay mặc định tắt; chỉ bật ở `NODE_ENV=development` hoặc `ENABLE_API_DOCS=true`.
 - **Severity**: LOW-MEDIUM
 - **Category**: Security / API Exposure
 - **File**: `backend/src/config/swagger/swagger.ts`, `backend/src/app.ts` (dòng gọi `setupSwagger(app)`)

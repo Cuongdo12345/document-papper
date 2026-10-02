@@ -52,7 +52,9 @@ Service throw ApiError.xxx(message, details?)
 
 `FRONTEND_RECOMMENDATION`: Axios interceptor xử lý 401 riêng (refresh flow, xem `AUTH_RBAC_MAP.md`), 403 hiển thị trang/toast "Không đủ quyền" (KHÔNG tự động logout — 403 khác 401), còn lại hiển thị `message` trực tiếp qua toast/inline error.
 
-## 4. Ngoại lệ — KHÔNG đi qua kiến trúc chuẩn (domain Upload)
+## 4. Ngoại lệ — KHÔNG đi qua kiến trúc chuẩn (domain Upload) — [ĐÃ SỬA 2026-09-30, BR-22/DEV-108]
+
+> **[CẬP NHẬT 2026-09-30]** Mục này mô tả hành vi CŨ. Từ DEV-108, `upload.controller.ts` dùng `catchAsync` + `ApiError`: mọi lỗi Upload giờ có đủ `{ success:false, message, errorCode }` (`BAD_REQUEST`/`FORBIDDEN`/`NOT_FOUND`/`UNKNOWN_ERROR`), giống mọi domain khác. Upload không kèm file → 400 (trước là 500). Message đã đổi: "Không timg thấy file"/"File not found" → "Không tìm thấy file", "File deleted" → "Đã xoá file". Phần dưới giữ làm lịch sử; hàm `parseApiError` phòng thủ (không giả định luôn có `errorCode`) vẫn nên giữ.
 
 `upload.controller.ts` — `getFileDetail`/`deleteFile` dùng `try/catch` thủ công, trả lỗi TRỰC TIẾP bằng `res.status(404/403).json({message})`:
 
@@ -83,10 +85,10 @@ Không giả định MỌI response lỗi đều có `errorCode` — sẽ crash/
 | Users | `change-password`/`reset-password` thành công → phải tự logout (revoke toàn bộ refresh token) |
 | Documents | 400 "đang có 1 đề xuất sửa chữa khác chưa duyệt" kèm `documentCode` trong message — có thể parse hiển thị link nếu muốn (message là text, không có field `conflictId` riêng) |
 | Assets | 409 khi `VersionError` (race condition assign/transfer/return đồng thời 2 request) — FE nên tự động refetch dữ liệu asset rồi cho user thử lại, không chỉ hiển thị lỗi tĩnh |
-| Upload | Xem Mục 4 — shape lỗi khác biệt |
+| Upload | Đã thống nhất format lỗi chung từ DEV-108 (Mục 4 là lịch sử); nhớ lỗi vượt số file/dung lượng là 400 `MULTER_LIMIT_*` |
 | Dashboard | Không có validate query rõ ràng — lỗi sai `month`/`year` có thể KHÔNG trả 400 mà trả dữ liệu rỗng/sai âm thầm (xem `API_REFERENCE.md` mục Dashboard) |
 
 ## 6. Known Gaps / Conflicts
 
-- **`OPENAPI_CONTRACT` vs `SOURCE_CODE_BEHAVIOR`**: OpenAPI mô tả response error qua `$ref: "#/components/responses/BadRequest"` (v.v.) — cấu trúc chung khớp Mục 2, NHƯNG OpenAPI **không thể hiện** ngoại lệ domain Upload (Mục 4) vì đó là hành vi runtime cụ thể, không phải 1 phần contract được document riêng. FE PHẢI dựa vào Mục 4 (source-code-verified), không dựa "OpenAPI nói mọi lỗi đều có `success:false`".
+- **`OPENAPI_CONTRACT` vs `SOURCE_CODE_BEHAVIOR`**: OpenAPI mô tả response error qua `$ref: "#/components/responses/BadRequest"` (v.v.) — cấu trúc chung khớp Mục 2, NHƯNG (trước DEV-108) OpenAPI **không thể hiện** ngoại lệ domain Upload (Mục 4). **[2026-09-30]** Ngoại lệ này đã hết: Upload dùng format lỗi chung và OpenAPI nhóm `/api/upload*` đã dùng `ErrorResponse`.
 - Shape lỗi Zod validation (`details`) — đã xác nhận CONFIRMED qua source (`validate.middleware.ts`), xem Mục 2.

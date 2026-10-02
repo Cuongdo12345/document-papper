@@ -5,7 +5,7 @@ description: Quy tắc làm việc với dự án Document Papper sau khi đã h
 
 # SKILL V3 — PROJECT KNOWLEDGE & DEVELOPMENT
 
-> **Rulebook đã rà soát khớp thực tế project đến: `DEV-056` / `FE-16` (2026-09-16).** Nếu task mới nhất chênh lệch lớn so với 2 mốc này, đối chiếu lại §3/§8/§20 trước khi tin tuyệt đối.
+> **Rulebook đã rà soát khớp thực tế project đến: `DEV-099` / `FE-40` (2026-09-30; lần trước: `DEV-056` / `FE-16`, 2026-09-16).** Nếu task mới nhất chênh lệch lớn so với 2 mốc này, đối chiếu lại §3/§8/§20 trước khi tin tuyệt đối.
 
 ## 1. MỤC ĐÍCH
 
@@ -88,20 +88,25 @@ Tài liệu bổ sung nếu tồn tại:
 - `docs/22_GLOBAL_TESTING_REVIEW.md`
 - `docs/23_CODE_REVIEW_ROADMAP.md`
 - `docs/30_DEVELOPMENT_COMPLETION_AUDIT.md`
+- `docs/31_BACKEND_CODE_REVIEW.md` — [2026-09-29] review toàn bộ backend (lỗi + hiệu năng), BR-01→BR-22 + 3 câu hỏi nghiệp vụ; mới nhất, đọc trước khi sửa lỗi backend
 - `docs/module-reviews/` — review chi tiết theo domain, index tại `docs/review-index/`
 
 **[CẬP NHẬT 2026-09-16]** Tài liệu phát triển sau-phân-tích (điều phối task-based development, chưa từng được liệt kê ở đây):
 
-- `docs/development/00_DEVELOPMENT_ROADMAP.md` — nguồn sự thật Stage/P0→P3
+- `docs/development/00_DEVELOPMENT_ROADMAP.md` — [CẬP NHẬT 2026-09-30] LỊCH SỬ, roadmap P0→P3 gốc chỉ gồm DEV-001→025 (đã DONE hết). Việc hiện tại/tiếp theo xem `docs/SESSION_HANDOFF.md` + `docs/31_BACKEND_CODE_REVIEW.md`
 - `docs/development/FEATURE_DEVELOPMENT_ROADMAP.md` — đề xuất tính năng, xem `docs/00_PROJECT_MEMORY.md` để biết mục nào ĐÃ implement trước khi coi là "chưa làm"
+- `docs/development/PRODUCTION_DEPLOYMENT_PLAN.md` — [2026-09-22] kế hoạch deploy production, trạng thái PLANNED, không tự ý bắt đầu Giai đoạn nào khi chưa được user chỉ định
+- `docs/development/DEV-001A_SUPER_ADMIN_IDENTITY_PLAN.md` — [2026-09-30] kế hoạch Super-Admin (`role.isSystemRole`), ĐÃ HOÀN TẤT, giữ làm lịch sử quyết định
+- `docs/development/changes/`, `docs/development/decisions/` — [2026-09-30] hiện rỗng, chưa dùng
 
 **[CẬP NHẬT 2026-09-16]** Tài liệu frontend (thay cho `06_FRONTEND_ANALYSIS.md`):
 
 - `docs/frontend/FRONTEND_MEMORY.md` — index kiến thức frontend, vai trò tương đương PROJECT_MEMORY
+- `docs/frontend/phases/` — [2026-09-30] ghi chú theo phase nhỏ, hiện có 1 file
 
 Task:
 
-- `docs/development/tasks/DEV-XXX.md` — task backend (quy ước thật đang dùng)
+- `docs/development/tasks/DEV-XXX.md` — task backend (quy ước thật đang dùng). Ngoại lệ hậu tố: `DEV-001A`, `DEV-009A` là task con/kế thừa của task gốc cùng số
 - `docs/frontend/tasks/FE-XX.md` — task frontend (quy ước thật đang dùng)
 - `docs/tasks/` — LEGACY, dừng ở `TASK-001`/`TASK-002`, không dùng tiếp
 

@@ -432,17 +432,477 @@ CẬP NHẬT TÀI LIỆU
 >   cho CẢ path/marker/label theo yêu cầu trực tiếp của user — lưu ý đi ngược khuyến nghị cũ FE-09 (không tái
 >   dùng màu status cho dataviz identity) nhưng là chỉ định trực tiếp, đã ghi rõ trong task doc. Dev server
 >   vẫn chạy sẵn (`:3000`/`:5174`). Chi tiết đầy đủ: `docs/frontend/tasks/FE-24.md`.
-> - **Next Task**: chưa được user chỉ định cho phiên kế tiếp. FE-19→24/DEV-071/DEV-072/DEV-073 đều đã DONE
->   (trừ DEV-073 còn 1 việc tuỳ chọn không bắt buộc — verify 403 bằng role khác, xem task doc Mục 7 — mục
->   "đổi `SystemDesignPage.tsx` sang gọi API thật" đã hoàn thành ở FE-24, không còn treo). Việc
->   CẦN LÀM THÊM khác (KHÔNG bắt buộc, chỉ cần khi dùng tính năng tương ứng, thao tác tay qua UI "Phân
->   quyền"): tick 4 `CONSUMABLE_REQUEST_*` cho role USER/IT/PHONG_VAT_TU_TTB (DEV-067) — `Permission`
->   catalog đã có sẵn để chọn. Riêng cho finding contrast ở FE-17 Mục 5: cần user QUYẾT ĐỊNH có duyệt
->   `UI_DESIGN_SYSTEM.md` Mục 2 (đổi token màu `success`) hay chỉ sửa hẹp variant đó — chưa tự ý chọn hướng
->   nào. **FE-18 đang CHỜ user xem `/app` (tab "Tổng quan") trên trình duyệt thật + duyệt** trước khi làm
->   Pass 3 (rollout Mục 4 sang trang khác) — KHÔNG tự bắt đầu Pass 3 khi chưa có xác nhận. Ứng viên khác
->   theo Roadmap: NHÓM D (dài hạn) — KHÔNG tự bắt đầu khi chưa có chỉ định rõ (CLAUDE.md §41). C3 giờ đã
->   DONE (DEV-070) — không còn là ứng viên.
+> - **`DEV-074`/`FE-25`** (2026-09-21, cùng ngày) — mở rộng `GET /api/system-design` (KHÔNG route/permission
+>   mới, dùng lại `SYSTEM_DESIGN_VIEW`): mỗi module trong `modules[]` thêm `description`/`features` (file
+>   cấu hình tĩnh mới `backend/src/services/systemDesign/moduleDescriptions.ts`, viết dựa trên đọc thật
+>   `FRONTEND_MEMORY.md`/`PROJECT_MEMORY.md`/`13_FINAL_PROJECT_REPORT.md` Module Map — không bịa) và
+>   `relatedDocs` (file mới `relatedDocs.ts` — quét ĐỘNG `docs/development/tasks/*.md`+
+>   `docs/frontend/tasks/*.md` tìm file nhắc `models/<module>/`/`features/<module>/`, trả URL GitHub thật,
+>   KHÔNG cache, KHÔNG hard-code danh sách). Tìm repo root bằng cách đi lên từ `__dirname` tới khi thấy
+>   `docs/development/tasks` — KHÔNG hard-code số cấp `..` cố định (khác dev/prod dist, xem lý do đầy đủ ở
+>   `DEV-074.md` Mục 4). FE (`FE-25`): mở rộng Drawer đã có ở FE-24 (KHÔNG trang mới) — click Module vừa
+>   `fitView` như cũ vừa mở Drawer hiện mô tả+tính năng+link GitHub (mở tab mới), KHÔNG markdown renderer.
+>   Cập nhật CLAUDE.md §36 thêm bước 9 mới (renumber bước cũ thành 10): nhắc cập nhật
+>   `moduleDescriptions.ts` khi thêm module mới. Test mới `relatedDocs.test.ts` (4 test, không mock) +
+>   `tsc`/lint/build/vitest frontend đều PASS, `jest` backend 41 suite/402 test PASS. **CHƯA tự verify trực
+>   quan trên trình duyệt** — user tự kiểm tra. Chi tiết: `docs/development/tasks/DEV-074.md` +
+>   `docs/frontend/tasks/FE-25.md`.
+> - **`DEV-075`/`FE-26`** (2026-09-21, cùng ngày — user muốn 1 trang UI cho "tài liệu phân tích tổng quan
+>   chung về cấu trúc dự án"): trang MỚI **"Tài liệu dự án"** (`/app/project-docs`, KHÁC pattern gần đây —
+>   đây LÀ route/nav item mới, không mở rộng trang có sẵn), dùng lại `SYSTEM_DESIGN_VIEW`. Đã hỏi rõ 3 quyết
+>   định trước khi code: (1) phạm vi CHỈ 12 file `01_PROJECT_OVERVIEW.md`→`13_FINAL_PROJECT_REPORT.md` (loại
+>   `00_PROJECT_MEMORY.md` — memory/index không phải phase — và `06` không tồn tại), KHÔNG gồm 14-22/module-
+>   reviews/task doc riêng; (2) render bằng `react-markdown@10.1.0` (xác nhận `dist-tags.latest` trước khi
+>   cài); (3) phát hiện cả 12 file đều dùng bảng GFM → cần thêm `remark-gfm@4.0.1` (dependency thứ 2, user
+>   đồng ý) nếu không bảng sẽ hiển thị hỏng. **Đây là markdown renderer ĐẦU TIÊN của dự án** — style map thủ
+>   công sang token màu sẵn có, KHÔNG cài `@tailwindcss/typography` (dependency thứ 3 ngoài phạm vi đã duyệt).
+>   Backend: `GET /api/project-docs` (danh sách, `title` suy từ dòng H1 đầu file) + `GET
+>   /api/project-docs/:id` (nội dung, chặn path traversal 2 lớp: regex + whitelist file thật) — quét ĐỘNG
+>   `docs/`, KHÔNG hard-code tên file. Tách `findRepoRoot()` (viết lần đầu ở DEV-074) thành helper dùng chung
+>   `shared/helpers/findRepoRoot.ts`, refactor `relatedDocs.ts` (DEV-074) dùng lại — verify test DEV-074 vẫn
+>   PASS nguyên vẹn sau refactor. Code-split qua `React.lazy` (`ProjectDocsPage.lazy.tsx`) — verify build:
+>   chunk 158KB tách riêng khỏi bundle chính. Test mới `projectDocs.service.test.ts` (5 test, không mock, có
+>   test path traversal) — `jest` backend 42 suite/407 test PASS, `tsc`/lint/build/vitest frontend PASS.
+>   curl runtime thật `GET /api/project-docs` không token → 401 đúng thiết kế. User đã tự browser-verify xong
+>   ("ok đã xong nhe", 2026-09-21) — trạng thái **DONE**. Chi tiết: `docs/development/tasks/DEV-075.md` +
+>   `docs/frontend/tasks/FE-26.md`.
+> - **[CẬP NHẬT 2026-09-23]** `CONSUMABLE_REQUEST_*` (DEV-067) — **ĐÃ GÁN XONG** cho USER/IT/
+>   PHONG_VAT_TU_TTB qua đúng flow `assignPermissionsToRoleService` (verify DB dev thật trước/sau), xem
+>   CLAUDE.md §41. `FE-18` (Dashboard KPI display/gộp muted) — **User đã duyệt qua screenshot thật**
+>   (2026-09-23), mở khoá Pass 3. `FE-27` (Pass 3a — THÍ ĐIỂM gộp `FilterBar`+`DataTable` 1 khung viền,
+>   CHỈ trên `UsersListPage`, `FilterBar` thêm `variant="embedded"` backward-compatible) — **DONE, user đã
+>   duyệt qua screenshot thật trên dev server**. Build/lint/vitest/visual-regression/a11y đều verify (a11y
+>   fail đúng lỗi CŨ đã biết `StatusBadge` contrast, không phải regression mới). Đã cập nhật baseline
+>   `users-datatable-chromium-win32.png` (thực tế byte không đổi — diff quá nhỏ để lệch ảnh).
+> - **[CẬP NHẬT 2026-09-23, `FE-28.md`]** User yêu cầu trực tiếp cả 2 việc còn treo — ĐÃ XONG:
+>   (1) Pass 3b — rollout gộp khung `FilterBar`+`DataTable` ra 17 trang/component còn lại (số thật, không
+>   phải 31 — xem `FE-28.md`), `DocumentsListPage.tsx` KHÔNG áp dụng được (không dùng `FilterBar`);
+>   (2) đóng nợ kỹ thuật contrast `StatusBadge` success (FE-17 Mục 5) — thêm token RIÊNG
+>   `--success-strong` (KHÔNG đổi `--success` gốc), 4/4 test a11y đại diện nay PASS. Verify đầy đủ
+>   typecheck/lint/vitest/build/a11y/visual-regression + spot-check screenshot 3 trang đa dạng cấu trúc.
+> - **[CẬP NHẬT 2026-09-23, `FE-29.md`]** User yêu cầu xử lý tiếp 2 việc treo từ `FE-28.md` — ĐÃ XONG:
+>   (1) audit 8 file (không phải 7) dùng `text-success`/`bg-success/10` ngoài `StatusBadge` bằng tính
+>   toán contrast thật (công thức OKLCH→sRGB + WCAG relative-luminance, cùng công thức axe-core) — 3/8
+>   có lỗi thật (chữ thật trên nền tint/nhạt, dưới AA 4.5:1) đã sửa (`SystemDesignLegend.tsx`,
+>   `MaintenanceCalendarPage.tsx`, `TwoFactorSection.tsx`, cùng pattern `text-success`→
+>   `text-success-strong`), 5/8 chỉ dùng cho icon nên chỉ cần ngưỡng 3:1 (WCAG 1.4.11), đã PASS, không
+>   sửa; (2) tính lại contrast `--success-strong` dark mode — PASS thoải mái (8.5–8.8:1), nhưng phát
+>   hiện quan trọng: **dark mode hiện KHÔNG thể bật được trong app thật** (grep toàn bộ `src/` không có
+>   code nào áp class `.dark`/theme toggle) — token CSS dark tồn tại từ FE-01 nhưng là dead code, chưa
+>   có tính năng bật dark mode thật, nên chưa thể verify bằng test browser thật, chỉ có bằng chứng tính
+>   toán. Verify đầy đủ typecheck/lint/vitest/build/a11y/visual-regression (8/8 PASS, không có regression,
+>   nhưng 4 màn đại diện không cover trực tiếp 3 file vừa sửa).
+> - **[CẬP NHẬT 2026-09-23, `FE-30.md`]** Dark mode — user yêu cầu làm thật (2 lựa chọn Light/Dark,
+>   KHÔNG có "System"; nút toggle icon đơn ở `Header.tsx`, KHÔNG đặt trong dropdown user menu) — **DONE**.
+>   `stores/uiStore.ts` thêm `theme`+`toggleTheme()` (tái dùng persist key `dp_ui_prefs` có sẵn), hook
+>   MỚI `hooks/useThemeSync.ts` áp class `.dark`, script inline trong `index.html` chống FOUC. Verify đầy
+>   đủ typecheck/lint/vitest/build + **12/12 e2e PASS** (4 test light cũ + 4 test dark MỚI thêm vào
+>   `a11y.spec.ts`, click toggle thật rồi chạy axe-core — bằng chứng THẬT đầu tiên `--success-strong`
+>   dark mode PASS, đóng nốt phần "chưa thể verify tự động" treo từ `FE-29.md`) + spot-check screenshot
+>   (kể cả reload để xác nhận persist + không FOUC).
+> - **[CẬP NHẬT 2026-09-23, cùng ngày]** User tự xác nhận đã kiểm tra bằng mắt thật 30+ trang còn lại ở
+>   dark mode (OK, không cần audit lại) + yêu cầu thêm visual-regression baseline riêng cho dark mode —
+>   **ĐÃ XONG**: `e2e/visual.spec.ts` thêm 4 snapshot dark mode (`*-dark.png`, describe
+>   `"FE-30 — Dark mode visual regression snapshot"`, bật dark mode qua click toggle thật), baseline tạo
+>   + re-run xác nhận ổn định, **16/16 e2e PASS** (8 a11y + 8 visual, cả light lẫn dark). Xem `FE-30.md`
+>   Mục 4.
+> - **[CẬP NHẬT 2026-09-23, `FE-31.md`]** `DocumentsListPage.tsx` — user yêu cầu làm nốt ("ok làm giúp
+>   tôi") — **DONE**: áp kết quả hình ảnh của pattern gộp khung (`divide-y`+viền ngoài+nền tint filter)
+>   lên layout custom sẵn có của trang này (KHÔNG sửa component `FilterBar` chung — trang vẫn không dùng
+>   nó, đúng quyết định gốc 2026-09-18). Verify đầy đủ + spot-check 3 trạng thái (thu gọn/mở nâng cao/dark
+>   mode) đều đúng. **18/18 trang dùng dạng "khung filter + DataTable" giờ đồng nhất 1 pattern** — không
+>   còn trang nào lệch trong phạm vi rollout Pass 3b/FE-27→31.
+> - **[CẬP NHẬT 2026-09-24, `DEV-076.md`]** User hỏi "phần Thiết bị y tế cần phát triển thêm tính năng
+>   nào không" — rà soát code phát hiện 3 gap thật (không đoán): (1) thiếu cảnh báo hết hạn giấy phép
+>   lưu hành (`licenseExpiredAt` có lưu nhưng không cron nào theo dõi — chính comment gốc code đã ghi
+>   nhận gap này); (2) `operatorCertificateRequired` chỉ là cờ boolean, không theo dõi ai được chứng
+>   nhận/khi nào hết hạn; (3) báo cáo tuân thủ mẫu Bộ Y tế cho thiết bị y tế — từng bị hoãn ở C3 gốc vì
+>   chưa có mẫu cụ thể. User chọn làm mục (1) — **DONE**: `checkLicenseExpiringService()` MỚI (mirror
+>   đúng `checkWarrantyExpiringService`/`checkCalibrationDueService`), field `licenseAlertSentAt` +
+>   index mới, `NotificationType.MEDICAL_DEVICE_LICENSE_EXPIRING` mới, reset alert khi sửa hạn qua PUT,
+>   `runMedicalDeviceAlertsService()` nay chạy song song cả 2 loại cảnh báo. **2 file test MỚI** (11 test)
+>   cho 2 service trước đây 0% coverage. `jest` backend: 44 suite/**418** test PASS (tăng từ 42/407).
+>   `tsc`/build backend + frontend đều PASS (FE chỉ thêm 1 field type cho khớp, không có UI mới — cảnh
+>   báo hiển thị qua `NotificationBell` chung có sẵn). Mục (2)/(3) CHƯA làm — ghi nhận, chưa có yêu cầu.
+> - **[CẬP NHẬT 2026-09-24, `DEV-077.md`]** User yêu cầu làm tiếp mục (2) ("theo dõi chứng chỉ vận hành
+>   nhé") — **DONE**: domain MỚI hoàn chỉnh `OperatorCertificate` (gắn 1 User + 1 AssetCategory, KHÔNG
+>   theo từng Asset — 4 quyết định nghiệp vụ đã xác nhận qua AskUserQuestion 2 vòng trước khi code: gắn
+>   User cụ thể, phạm vi theo danh mục, cảnh báo gửi CẢ role IT LẪN người có chứng chỉ, CHẶN gán/chuyển
+>   giao thiết bị cho user chưa đủ điều kiện). Backend: model/dto/service/route/permission mới đầy đủ,
+>   guard tích hợp vào `assignAssetService`/`transferAssetService`, cảnh báo hết hạn gộp vào cron Medical
+>   Device đã có (`runMedicalDeviceAlertsService()` nay trả 3 khoá). Frontend: section MỚI trong
+>   `MedicalDeviceSection.tsx` ("Người vận hành đủ điều kiện") + modal cấp chứng chỉ. **`jest` backend:
+>   45 suite/439 test PASS** (tăng từ 44/418 — 3 file test, +21 test, cover cả guard chặn gán thiết bị).
+>   `tsc`/build cả 2 phía PASS, `playwright` a11y+visual 16/16 PASS. **Spot-check end-to-end THẬT qua UI**
+>   (tạo Khoa/Phòng→Danh mục→Asset→Hồ sơ→cấp chứng chỉ, assertion tự động xác nhận list cập nhật đúng).
+>   Mục (3) (báo cáo tuân thủ mẫu Bộ Y tế) VẪN CHƯA làm — cần mẫu cụ thể trước, chưa có yêu cầu mới.
+> - **[CẬP NHẬT 2026-09-24, `DEV-077.md` Mục 5b]** User báo "chưa thấy UI phân quyền và UI phần vừa làm" —
+>   kiểm tra DB dev thật phát hiện bug thật (cùng pattern DEV-068): `OPERATOR_CERTIFICATE_VIEW`/`_CREATE`
+>   có trong code (`permission.constant.ts`/`rolePermission.map.ts`) nhưng **0 bản ghi trong `Permission`
+>   collection DB dev** — `seed-rbac.ts` không tự chạy khi code đổi. Đây là lý do UI "Phân quyền" trống VÀ
+>   nút "Cấp chứng chỉ" không hiện cho AI kể cả ADMIN trên DB dev thật (môi trường Playwright e2e dùng để
+>   spot-check DEV-077 không bị ảnh hưởng vì seed permission mới từ code mỗi lần chạy, không đọc DB dev).
+>   **ĐÃ SỬA**: script tạm (additive-only, KHÔNG dùng `--sync-roles`) tạo 2 Permission doc + merge vào
+>   `role.permissions` của ADMIN/IT/TRUONG_KHOA/DIEU_DUONG_TRUONG/BAN_GIAM_DOC/PHONG_VAT_TU_TTB (VIEW) và
+>   ADMIN/IT/PHONG_VAT_TU_TTB (CREATE), đúng thiết kế gốc DEV-077.md Mục 3. Verify DB: 113 permission,
+>   permCount từng role tăng đúng kỳ vọng. **CHƯA giải quyết**: cache permission in-memory (TTL 5 phút)
+>   của backend dev server đang chạy KHÔNG được clear (script chạy process riêng, không qua
+>   `clearPermissionCacheForRole`) — user cần đợi tối đa 5 phút hoặc khởi động lại backend dev server /
+>   đăng nhập lại để thấy quyền mới ngay trên UI.
+> - **[CẬP NHẬT 2026-09-24, `DEV-078.md`]** User yêu cầu làm tiếp phần Sửa/Thu hồi/Xoá chứng chỉ vận hành
+>   (mục treo ở `DEV-077.md` Mục 6) — **DONE**: chốt 4 quyết định nghiệp vụ qua AskUserQuestion trước khi
+>   code (xoá MỀM; Thu hồi tách riêng Xoá, Thu hồi bắt buộc lý do còn Xoá thì không; Sửa CHỈ
+>   `certificateNumber`, không sửa được ngày cấp/hạn; 2 permission MỚI riêng
+>   `OPERATOR_CERTIFICATE_UPDATE`/`_REVOKE`, REVOKE dùng chung cho cả thu hồi lẫn xoá). Backend: field
+>   `isActive`/`revokedAt`/`revokedReason`/`deletedAt` mới, 3 route mới (`PATCH /:id`, `PATCH
+>   /:id/revoke`, `DELETE /:id`), mọi truy vấn "đang hợp lệ" (guard gán/chuyển giao, picker, cron cảnh
+>   báo) đều thêm điều kiện `isActive:true`. Frontend: 3 nút hành động mới trên list "Người vận hành đủ
+>   điều kiện" (`MedicalDeviceSection.tsx`), tái sử dụng `WorkflowActionModal`/`ConfirmDialog` có sẵn
+>   (không tạo modal riêng cho thu hồi/xoá, chỉ 1 modal mới cho sửa vì chỉ 1 field). **`jest` backend: 45
+>   suite/448 test PASS** (+9). `tsc`/build cả 2 phía PASS, `vitest` 25/25, `playwright` a11y+visual
+>   16/16 PASS. **Spot-check end-to-end THẬT qua UI** cho cả 3 hành động mới (sửa/thu hồi có validate bắt
+>   buộc lý do/xoá) — assertion tự động PASS. DB dev: đã seed 2 permission mới + gán ADMIN/IT/PHONG_VAT_TU_TTB
+>   (cùng lưu ý cache 5 phút như lần seed trước, xem `DEV-077.md` Mục 5b).
+> - **[CẬP NHẬT 2026-09-24, `DEV-078.md` bổ sung]** User kiểm tra UI xong, báo còn thiếu màn hình xem
+>   chứng chỉ đã xoá/thu hồi — đúng gap đã tự ghi nhận ở bản DEV-078 gốc. **DONE**: thêm nút "Xem lịch sử"
+>   cạnh "Cấp chứng chỉ" → modal MỚI `OperatorCertificateHistoryModal.tsx` liệt kê TOÀN BỘ bản ghi của
+>   danh mục (còn hạn/hết hạn/đã thu hồi kèm lý do+ngày/đã xoá) qua hook MỚI
+>   `useOperatorCertificateHistory` (`GET /operator-certificates` không kèm `validOnly`, khác
+>   `useCertifiedOperators` chỉ trả người còn hạn đã dedupe). Sửa luôn 4 mutation
+>   (create/update/revoke/delete) để invalidate CẢ 2 query key `certified-users` VÀ `history` (trước đó
+>   chỉ invalidate 1, có thể để lộ dữ liệu cũ nếu mở đồng thời). Verify: `tsc`/`oxlint`/`vitest`
+>   (25/25)/`build`/`playwright` a11y+visual (16/16) re-run PASS + **spot-check UI thật lần 2**: seed 1
+>   chứng chỉ còn hạn + 1 đã thu hồi cho cùng user/danh mục → xác nhận list ngoài chỉ hiện chứng chỉ còn
+>   hạn (đúng dedupe) trong khi modal lịch sử hiện ĐỦ CẢ 2 kèm đúng badge + lý do thu hồi.
+> - **[CẬP NHẬT 2026-09-24, `DEV-079.md`]** User yêu cầu tính năng MỚI: upload/sửa/xoá ảnh đại diện cho
+>   module User — **DONE**: chốt 2 quyết định qua AskUserQuestion trước khi code (self-service + ADMIN
+>   đặt/xoá hộ user khác, dùng lại permission `USER_UPDATE`; lưu THẲNG base64 trong document User thay vì
+>   file riêng — dự án không có route serving file public/static, base64 trả thẳng qua response đã xác
+>   thực sẵn là cách đơn giản nhất không phá vỡ nguyên tắc bảo mật hiện có). Backend: field `avatar`
+>   MỚI trên `User` (`select:false` như `password`, KHÔNG lộ ở `GET /users` list), DTO validate
+>   MIME+kích thước (≤300KB gốc), 2 cặp route mới (`/users/me/avatar` self, `/users/:id/avatar` admin,
+>   dùng chung 2 service function phân biệt qua `performedBy` optional để quyết định có ghi audit hay
+>   không). Frontend: component dùng chung MỚI `Avatar.tsx` (thay initials-only cũ ở `Header.tsx`), modal
+>   self-service (`ProfilePage`) + modal admin (`UsersListPage`, tự fetch chi tiết qua `GET /users/:id` —
+>   lần đầu FE dùng endpoint này), tái sử dụng `FileUpload` sẵn có. **`jest` backend: 45 suite/459 test
+>   PASS** (+11) + **`test:e2e` HTTP thật: 4 suite/28 test PASS** (+8 test MỚI verify 403/401 thật theo
+>   CLAUDE.md §18). Frontend: `tsc`/`build` PASS, `vitest` 25/25, `oxlint` baseline giữ nguyên 4 (chủ động
+>   tách `getInitials` ra file riêng để không tăng), `playwright` a11y+visual 16/16 PASS. **Spot-check
+>   UI thật qua trình duyệt** cho cả 2 luồng (self + admin), dùng file ảnh thật qua `setInputFiles` — toàn
+>   bộ assertion PASS.
+> - **[CẬP NHẬT 2026-09-24, `DEV-080.md`]** User yêu cầu dựng lại Danh mục tài sản có cấp cha — **DONE**:
+>   chốt qua AskUserQuestion: cây **3 cấp** (gốc `CNTT`/`TBYT` → 7 nhóm → loại thiết bị, GIỮ NGUYÊN mã
+>   danh mục lá cũ nên 0 tài sản phải chuyển), **xoá mềm 7 danh mục trùng** (`MAY_*` tiếng Việt, 0 tài
+>   sản/0 chứng chỉ), **tài sản chỉ gắn danh mục lá**. Backend: helper cây trong `assetCategory.service.ts`
+>   (lọc `$in` con cháu ở list/export, chặn gán vào nhóm ở create/update/import Excel, chống vòng lặp
+>   A→B→A, chặn chọn cha đang chứa tài sản, `parentCategory:null` để gỡ cha — trước đây không gỡ được).
+>   Dữ liệu dev đã migrate qua `backend/scripts/migrate-asset-category-tree.ts` (dry-run mặc định,
+>   `--apply` ghi thật, idempotent — **PHẢI chạy lại trên môi trường khác khi deploy**). Frontend: bảng
+>   danh mục hiển thị cây (bỏ phân trang), component dùng chung `AssetCategoryOptions` cho 4 dropdown.
+>   Verify: `jest` 46 suite/469 test, `test:e2e` 5 suite/34 test (+6 test cây trên Mongo thật), FE
+>   `tsc`/`build`/`vitest` 29/29/`oxlint` baseline 4/playwright 16/16 PASS + spot-check UI thật PASS.
+> - **[CẬP NHẬT 2026-09-24, `DEV-081.md`]** User đổi cách hiển thị trang Danh mục tài sản — **DONE**: bỏ
+>   bảng cây của DEV-080, thay bằng danh sách phẳng CHỈ danh mục con (mặc định), bộ lọc "Nhóm" (chọn gốc/nhóm
+>   → cả nhánh) + "Cấp" (con/nhóm/tất cả — giữ đường sửa/xoá danh mục nhóm) + phân trang server 10 dòng.
+>   Backend: `QueryAssetCategoryDTO` thêm `group`/`level` tuỳ chọn (không truyền = như cũ). `test:e2e`
+>   5 suite/35 test (+1), jest 469, FE tsc/build/vitest/oxlint/playwright PASS + spot-check UI thật PASS.
+> - **[CẬP NHẬT 2026-09-24, `DEV-082.md`]** User báo tài sản "vẫn lưu danh mục cũ". Kiểm tra DB (chỉ đọc):
+>   dữ liệu ĐÃ đồng bộ (119/119 tài sản ở danh mục lá active), KHÔNG migrate. Đã hỏi user, chốt: chỉ hiện dòng
+>   "Nhóm: …" dưới ô Danh mục ở form Tạo/Sửa tài sản — **DONE**. Sửa kèm 1 lỗi hiển thị có từ trước ở
+>   `AssetEditModal`: ô chọn hiện option đầu tiên khi danh mục tải chậm, trong khi giá trị lưu vẫn đúng. FE
+>   vitest 32/32, tsc/oxlint/build/playwright PASS, spot-check UI thật PASS. Backend không đổi.
+> - **[CẬP NHẬT 2026-09-24, `DEV-083.md`]** User yêu cầu: bấm vào ô trạng thái (Đang sử dụng/Trong kho/Đang
+>   bảo trì/Thất lạc/Đã thanh lý/Đã giữ chỗ) ở widget "Tài sản" trên Dashboard → xem danh sách tài sản tương
+>   ứng — **DONE**, không cần hỏi thêm (không có gì mơ hồ). Mỗi ô đổi thành `Link` tới
+>   `/app/assets?status=<mã>`; `AssetsListPage` đọc `status` từ URL lúc mount để lọc sẵn (1 chiều, không
+>   đồng bộ ngược URL khi đổi filter sau đó — đúng phạm vi yêu cầu). Đã kiểm tra mọi role có `DASHBOARD_READ`
+>   đều sẵn có `ASSET_VIEW` — không tài khoản nào thấy widget nhưng bấm vào bị chặn quyền, không cần
+>   route/permission mới. Gộp theo `ASSET_STATUS_MAP` dùng chung mới
+>   (`features/assets/constants/assetStatus.constants.ts`) — trước đó `AssetStatusBadge.tsx` và
+>   `AssetsListPage.tsx` mỗi nơi tự định nghĩa 1 bảng nhãn trùng nhau, việc này sẽ tạo bản trùng thứ 3 nên
+>   gộp lại thay vì lặp thêm; tách file riêng để giữ `AssetStatusBadge.tsx` chỉ export component (tránh lặp
+>   lỗi oxlint `only-export-components` đã gặp ở DEV-079). FE tsc/oxlint (baseline 4 giữ nguyên)/vitest
+>   32/32/build/playwright a11y+visual 16/16 PASS + spot-check UI thật (seed 2 tài sản qua API, bấm ô "Trong
+>   kho" → đúng URL + bộ lọc + đúng 2 dòng) PASS. Backend không đổi.
+> - **[CẬP NHẬT 2026-09-24, `DEV-084.md`]** User yêu cầu: bấm ô Loại A/B/C/D ở widget "Thiết bị y tế" trên
+>   Dashboard → xem danh sách thiết bị + có màu sắc + hiệu ứng hover — **DONE**. KHÁC DEV-083: KHÔNG có
+>   trang "Danh sách thiết bị y tế" sẵn có (chỉ có CRUD theo `:assetId` đơn lẻ) — đã hỏi qua
+>   AskUserQuestion, user chọn **Modal tại Dashboard** (không xây route/trang mới). Backend: route MỚI
+>   HOÀN TOÀN `GET /dashboard/medical-devices/by-class` (dùng lại permission `DASHBOARD_READ`, không tạo
+>   permission mới) — **đã viết E2E MỚI theo CLAUDE.md §18** (`medical-device-by-class.e2e-test.ts`, 6 test:
+>   401 không token, 403 role USER thật, 400 thiếu/sai `deviceClass`, 200 đúng dữ liệu/phân trang). Frontend:
+>   modal MỚI `MedicalDevicesByClassModal.tsx` (AppModal+DataTable+Pagination, mirror `CalibrationDueWidget`);
+>   màu theo mức rủi ro A→D (success→info→warning→destructive, trước đó cả 4 loại cùng 1 màu xám) +
+>   hover (cùng hiệu ứng DEV-083). `jest` 469 (không đổi)/**`test:e2e` 6 suite/41 test PASS** (+6)/FE
+>   tsc/oxlint (baseline 4)/vitest 32/32/build/playwright 16/16 PASS + spot-check UI thật (màu đổi đúng,
+>   hover đổi border, modal đúng dữ liệu, bấm tên thiết bị → đúng trang chi tiết) PASS.
+> - **[CẬP NHẬT 2026-09-25, `DEV-085.md`]** User báo "Tỷ lệ chuyển đổi Đề xuất → Báo cáo theo khoa/phòng"
+>   trên Dashboard luôn hiện 0% mọi khoa — **DONE, đây là BUG THẬT** (không phải dữ liệu thật = 0%).
+>   Nguyên nhân: `proposalConversionByDepartmentService` đọc `referenceTo` TRÊN CHÍNH document PROPOSAL —
+>   field này (theo đúng comment gốc `document.model.ts` "⛓ CHỈ DÙNG CHO REPORT") CHỈ được set ở REPORT
+>   (trỏ ngược về PROPOSAL), PROPOSAL không bao giờ tự có field này → luôn đọc ra rỗng → 0% với MỌI khoa
+>   bất kể dữ liệu. Xác nhận trên DB dev: 190 PROPOSAL/0 có `referenceTo`, 81 REPORT đều có `referenceTo`
+>   trỏ tới 81 PROPOSAL khác nhau — **thực tế đã có 81/190 (42.6%) đề xuất chuyển đổi thành báo cáo**. Sửa
+>   bằng `$lookup` join ĐÚNG HƯỚNG (mirror cách `countReportsByProposal` đã làm đúng ở module Document).
+>   Trước đây KHÔNG có test nào che hàm này (đúng loại bug mock `Document.aggregate()` không phát hiện
+>   được) — đã viết E2E MỚI `dashboard-proposal-conversion.e2e-test.ts` (HTTP + MongoDB thật, KHÔNG mock):
+>   3 test (50% đúng dữ liệu, 0% đúng nghĩa phân biệt bug cũ, report xoá mềm không tính). Đối chiếu thủ công
+>   trực tiếp trên DB dev xác nhận tổng converted = 81 khớp. `jest` 469 (không đổi)/**`test:e2e` 7 suite/44
+>   test PASS** (+3)/build PASS. **Frontend KHÔNG cần đổi code** — widget chỉ hiển thị thẳng
+>   `conversionRate` từ API, không tự tính lại.
+> - **[CẬP NHẬT 2026-09-25, `FE-32.md`]** User gửi ảnh Sidebar (icon toàn xám đơn sắc), yêu cầu thêm màu
+>   cho icon từng module — hỏi trước 2 câu (AskUserQuestion): tô theo NHÓM (~5 nhóm, user chọn) hay theo
+>   TỪNG mục riêng (~15, không chọn); dùng lại token trạng thái có sẵn hay tạo bảng màu MỚI riêng (user
+>   chọn tạo MỚI). Dùng skill `dataviz` để chọn màu có kiểm chứng (không chọn bằng mắt): thử dải hue
+>   xanh dương→hồng hẹp trước — FAIL (CVD ΔE chỉ 2.0, quá gần nhau); chuyển sang dùng 5 slot ĐẦU của bảng
+>   categorical mặc định đã validate sẵn của skill (blue/orange/aqua/yellow/magenta, giữ nguyên thứ tự
+>   liền kề đã chứng minh an toàn), chạy `validate_palette.js` với ĐÚNG surface `--sidebar` của project
+>   (quy đổi OKLCH→hex: light `#fbfcfd`/dark `#090e14`) — 3/5 màu light-mode dưới 3:1 contrast, đã hạ `L`
+>   riêng 3 màu đó (giữ nguyên hue/chroma) tới khi PASS toàn bộ 5 check cả 2 mode. Thêm 5 token
+>   `--module-overview/documents/assets/vendors/admin` (`index.css`), field `moduleColor` mới trên
+>   `NavItem` (`navigation.ts`, gán theo nhóm liền kề), `Sidebar.tsx` dùng bảng tra cứu class literal
+>   (KHÔNG ghép chuỗi — Tailwind v4 quét class tĩnh, ghép chuỗi sẽ không sinh CSS). Chỉ icon đổi màu, text
+>   label giữ nguyên (dataviz skill: "text wears text tokens, never series color"), không đổi hover/active
+>   pill cũ. `tsc`/`oxlint` (baseline 4, không tăng)/`vitest` 32/32/`build` PASS, **Playwright a11y+visual
+>   16/16 PASS** (không có unit test Sidebar riêng — thuần CSS/JSX). Spot-check UI thật bằng Playwright tạm
+>   (đã xoá): 5 màu nhóm khác nhau hoàn toàn, 2 mục cùng nhóm "Tài liệu" cùng màu, dark mode đổi đúng giá
+>   trị riêng, ảnh chụp xác nhận rõ ràng — không đổi RBAC/API/DB.
+> - **[CẬP NHẬT 2026-09-25, `FE-33.md`]** Follow-up ngay sau FE-32 — user gửi ảnh nhóm "Quản trị hệ
+>   thống" (đang magenta), yêu cầu trực tiếp đổi sang xanh lá cho đẹp hơn. Dùng ĐÚNG hex slot "green"
+>   (`#008300`) của bảng categorical mặc định `dataviz` skill (không tự pha), re-run
+>   `validate_palette.js` với 4 màu module FE-32 còn lại trên đúng surface `--sidebar` — PASS cả 2 mode
+>   (1 cặp green/vendors-gold rơi mép dưới dải WARN chấp nhận được nhờ luôn có label chữ đi kèm). Cách
+>   `--success` (H155) ~13° để không đọc nhầm 2 ngữ cảnh. Chỉ đổi giá trị `--module-admin` ở `index.css`
+>   (2 mode), không đổi cấu trúc FE-32. `tsc`/`oxlint` (baseline 4)/`vitest` 32/32/`build` PASS, spot-check
+>   Playwright tạm xác nhận cả 9 mục nhóm đổi đúng màu, nhóm cạnh bên không bị ảnh hưởng.
+> - **[CẬP NHẬT 2026-09-25, `FE-34.md`]** User gửi ảnh trang System Design, yêu cầu panel "Lọc theo
+>   module"/"Chú giải" thu gọn được + kéo-thả được. KHÔNG thêm dependency mới — tự viết bằng Pointer
+>   Events thuần (`package.json` chưa có thư viện drag nào). Component dùng chung mới
+>   `DraggableCollapsiblePanel.tsx` (`features/systemDesign/components/`): nút thu gọn mirror pattern
+>   accordion đã có ở `Sidebar.tsx` (FE-21); kéo-thả qua tay cầm riêng (icon `GripVertical` + tiêu đề,
+>   TÁCH khỏi vùng nút để không nuốt click), cộng `transform: translate()` lên vị trí gốc do
+>   `<Panel position="top-left|top-right">` của xyflow đặt, có CLAMP theo biên khung `.react-flow` để
+>   không kéo mất hẳn panel ra ngoài. `ModuleFilterPanel.tsx`/`SystemDesignLegend.tsx` bọc nội dung cũ
+>   trong wrapper này, giữ nguyên toàn bộ logic filter. CỐ Ý không lưu vị trí qua localStorage (chưa được
+>   yêu cầu). `tsc`/`oxlint` (baseline 4)/`vitest` 32/32/`build`/Playwright a11y+visual 16/16 PASS
+>   (trang System Design không thuộc bộ này, không có rủi ro hồi quy chéo). Spot-check Playwright tạm xác
+>   nhận: thu gọn ẩn đúng nội dung, kéo panel dịch chuyển thật ~420px, không vỡ layout.
+> - **[CẬP NHẬT 2026-09-26, `DEV-086.md`]** User gửi ảnh trang "Khoa/Phòng" (chỉ Sửa/Xoá từng dòng), yêu
+>   cầu thêm xoá mềm + khôi phục + xoá nhiều, kèm chỉ định rõ "có thắc mắc thì hỏi, không tự ý làm". Khảo
+>   sát source: Department trước đây hard-delete, KHÔNG có `isActive`. Project có 2 convention xoá mềm
+>   khác nhau (AssetCategory: đầy đủ `isActive`+`deletedAt`+`deletedBy`, khôi phục dùng lại `*_UPDATE`;
+>   User/Contract: `isActive`-only, quyền `*_RESTORE` riêng) — hỏi 4 câu trước khi code: user chọn kiểu
+>   ĐẦY ĐỦ như AssetCategory + quyền RIÊNG `DEPARTMENT_RESTORE` (khác AssetCategory) + GIỮ NGUYÊN 3 điều
+>   kiện chặn xoá cũ (còn user/document/asset) + KHÔNG làm xoá vĩnh viễn (ngoài phạm vi yêu cầu). Backend:
+>   `deleteDepartmentService` đổi `deleteOne` → soft-delete (3 guard giữ nguyên), thêm
+>   `restoreDepartmentService`/`bulkDeleteDepartmentService`/`bulkRestoreDepartmentService` (tái dùng
+>   `runBulkDelete`), `getAllDepartmentsService`/`getDepartmentByIdService`/`updateDepartmentService` lọc
+>   `isActive`; route mới `POST bulk-delete`/`POST bulk-restore`/`PATCH :id/restore` + permission mới
+>   `DEPARTMENT_RESTORE` (gán role IT). **CLAUDE.md §18**: E2E MỚI `department-soft-delete.e2e-test.ts`
+>   9 test (401/403 thật trên 3 route mới, xoá mềm/khôi phục/vẫn-chặn-khi-còn-refs/bulk). Đã SEED THẬT
+>   permission mới vào DB dev (script tạm `backend/scripts/_tmp-*.ts`, đã xoá — qua đúng flow
+>   `assignPermissionsToRoleService`, cộng thêm không ghi đè, IT 46→47 permission — cùng bài học DEV-068/
+>   077 "permission mới không tự có trong DB"). Frontend: `DepartmentsListPage.tsx` mirror ĐÚNG cấu trúc
+>   `AssetCategoriesListPage.tsx` (bộ lọc Hiển thị, `useRowSelection`+`BatchActionBar`, row action đổi
+>   Sửa+Xoá ↔ Khôi phục theo `isActive`). Phát hiện phụ NGOÀI PHẠM VI (đã ghi nhận, KHÔNG sửa — CLAUDE.md
+>   §26): 2 nơi import Excel (Document/Asset) gán Department cho bản ghi mới KHÔNG lọc `isActive`, xem
+>   DEV-086.md Mục 2/6. `jest` 46 suite/473 test PASS (+4, gồm sửa 1 test `systemDesign.service.test.ts`
+>   dùng Department làm ví dụ "0 ObjectId ref" — nay Department có `deletedBy` thật nên đổi mẫu sang
+>   `Counter`). `test:e2e` 8 suite/53 test PASS (+9). FE `tsc`/`oxlint` (baseline 4)/`vitest` 32/32/`build`/
+>   Playwright a11y+visual 16/16 PASS. Spot-check UI thật bằng Playwright tạm (đã xoá) xác nhận đầy đủ.
+> - **[SỬA NGAY SAU ĐÓ, cùng ngày, DEV-086.md Mục 7]** User báo trang "Khoa/Phòng" trống trơn ngay sau khi
+>   nhận báo cáo DONE — **BUG THẬT do task trên gây ra**: Mongoose `default: true` của `isActive` mới thêm
+>   chỉ áp dụng khi TẠO document MỚI, 29 khoa/phòng đã có TỪ TRƯỚC hoàn toàn thiếu field này trong DB (xác
+>   nhận trực tiếp) — filter mặc định `{isActive: true}` của `getAllDepartmentsService` không khớp field
+>   không tồn tại nên toàn bộ 29 khoa biến mất khỏi danh sách. Nguyên nhân gốc: task trên KHÔNG viết
+>   migration backfill cho dữ liệu cũ (khác DEV-080/AssetCategory ĐÃ có `migrate-asset-category-tree.ts`
+>   cho đúng loại thay đổi này), và bước Verify chỉ test bằng dữ liệu MỚI tạo qua Playwright (luôn "vô tình
+>   đúng" vì default áp dụng đúng lúc tạo) — không test lại trên dữ liệu THẬT đã tồn tại. Fix: script MỚI
+>   `backend/scripts/migrate-department-isActive-backfill.ts` (dry-run mặc định/`--apply`, cùng convention
+>   migration cũ), đã chạy `--apply` trên DB dev — 29/29 khoa cập nhật `isActive: true` thành công, verify
+>   lại dry-run → 0 khoa còn thiếu field, gọi trực tiếp `getAllDepartmentsService` → đúng `total: 29`. Bài
+>   học đã ghi vào DEV-086.md Mục 7: field mới có default trên schema đã có dữ liệu PHẢI kèm migration
+>   backfill CHẠY THẬT trong cùng task, không chỉ dựa Mongoose default; verify PHẢI thử trên dữ liệu thật
+>   đã có sẵn, không chỉ dữ liệu tự tạo lúc test.
+> - **[CẬP NHẬT 2026-09-27, `FE-35.md`]** `BatchActionBar` ở 8 trang chỉ hiện hành động áp dụng được theo
+>   DÒNG ĐANG CHỌN (user chốt qua AskUserQuestion): dòng đang hoạt động → Xoá, dòng đã ẩn → Khôi phục; mỗi
+>   mutation chỉ gửi đúng nhóm id. Helper mới `utils/splitSelectionByActive.ts` (+4 test). tsc/oxlint (4)/
+>   vitest 36/36/build/Playwright 16/16 PASS + spot-check UI thật. **Phát hiện chưa sửa, chờ user**: bộ lọc
+>   "Tất cả" ở cả 8 trang thực chất = "Đang hoạt động" (backend coi thiếu `isActive` = `true`) — xem FE-35.md Mục 4.
+> - **[CẬP NHẬT 2026-09-27, `DEV-087.md`]** Hợp đồng bảo trì: thêm huỷ hàng loạt ("xoá nhiều" — Contract
+>   không có xoá, chỉ có huỷ) + khôi phục hàng loạt. Route mới `POST /contracts/bulk-cancel` (CONTRACT_UPDATE)
+>   / `bulk-restore` (CONTRACT_RESTORE, đã có trong DB) — không field/permission mới nên không migration/seed.
+>   E2E mới 5 test (401/403 thật). `BatchActionBar` thêm prop `deleteLabel`. Backend jest 473/e2e 58 PASS, FE
+>   tsc/oxlint(4)/vitest 36/build/Playwright 16/16 PASS + spot-check UI thật. Câu hỏi FE-35 về bộ lọc "Tất cả"
+>   (8 trang khác) vẫn đang chờ user trả lời.
+> - **[CẬP NHẬT 2026-09-27, `FE-36.md`]** Trang Phân quyền: kéo thả (chuột/cảm ứng/phím mũi tên) sắp xếp các
+>   nhóm quyền trong `RolePermissionMatrix`, thứ tự lưu trình duyệt (`uiStore.permissionGroupOrder`, dùng chung
+>   mọi role), nút "Đặt lại thứ tự" về A→Z. Chỉ frontend. Sửa lỗi mất pointer capture khi React di chuyển node
+>   (nghe trên `window`). tsc/oxlint(4)/vitest 43/build/Playwright 16/16 PASS + spot-check 6 kịch bản UI thật.
+> - **[CHỐT 2026-09-27]** Câu hỏi FE-35 về bộ lọc "Tất cả" (8 trang thực chất = "Đang hoạt động"): user trả
+>   lời **KHÔNG cần sửa** — giữ nguyên hiện trạng, không hỏi lại.
+> - **[CẬP NHẬT 2026-09-28, `FE-37.md` + `DEV-088.md`]** Dashboard: tab nhớ qua URL `?tab=`, biểu đồ cột
+>   focus được (bàn phím/chạm) + trạng thái rỗng + tooltip hết bị cắt, skeleton khi tải, số KPI định dạng
+>   vi-VN, hỗ trợ "giảm chuyển động" TOÀN app (`index.css`); hiệu ứng cột mọc + số đếm tăng, nút "Làm mới"
+>   + giờ cập nhật (lưu ý backend cache 30s), số cảnh báo trên tab, thẻ KPI bấm được → danh sách lọc sẵn.
+>   `DocumentsListPage` đọc `?category=`/`?department=` + ô lọc Khoa/Phòng mở cho người có
+>   `DOCUMENT_VIEW_ALL_DEPARTMENTS` (user chốt). DEV-088: KPI "Khoa/Phòng" không đếm khoa đã xoá mềm (bỏ sót
+>   từ DEV-086). BE jest 473/e2e 59/build PASS; FE tsc/oxlint(4)/vitest 46/build/Playwright 16/16 PASS +
+>   spot-check UI thật. Chưa verify UI thật với tài khoản IT (môi trường test chỉ có ADMIN).
+> - **[CẬP NHẬT 2026-09-28] User chốt KHÔNG làm auto-refresh/real-time** (đã giải thích hiện trạng staleTime 0 +
+>   refetch khi mở trang/quay lại tab + chuông 30s) — không đề xuất lại trừ khi user báo trang cụ thể.
+> - **[CẬP NHẬT 2026-09-28, `FE-38.md`]** Cấp phát/Luân chuyển tài sản: ô "Gán cho người dùng" trống vì chỉ
+>   liệt kê user CÙNG khoa (khoa Châm cứu có 0 user — 11 tài khoản/29 khoa). Nay 2 nhóm "Thuộc khoa đã
+>   chọn"/"Khoa khác" + gợi ý khi khoa trống (component mới `AssigneeOptions`). FE tsc/oxlint(4)/vitest 49/
+>   build PASS + spot-check UI thật. **Chờ user quyết**: 11 khoa mang tên thiết bị (tạo nhầm qua "Đồng bộ
+>   khoa/phòng từ Excel" ngày 21/9, 0 dữ liệu trỏ tới) — xem FE-38.md Mục 4.
+> - **[CẬP NHẬT 2026-09-28, `DEV-089.md`]** "Đồng bộ khoa/phòng từ Excel" viết lại: bắt buộc cột tiêu đề
+>   "Khoa"/"Khoa/Phòng" ở dòng 1 (vị trí bất kỳ), `?dryRun=true` xem trước, tạo thật kèm `names` (chỉ khoa đã
+>   tick); phân loại mới/đã có/đang ẩn/trùng mã. Modal 3 bước. BE jest 473/e2e 65 (+6)/build PASS; FE
+>   tsc/oxlint(4)/vitest 49/build/Playwright 16/16 + spot-check UI thật. 11 khoa lạ trên DB dev VẪN CÒN (chờ user).
+> - **[CẬP NHẬT 2026-09-29, `docs/31_BACKEND_CODE_REVIEW.md`]** Review toàn bộ backend (chỉ báo cáo, CHƯA sửa):
+>   3 HIGH (BR-01 `/auths/register` public, BR-02 `submitWorkflow` không kiểm tra gì, BR-03 tạo tài liệu tin
+>   `department` từ client), 8 MEDIUM (audit ADMIN bypass = 90,6% bảng audit, cache không dọn, khoa xoá mềm
+>   nhận dữ liệu ở 10 chỗ, thiếu index `WorkflowInstance.documentId`, thiếu `trust proxy`, múi giờ UTC, 14 lỗ
+>   hổng npm, xoá theo tháng), 11 LOW + 3 câu hỏi nghiệp vụ. Đã xác minh ~30 phát hiện cũ (REVIEW-00→16) ĐÃ
+>   SỬA nhưng `CODE_REVIEW_SUMMARY.md` chưa cập nhật. **Next:** chờ user chọn hạng mục cần sửa.
+> - **[CẬP NHẬT 2026-09-29, `DEV-090.md`]** BR-01 ĐÃ SỬA: `/auths/register` mặc định tắt (404), bật bằng ENV
+>   `ALLOW_SELF_REGISTER=true` (user chọn cách này, không xoá route). BE jest 473/e2e 69 (+4)/build PASS.
+>   **Next:** chờ user chọn hạng mục tiếp theo; đề xuất BR-02 (`submitWorkflow`) rồi BR-03.
+> - **[CẬP NHẬT 2026-09-29, `DEV-091.md`]** BR-02 ĐÃ SỬA: `submitWorkflow` kiểm tra tài liệu tồn tại/còn hoạt
+>   động (404), cùng khoa hoặc Admin (403, user không có khoa cũng bị chặn), workflow gần nhất phải là
+>   rejected/cancelled hoặc chưa có (400, kiểm tra trong transaction). Không giới hạn loại tài liệu (user chọn).
+>   BE jest 473/e2e 79 (+10)/build PASS.
+> - **[CẬP NHẬT 2026-09-29, `FE-39.md`]** Nút "Submit vào workflow" chỉ hiện cho người cùng khoa hoặc Admin (ẩn với IT
+>   xem tài liệu khoa khác). FE tsc/oxlint(4)/vitest 49/build PASS, Playwright 16/16 + spec tạm 3/3.
+>   **Next:** chờ user chọn; đề xuất BR-03 (tạo tài liệu tin `department` do client gửi).
+> - **[CẬP NHẬT 2026-09-29, `DEV-092.md` + `FE-40.md`]** BR-03 ĐÃ SỬA: tạo tài liệu chỉ vào khoa của mình; khoa khác
+>   cần ADMIN hoặc permission MỚI `DOCUMENT_CREATE_ALL_DEPARTMENTS` (user chọn). Đã seed vào catalog DB dev + gán
+>   ADMIN (116→117); CHƯA gán role nào khác (user tự gán qua UI nếu cần). Sửa kèm lỗi body ghi đè `userId`. FE: ô Khoa
+>   chỉ mở cho ADMIN/quyền mới. BE jest 477/e2e 86/build PASS; FE tsc/oxlint(4)/vitest 49/build/Playwright 16/16.
+>   Cả 3 HIGH (BR-01→03) đã xong. **Next:** chờ user chọn; đề xuất BR-04 (audit ADMIN bypass) → BR-05 → BR-07 → BR-08.
+> - **[CẬP NHẬT 2026-09-29, `DEV-093.md`]** BR-04 ĐÃ SỬA: audit ADMIN bypass chỉ ghi (`ADMIN_BYPASS`) khi quyền hiệu
+>   lực của Admin không đủ (fire-and-forget, không chặn request). Migration MỚI
+>   `backend/scripts/migrate-admin-bypass-audit-action.ts` đã chạy `--apply` trên DB dev: 9.829 bản ghi đổi nhãn
+>   `AUDIT_DASHBOARD_VIEW`→`ADMIN_BYPASS` (môi trường khác cần chạy lại). BE jest 482/e2e 88/build PASS. FE không đổi.
+>   **Next:** chờ user chọn; đề xuất BR-05 (cache không dọn + `limit` tuỳ ý) → BR-07 → BR-08.
+> - **[CẬP NHẬT 2026-09-29, `DEV-094.md`]** BR-05 ĐÃ SỬA: `memoryCache` trần 500 mục (dọn hết hạn trước, rồi bỏ mục cũ
+>   nhất, không timer); 3 endpoint dashboard (warranty-expiring/maintenance-overdue/overdue-approvals) dùng
+>   `parsePaginationQuery` (max 100), khoá cache chỉ từ tham số đã parse. BE jest 486/e2e 97/build PASS. FE không đổi.
+>   **Next:** chờ user chọn; đề xuất BR-07 (index `WorkflowInstance.documentId`) → BR-08 (`trust proxy`) → BR-06.
+> - **[CẬP NHẬT 2026-09-29, `DEV-095.md`]** BR-07 ĐÃ SỬA: index `{documentId:1, createdAt:-1}` cho `WorkflowInstance`
+>   (autoIndex đã tạo trên DB dev, `explain` xác nhận IXSCAN). Nếu production tắt `autoIndex` thì phải tạo tay.
+>   BE jest 488/e2e 97/build PASS. **Next:** chờ user chọn; đề xuất BR-08 (`trust proxy`) → BR-06 (khoa xoá mềm).
+> - **[CẬP NHẬT 2026-09-29, `DEV-096.md`]** BR-08 ĐÃ SỬA: `app.set("trust proxy", parseTrustProxy(TRUST_PROXY))` —
+>   ENV số lớp proxy, mặc định tắt, `true` bị từ chối lúc khởi động. Deploy plan đã ghi `TRUST_PROXY=2` + Nginx
+>   `X-Forwarded-For`. BE jest 503/e2e 101/build PASS. Chưa verify trên proxy thật (dev không có).
+>   **Next:** chờ user chọn; còn MEDIUM: BR-06 (khoa xoá mềm nhận dữ liệu), BR-09 (múi giờ), BR-10 (npm audit), BR-11.
+> - **[CẬP NHẬT 2026-09-29, `DEV-097.md`]** BR-09 ĐÃ SỬA: (A) 6 aggregation `$month/$year/$dateToString` thêm
+>   `timezone: Asia/Ho_Chi_Minh`; (B) `src/config/timezone.ts` ép `process.env.TZ` giờ VN, import ĐẦU TIÊN ở
+>   `server.ts` (+ jest configs + startPlaywrightServer); (C, phát hiện thêm, user đồng ý) helper
+>   `parseDateRangeBound` — lọc "Từ/Đến ngày" `YYYY-MM-DD` trọn ngày giờ VN ở 8 chỗ. BE jest 511/e2e 107/build PASS,
+>   Playwright 16/16. **Next:** chờ user chọn; còn MEDIUM: BR-06 (khoa xoá mềm nhận dữ liệu), BR-10 (npm audit), BR-11.
+> - **[CẬP NHẬT 2026-09-29, `DEV-098.md`]** BR-11 ĐÃ SỬA: xoá theo tháng bỏ qua tài liệu có workflow chờ duyệt THẬT
+>   (`PENDING_WORKFLOW_FILTER` = pending + có `workflowInstanceId`), ghi 1 dòng audit tổng hợp (cùng transaction), dò
+>   biên bản bằng 1 `distinct` (hết N+1). Sửa kèm: xoá từng cái trước đây chặn nhầm MỌI tài liệu chưa gửi duyệt
+>   (`workflowStatus` default "pending"). FE: toast/mô tả modal. BE jest 514/e2e 111/build; FE tsc/oxlint(4)/vitest
+>   49/build PASS. **Next:** chờ user chọn; còn MEDIUM: BR-06 (khoa xoá mềm nhận dữ liệu), BR-10 (npm audit).
+> - **[CẬP NHẬT 2026-09-30, `DEV-099.md`]** BR-10 ĐÃ SỬA: `npm audit fix` và nâng mức tối thiểu (mongoose 9.10.3/driver
+>   7.6, multer 2.4, nodemailer 9.1.1, express-rate-limit 8.7, morgan 1.12.1), gỡ `@tailwindcss/vite`. Audit từ 14 (8 high)
+>   xuống 3 moderate, user chấp nhận (uuid qua exceljs; nodemailer ×2 cần 10.x). Hậu quả của việc nâng driver:
+>   - 23+1 lỗi kiểu (filter chặt hơn), đã sửa chỉ ở tầng kiểu;
+>   - **lỗi thật**: xoá theo tháng (DEV-098) chạy `Promise.all` trong transaction, trả 500; đã đổi sang tuần tự;
+>   - e2e jest cần `runtimeAdapters: { os }` ở `setup.ts`.
+>   BE tsc 0 / jest 514 / e2e 111 / build PASS, Playwright 16/16. **Next:** chờ user chọn; MEDIUM còn lại duy nhất: BR-06
+>   (khoa xoá mềm nhận dữ liệu), sau đó là nhóm LOW BR-12→BR-22.
+> - **[CẬP NHẬT 2026-09-30] Audit CLAUDE.md/SKILL.md** (user yêu cầu, theo cảnh báo đầu CLAUDE.md): mốc rà soát dời lên
+>   DEV-099 / FE-40. Đã bổ sung:
+>   - §4 / SKILL §3: DEV-001A plan, `changes/` và `decisions/` (rỗng), `frontend/phases/`, và `PRODUCTION_DEPLOYMENT_PLAN` trong SKILL;
+>   - §9: hậu tố `DEV-001A` / `DEV-009A`;
+>   - §36: 12 domain / 32 model thật.
+>   Phát hiện nhưng user CHƯA chọn sửa:
+>   - `00_DEVELOPMENT_ROADMAP.md` dừng ở DEV-025, dù §4 vẫn gọi là "nguồn sự thật";
+>   - `00_PROJECT_MEMORY.md` dừng ở DEV-071 và ghi 31 model (thực tế 32);
+>   - `FRONTEND_MEMORY.md` dừng ở FE-26;
+>   - `FEATURE_DEVELOPMENT_ROADMAP.md` nhắc tới `ROADMAP_TOI_GO_LIVE.md`, file này không tồn tại.
+>   **Next:** chờ user chọn (BR-06 hoặc các mục trên).
+> - **[CẬP NHẬT 2026-09-30] Đã sửa 4 chỗ lệch trên** (user yêu cầu):
+>   - `00_DEVELOPMENT_ROADMAP.md`: thêm banner LỊCH SỬ; sửa mô tả tương ứng ở CLAUDE.md §4/§37 và SKILL §3.
+>   - `00_PROJECT_MEMORY.md`: 32 model; ghi chú frontend đã tồn tại; sửa dòng "B5-B7/C chưa làm"; thêm "Chỉ mục task DEV-037 → DEV-099".
+>   - `FRONTEND_MEMORY.md`: §1 đánh dấu ảnh chụp cũ; thêm FE-27 → 40 vào §11.
+>   - `FEATURE_DEVELOPMENT_ROADMAP.md`: ghi chú `ROADMAP_TOI_GO_LIVE.md` chưa từng tồn tại, kèm tình trạng các nhóm.
+>   **Next:** BR-06 (MEDIUM cuối cùng), chờ user xác nhận.
+> - **[CẬP NHẬT 2026-09-30, `DEV-100.md`]** BR-06 ĐÃ SỬA: khoa đã xoá mềm không nhận dữ liệu mới.
+>   - 10 chỗ trả 400 "đã bị xoá"; import Excel báo lỗi theo dòng; sửa user chỉ chặn khi đổi khoa.
+>   - Sửa thêm (user duyệt): không xoá được khoa còn vật tư đang hoạt động hoặc dự trù PENDING; chặn khôi phục user và vật tư vào khoa đã xoá.
+>   - Helper chung ở `departmentLookup.helper.ts`.
+>   - BE tsc 0 / jest 518 / e2e 123 / build PASS, Playwright 16/16.
+>   **Hết mục MEDIUM trong review backend.** **Next:** chờ user chọn; còn nhóm LOW BR-12 → BR-22 và 3 câu hỏi nghiệp vụ Q1 → Q3.
+> - **[CẬP NHẬT 2026-09-30, `DEV-101.md`]** BR-12 ĐÃ SỬA: escape regex ở `getList` (keyword) và `listAllSessions` (search)
+>   trong `users.service.ts`. E2E mới 5 test (đã kiểm chứng: gỡ phần sửa thì 3 test fail). BE tsc 0 / jest 518 / e2e 128 / build PASS.
+>   **Next:** thứ tự LOW user đã xem: BR-14 (OTP atomic) → BR-15 → BR-18 → BR-16 → BR-17 → BR-20 → BR-21 → BR-22 → BR-13 → BR-19;
+>   chờ user chỉ định mục tiếp theo.
+> - **[CẬP NHẬT 2026-09-30, `DEV-102.md`]** BR-14 ĐÃ SỬA: `checkOtpAtomically` trong `auths.service.ts` (giành lượt thử `$inc` + giành quyền dùng mã `used:false→true`),
+>   dùng ở `verifyLoginOtp` và `confirmEnableTwoFactor`. Sửa kèm lỗi 1 mã dùng nhiều lần (user duyệt). E2E mới 4 test gửi 20 request song song thật
+>   (đã kiểm chứng: khôi phục logic cũ thì 3/4 fail). BE tsc 0 / jest 520 / e2e 132 / build PASS.
+>   **⚠️ Chưa giải quyết:** 1 lần chạy `npx jest` đầu tiên có 1 test fail trong `auths.service.test.ts`, không tái hiện được sau 10 lần chạy lại
+>   (chi tiết + giả thuyết chưa xác minh ở DEV-102 Mục 5). Nếu gặp lại, bắt đủ log của test fail.
+>   **Next:** BR-15 (giới hạn số file upload), chờ user xác nhận.
+> - **[CẬP NHẬT 2026-09-30, `DEV-103.md` + `FE-41.md`]** BR-15 ĐÃ SỬA phần số file: `createUploader` đặt `limits.files = 10` (`MAX_FILES_PER_REQUEST`), vượt → 400
+>   `MULTER_LIMIT_FILE_COUNT`, multer tự xoá file dở. FE: `FileUpload` thêm prop `maxFiles`, `FilesListPage` báo lỗi ngay khi chọn quá 10. Kiểm tra nội dung file
+>   (magic bytes) user chọn CHƯA làm. E2E mới 5 test (đã kiểm chứng: gỡ giới hạn thì test 11 file fail). BE tsc 0 / jest 520 / e2e 137 / build PASS;
+>   FE tsc 0 / oxlint 4 / vitest 49 / build PASS; Playwright 16/16. **Chưa tự kiểm tra trực quan** modal "Tải file lên" trên trình duyệt.
+>   **Next:** BR-18 (tắt/giới hạn `/api-docs` Swagger ở production), chờ user xác nhận.
+> - **[CẬP NHẬT 2026-09-30, `DEV-104.md`]** BR-18 ĐÃ SỬA: `/api-docs` mặc định TẮT (404); bật khi `NODE_ENV=development` hoặc `ENABLE_API_DOCS=true`
+>   (`isApiDocsEnabled` trong `config/swagger/swagger.ts`, fail-closed khi thiếu cấu hình). Máy dev đang `NODE_ENV=development` nên không đổi.
+>   `.env.example`, README, deploy plan (Giai đoạn 3) đã cập nhật. Unit 17 test + E2E 3 test trên app thật (đã kiểm chứng cả 2 hướng lỗi).
+>   BE tsc 0 / jest 537 / e2e 140 / build PASS, Playwright 16/16.
+>   **Next:** BR-16 (xoá vĩnh viễn tài sản không kiểm tra tham chiếu), cần user chốt chặn hay cho xoá — chờ user xác nhận.
+> - **[CẬP NHẬT 2026-09-30, `DEV-105.md`]** BR-17 ĐÃ SỬA: `buildMapFromReports(subType, proposalIds)` (tham số bắt buộc) chỉ nạp biên bản tham chiếu tới
+>   đúng các đề xuất được xuất (`referenceTo: {$in}`) thay vì mọi biên bản của hệ thống; `exportDocumentsExcelPRO` lấy `_id` đề xuất theo cùng `filter` trước.
+>   Kết quả file xuất không đổi. Unit 4 test + E2E 6 test đọc lại file .xlsx thật (đã kiểm chứng: logic cũ thì 2 test fail). Chưa đo benchmark thời gian/bộ nhớ.
+>   BE tsc 0 / jest 541 / e2e 146 / build PASS.
+>   **Next:** BR-20 (giảm truy vấn ở `authenticate` + nhiễu log), chờ user xác nhận; hoặc BR-16 nếu user muốn chốt nghiệp vụ xoá tài sản.
+> - **[CẬP NHẬT 2026-09-30, `DEV-106.md`]** BR-20 ĐÃ SỬA: `authenticate` dùng 1 `User.aggregate` + `$lookup` (giữ đúng hình dạng `req.user`, `isSystemRole` mặc định false) thay cho
+>   findById + populate; không `console.error` với lỗi xác thực bình thường (ApiError, JsonWebTokenError), vẫn log lỗi DB và thiếu `JWT_SECRET`. Unit 11 + E2E 9 test
+>   (đã kiểm chứng; lần đầu e2e của tôi không bắt được thiếu `isSystemRole`, đã thêm ca phân biệt). BE tsc 0 / jest 552 / e2e 155 / build PASS, Playwright 16/16. Chưa benchmark.
+>   Ghi nhận: lỗi DB vẫn trả 401 (hành vi cũ, DEV-106 Mục 4).
+>   **Next:** BR-21 (System Design đọc đồng bộ ~130 file mỗi request), hoặc BR-22, BR-16, BR-13, BR-19 — chờ user chọn.
+> - **[CẬP NHẬT 2026-09-30, `DEV-107.md`]** BR-21 ĐÃ SỬA: `buildRelatedDocsMap` cache KẾT QUẢ CUỐI 60 giây (user chọn), qua `getOrSetCacheSync` mới ở `memoryCache.ts`.
+>   Đo: ~40ms mỗi request (chặn server) → ~0,2ms; lần đầu mỗi phút ~75ms. Bài học: cache riêng nội dung file chỉ giảm ~40→18ms vì phần dò chuỗi cũng tốn ~17ms.
+>   Đánh đổi: file task mới có thể chậm tối đa 60 giây mới hiện trên trang System Design. Unit +10, E2E 3 (đã kiểm chứng). BE tsc 0 / jest 562 / e2e 158 / build PASS, Playwright 16/16.
+>   **Next:** BR-22 (upload controller dùng catchAsync/ApiError), hoặc BR-16, BR-13, BR-19 — chờ user chọn.
+> - **[CẬP NHẬT 2026-09-30, `DEV-108.md`]** BR-22 ĐÃ SỬA: 5 handler của `upload.controller.ts` bọc `catchAsync` + `ApiError`; lỗi giờ `{success:false, message, errorCode}` (trước `{message}`).
+>   User chọn: upload không kèm file → 400 "Vui lòng chọn ít nhất 1 file để tải lên" (trước 500); sửa typo "Không timg thấy file" + thống nhất tiếng Việt ("File not found" → "Không tìm thấy file", "File deleted" → "Đã xoá file").
+>   Route/permission/response thành công không đổi; OpenAPI nhóm `/api/upload*` dùng `ErrorResponse`. E2E +20 (chạy trên code cũ: 11 fail; sau sửa: pass). BE tsc 0 / jest 562 / e2e 178 / build PASS, Playwright 16/16.
+>   Ghi nhận: file mồ côi trên đĩa nếu lưu DB lỗi sau khi multer ghi; `deleteFile` không kiểm `isDeleted` (DEV-108 Mục 6).
+>   **Next:** còn BR-16 (cần user chốt nghiệp vụ xoá tài sản), BR-13, BR-19 (đụng DB, cần duyệt) và câu hỏi Q1–Q3 — chờ user chọn.
+> - **[CẬP NHẬT 2026-09-30, `DEV-109.md`]** BR-19 ĐÃ SỬA: bỏ 3 index thừa khỏi schema (`notifications.recipient`, `apiperformances.createdAt:-1`, `documents.referenceTo`) và
+>   XOÁ 7 index cũ trên **DB dev** (gồm 4 index `useraudits` đã bỏ khỏi schema từ lâu nhưng còn nằm lại trong DB) bằng `scripts/migrate-drop-redundant-indexes.ts` (đích danh theo tên, chỉ xoá khi có index thay thế).
+>   Dữ liệu không đổi; index nhỏ đi ~664KB. E2E +11 (có `explain` chứng minh truy vấn thật vẫn dùng index). BE tsc 0 / jest 562 / e2e 189 / build PASS.
+>   **PRODUCTION CHƯA chạy** — khi deploy phải chạy script (xem trước rồi `--apply`), Mongoose không tự xoá index. `PRODUCTION_DEPLOYMENT_PLAN.md` hiện không liệt kê bước migration nào.
+>   Ghi nhận, chưa xoá theo lựa chọn của user: 5 index 0 lượt dùng (DEV-109 Mục 6).
+>   **Next:** còn BR-13 (TTL/retention, xoá dữ liệu thật — cần chốt thời hạn), BR-16 (cần chốt nghiệp vụ) và Q1–Q3 — chờ user chọn.
+> - **[CẬP NHẬT 2026-09-30, `DEV-110.md`]** BR-13 ĐÃ SỬA MỘT PHẦN: TTL `RefreshToken.expiresAt` (xoá đúng lúc hết hạn) và `Notification.createdAt` (90 ngày) theo lựa chọn của user;
+>   `UserAudit` CỐ Ý CHƯA đặt TTL (log tuân thủ, chờ user chốt yêu cầu lưu trữ). Trên DB dev, server `ts-node-dev` tự restart + `autoIndex` đã tạo 2 index lúc 11:28 UTC nên
+>   `refreshtokens` 527 → 7 (520 token hết hạn bị xoá đúng như đã duyệt); `notifications` vẫn 383. Script `scripts/migrate-ttl-retention-indexes.ts` (đếm/`--apply`) cho production.
+>   E2E +4 (chờ MongoDB xoá thật, đã kiểm chứng gỡ TTL thì fail). BE tsc 0 / jest 562 / e2e 193 / build PASS.
+>   **Production:** `autoIndex: true` bật vô điều kiện ⇒ khởi động bản này sẽ tự tạo TTL và xoá ngay dữ liệu quá hạn (DEV-110 Mục 7); sao lưu nếu cần giữ thông báo cũ.
+>   Ghi nhận: `RefreshToken` vẫn không có index `token`; `UserAudit` chưa có retention.
+>   **[CHỐT 2026-09-30]** `UserAudit`: user chọn KHÔNG đặt TTL, giữ vô hạn (91% collection là `ADMIN_BYPASS`, log thật chỉ ~100–300/tháng; DEV-110 Mục 6). BR-13 đóng hoàn toàn.
+>   **[CHỐT 2026-10-01]** Q1–Q3 (duyệt theo role toàn viện, tài sản/vật tư/Dashboard không lọc theo khoa, `GET /workflow/:id` không lọc khoa): user quyết định GIỮ NGUYÊN, "quy trình sẽ chỉnh sửa sau". Không đổi code; xem `31_BACKEND_CODE_REVIEW.md` Mục 2.
+>   **Next:** chỉ còn BR-16 (cần chốt nghiệp vụ xoá tài sản). Q1–Q3 chờ quy trình mới. Thay đổi DEV-099 → DEV-110 vẫn CHƯA commit — chờ user yêu cầu.
+> - **Next Task**: chưa được user chỉ định cho phiên kế tiếp. Ứng viên còn treo (không bắt buộc): báo cáo
+>   tuân thủ mẫu Bộ Y tế cho thiết bị y tế (cần mẫu cụ thể trước); UI test nhánh CHẶN gán thiết bị cho
+>   user chưa đủ điều kiện (đã test ở tầng service, chưa qua UI thật — cần ≥2 user trong môi trường test);
+>   2 bảng "Theo danh mục"/"Theo khoa/phòng" ở `AssetSummaryWidget` chưa bấm được (xem DEV-083.md Mục 5);
+>   nếu sau này cần duyệt/lọc thiết bị y tế thường xuyên hơn — cân nhắc nâng cấp modal DEV-084 thành trang
+>   riêng (đã có sẵn service/route để tái dùng, xem DEV-084.md Mục 5); vị trí/trạng thái thu gọn 2 panel
+>   System Design (FE-34) chưa lưu qua localStorage — có thể thêm sau nếu user muốn nhớ giữa các lần tải
+>   trang; 2 nơi Excel import (Document/Asset) chưa lọc `isActive` khi gán Department (DEV-086.md Mục 6) —
+>   task nhỏ riêng nếu user muốn đồng bộ. Không còn việc UI nào treo từ chuỗi FE-27→34/DEV-077→DEV-086.
+>   Ứng viên khác theo Roadmap: NHÓM D
+>   (dài hạn) — KHÔNG tự bắt đầu khi chưa có chỉ định rõ (CLAUDE.md §41).
 >
 > Từ đây trở xuống là nội dung TRƯỚC 2026-09-16, giữ nguyên nội dung gốc để tra cứu lịch sử — không tự ý coi là trạng thái hiện tại.
 

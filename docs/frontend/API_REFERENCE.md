@@ -9,7 +9,7 @@
 ## AUTH
 
 ### POST /api/auths/register
-Purpose: Đăng ký tài khoản mới. Auth: public. Body: `{username, email, password≥8, confirmPassword, fullName}`. Response: `{message, data}`. Errors: 400 (trùng username/email, mật khẩu không khớp). Notes: KHÔNG tự động login — điều hướng `/login` sau khi thành công.
+**[2026-09-29, DEV-090/BR-01] Mặc định TẮT: trả 404 nếu ENV backend `ALLOW_SELF_REGISTER` khác `"true"`. Frontend không dùng route này.** Purpose: Đăng ký tài khoản mới. Auth: public. Body: `{username, email, password≥8, confirmPassword, fullName}`. Response: `{message, data}`. Errors: 400 (trùng username/email, mật khẩu không khớp). Notes: KHÔNG tự động login — điều hướng `/login` sau khi thành công.
 
 ### POST /api/auths/login
 Purpose: Đăng nhập. Auth: public (rate-limited). Body: `{username, password≥5}`. Response: `{message, data:{accessToken, refreshToken, user}}`. Errors: 400, 401 (sai mật khẩu/user không tồn tại — message chung, không phân biệt), 429.
@@ -127,7 +127,7 @@ Xem đầy đủ business rule + workflow liên kết ở `DOCUMENT_DOMAIN_MAP.m
 
 | Method | Path | Permission |
 |---|---|---|
-| POST | `/api/documents/proposal` | `DOCUMENT_CREATE` |
+| POST | `/api/documents/proposal` | `DOCUMENT_CREATE`. **[2026-09-29, DEV-092/BR-03]** `department` phải là khoa của người tạo, trừ ADMIN hoặc người có `DOCUMENT_CREATE_ALL_DEPARTMENTS` (403 nếu vi phạm) |
 | GET | `/api/documents` | `DOCUMENT_VIEW` |
 | GET | `/api/documents/:id` | `DOCUMENT_VIEW_DETAIL` |
 | PUT | `/api/documents/:id` | `DOCUMENT_UPDATE` |
@@ -144,7 +144,10 @@ Xem đầy đủ business rule + workflow liên kết ở `DOCUMENT_DOMAIN_MAP.m
 Permission: `WORKFLOW_TEMPLATE_CREATE`. Body: `{name, steps:[{stepOrder,name,role(string tự do)}] min 1, isActive?}`. Notes: `role` là STRING TỰ DO (không phải ref Role, không validate khớp Role thật tồn tại) — form tạo template nên gợi ý chọn từ danh sách Role hiện có nhưng backend không ép buộc khớp.
 
 ### POST /api/workflows/submit
-Permission: `WORKFLOW_SUBMIT`. Body: `{documentId, templateId}`.
+Permission: `WORKFLOW_SUBMIT`. Body: `{documentId, templateId}`. **[2026-09-29, DEV-091/BR-02]** Backend kiểm tra:
+- 404: tài liệu không tồn tại hoặc đã xoá.
+- 403: tài liệu thuộc khoa khác và người gọi không phải Admin (user không có khoa cũng bị 403).
+- 400: workflow gần nhất đang `pending`/`approved`/`completed`. Chỉ gửi duyệt khi chưa có workflow, hoặc workflow gần nhất `rejected`/`cancelled`.
 
 ### GET /api/workflows/pending
 Permission: `WORKFLOW_VIEW`. Query: `page,limit`. Notes: "hộp thư chờ duyệt" — endpoint tần suất cao, đã có index riêng.
@@ -268,12 +271,12 @@ Model field: `{type, title, message, resourceType, resourceId(dynamic ref theo r
 
 | Method | Path | Permission | Ghi chú |
 |---|---|---|---|
-| POST | `/api/upload` | `UPLOAD_FILES` | `multipart/form-data`, field `files` (mảng). MIME whitelist: PDF, JPEG, PNG, `.docx`, `.xlsx`. Max size mặc định 10MB/file |
+| POST | `/api/upload` | `UPLOAD_FILES` | `multipart/form-data`, field `files` (mảng). MIME whitelist: PDF, JPEG, PNG, `.docx`, `.xlsx`. Max size mặc định 10MB/file; **tối đa 10 file/request** (BR-15/DEV-103, vượt → 400 `MULTER_LIMIT_FILE_COUNT`) |
 | GET | `/api/upload` | `VIEW_FILES` | User thường chỉ thấy file MÌNH upload; ADMIN xem tất cả |
 | GET | `/api/upload/:id` | `VIEW_FILE_DETAIL` | 403 nếu không phải chủ file/ADMIN |
 | DELETE | `/api/upload/:id` | `DELETE_FILE` | 403 nếu không phải chủ file/ADMIN |
 
-⚠️ 2 route detail/delete trả lỗi 404/403 KHÔNG qua `error.middleware.ts` chuẩn — xem `ERROR_HANDLING.md` Mục 3.
+Lỗi của nhóm Upload đi qua `error.middleware.ts` chuẩn `{success:false, message, errorCode}` (BR-22/DEV-108; trước đây 404/403 chỉ có `{message}`). `POST` không kèm file → 400 `BAD_REQUEST`. `GET /api/upload/:id/download` (`VIEW_FILE_DETAIL`) tải nội dung file, cùng guard chủ file/ADMIN.
 
 ---
 

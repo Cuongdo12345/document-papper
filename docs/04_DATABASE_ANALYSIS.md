@@ -124,7 +124,7 @@ server.ts
 | `expiresAt` | Date | ✅ | — |
 | `revoked` | Boolean | ❌ | `false` |
 
-**Index: KHÔNG có index nào ngoài `_id` mặc định** — CONFIRMED (không có `.index()` nào trong file, không field nào `unique`/`index: true`). Xem mục 9 (Query Analysis) — đây là 1 risk cụ thể vì `token` được query trực tiếp ở `login`/`refresh`/`logout`.
+**Index** [CẬP NHẬT 2026-09-30 — mô tả gốc "KHÔNG có index nào ngoài `_id`" đã lỗi thời từ DEV-069/070]: `{user:1, revoked:1, createdAt:-1}`, `{revoked:1, expiresAt:1, createdAt:-1}`, và ⏱ TTL `{expiresAt:1}` với `expireAfterSeconds:0` (BR-13/DEV-110 — tự xoá token đúng lúc hết hạn; trước đó 520/526 token hết hạn nằm mãi trong DB). **Vẫn KHÔNG có index trên `token`** dù `refresh()`/`logout()` query theo `token` — user chọn chỉ ghi nhận (TTL giữ collection nhỏ). Xem mục 9.
 
 ### 4.4 `PasswordResetToken` (`models/auth/passwordResetToken.model.ts`)
 
@@ -207,6 +207,7 @@ Không có index bổ sung ngoài unique `code`. Bảng nhỏ theo bản chất 
 - `{department:1, subType:1, createdAt:-1}` (list+filter chính)
 - `{createdBy:1}`
 - `{createdAt:-1}`
+- [CẬP NHẬT 2026-09-30, BR-19/DEV-109] index đơn `{referenceTo:1}` đã bỏ vì là tiền tố của index kép này.
 - `{referenceTo:1, category:1, isActive:1, createdAt:1}` — comment xác nhận index này **từng bị comment out** và mới được bật lại (P3.1) để tránh collection-scan ở `findReportsByProposal`.
 
 **Không có index trên `isActive` hay `deletedAt` riêng lẻ** — trong khi nhiều query lọc `{isActive:true, deletedAt:null}` (vd dashboard aggregate, xem mục 9.2) — **POTENTIAL RISK**.
@@ -332,7 +333,7 @@ Nhật ký **bất biến (append-only)** — comment tự xác nhận chủ đ�
 
 | Field | Type | Required | Default | Ghi chú |
 |---|---|---|---|---|
-| `recipient` | ObjectId 🔗 `User` | ✅ | — | `index:true` field-level |
+| `recipient` | ObjectId 🔗 `User` | ✅ | — | ~~`index:true` field-level~~ — đã bỏ (BR-19/DEV-109), 2 index kép bên dưới đã phủ tiền tố `recipient` |
 | `createdBy` | ObjectId 🔗 `User` | ❌ | — | optional vì có thể do cron tạo |
 | `type` | String enum (`NotificationType`) | ✅ | — | 11 giá trị, mỗi giá trị khớp 1 trigger cụ thể (comment tự liệt kê, không dùng type "chung chung") |
 | `title`, `message` | String | ✅ | — | |
@@ -343,7 +344,7 @@ Nhật ký **bất biến (append-only)** — comment tự xác nhận chủ đ�
 | `channelsSent` | String[] enum | ❌ | `[]` | |
 | `priority` | String enum | ❌ | `NORMAL` | |
 
-**Index**: `{recipient:1, createdAt:-1}`, `{recipient:1, isRead:1, createdAt:-1}` (query chính — 99% traffic theo comment), `{resourceType:1, resourceId:1}`.
+**Index**: `{recipient:1, createdAt:-1}`, `{recipient:1, isRead:1, createdAt:-1}` (query chính — 99% traffic theo comment), `{resourceType:1, resourceId:1}`, và ⏱ TTL `{createdAt:1}` 90 ngày (BR-13/DEV-110, 2026-09-30 — tự xoá thông báo cũ).
 
 ### 4.19 `Upload` (`models/uploadFiles/upload.model.ts`)
 
@@ -367,7 +368,7 @@ Nhật ký **bất biến (append-only)** — comment tự xác nhận chủ đ�
 | `user` | ObjectId 🔗 `User` |
 | `isSlow` | Boolean |
 
-**Index**: `{endpoint:1}`, `{createdAt:-1}`, và ⏱ TTL `{createdAt:1}` với `expireAfterSeconds: 2592000` (30 ngày) — tự động xoá log hiệu năng cũ. Comment tự cảnh báo rủi ro vận hành quan trọng: nếu deploy TTL index này lên collection **đã có sẵn dữ liệu cũ hơn 30 ngày**, MongoDB sẽ xoá NGAY ở lần quét đầu tiên (không đợi đủ 30 ngày nữa) — cần export backup trước nếu cần giữ dữ liệu cũ.
+**Index** [CẬP NHẬT 2026-09-30, BR-19/DEV-109: đã bỏ `{createdAt:-1}` thừa — TTL `{createdAt:1}` phục vụ cả lọc khoảng thời gian lẫn sort]: `{endpoint:1}` và ⏱ TTL `{createdAt:1}` với `expireAfterSeconds: 2592000` (30 ngày) — tự động xoá log hiệu năng cũ. Comment tự cảnh báo rủi ro vận hành quan trọng: nếu deploy TTL index này lên collection **đã có sẵn dữ liệu cũ hơn 30 ngày**, MongoDB sẽ xoá NGAY ở lần quét đầu tiên (không đợi đủ 30 ngày nữa) — cần export backup trước nếu cần giữ dữ liệu cũ.
 Model có 1 khối code phiên bản trước bị comment nguyên (khai 3 field `dbTime/serviceTime/controllerTime` không bao giờ có dữ liệu thật — đã xoá khỏi bản hiện tại, đúng như Phase 03 không ghi nhận field này).
 
 ### 4.21 `ImportHistory` (`models/importAudit/importhistory.model.ts`)
@@ -510,7 +511,7 @@ Roadmap C1 (`DEV-068`, 2026-09-19) — xác thực 2 lớp qua email OTP. Commen
 | `used` | Boolean | ❌ | `false` | |
 | `attempts` | Number | ❌ | `0` | đếm số lần thử sai — KHÔNG có field `maxAttempts`/giới hạn cứng ở tầng schema (validate giới hạn số lần thử là UNKNOWN ở tầng nào — chưa đọc `auths.service.ts`/`twoFactor*.service.ts` ở phase này) |
 
-**Index**: `{expiresAt:1}` với `expireAfterSeconds:0` (⏱ TTL — tự xoá, giống hệt `PasswordResetToken`), `{user:1, createdAt:-1}` (luôn tìm OTP MỚI NHẤT chưa dùng của 1 user — comment nguồn tự xác nhận mục đích). **Khác `RefreshToken` (mục 4.3, KHÔNG có TTL) — `TwoFactorOtp` đi đúng pattern tốt của `PasswordResetToken`, không lặp lại thiếu sót đã ghi nhận ở `RefreshToken`.**
+**Index**: `{expiresAt:1}` với `expireAfterSeconds:0` (⏱ TTL — tự xoá, giống hệt `PasswordResetToken`), `{user:1, createdAt:-1}` (luôn tìm OTP MỚI NHẤT chưa dùng của 1 user — comment nguồn tự xác nhận mục đích). **Khác `RefreshToken` (mục 4.3; lúc viết KHÔNG có TTL, đã thêm ở BR-13/DEV-110) — `TwoFactorOtp` đi đúng pattern tốt của `PasswordResetToken`, không lặp lại thiếu sót đã ghi nhận ở `RefreshToken`.**
 
 ### 4.30 `DocumentPdfExport` (`models/documents/documentPdfExport.model.ts`) — CONFIRMED, DEV-071
 

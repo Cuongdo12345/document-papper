@@ -73,6 +73,8 @@ export const uploadExcel = multer({ storage, limits: { fileSize: MAX_FILE_SIZE }
 
 ### RV08-03 — `buildMapFromReports` tải TOÀN BỘ Document theo subType, không lọc theo phạm vi export (MEDIUM, CONFIRMED — không đổi so với Phase 10 PERF-08)
 
+> **[ĐÃ SỬA 2026-09-30, `DEV-105.md`]** `buildMapFromReports` nay nhận danh sách đề xuất được xuất và chỉ nạp biên bản tham chiếu tới chúng.
+
 - **File**: `backend/src/shared/helpers/buildMapReports.ts`
 - **File phụ**: `backend/src/services/excel/excel.service.ts:156-159` (`exportDocumentsExcelPRO`)
 
