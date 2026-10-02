@@ -1,6 +1,14 @@
 import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { createContract, updateContract, cancelContract, restoreContract } from "@/api/contract.api";
+import {
+  createContract,
+  updateContract,
+  cancelContract,
+  restoreContract,
+  bulkCancelContracts,
+  bulkRestoreContracts,
+} from "@/api/contract.api";
 import { unwrapResponse } from "@/utils/unwrapResponse";
+import { showBulkDeleteToast } from "@/utils/bulkDeleteToast";
 import { toast } from "@/stores/toastStore";
 import { parseApiError } from "@/utils/parseApiError";
 import type { CreateContractRequest, UpdateContractRequest, CancelContractRequest } from "@/types/contract.types";
@@ -48,6 +56,32 @@ export function useCancelContract() {
       const contract = unwrapResponse(data).data;
       toast.success(`Đã huỷ hợp đồng: ${contract.title}`);
       invalidateAfterAction(queryClient, variables.id);
+    },
+    onError: (error) => toast.error(parseApiError(error).message),
+  });
+}
+
+/** [DEV-087] Huỷ hàng loạt — Batch Action Bar. */
+export function useBulkCancelContracts() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ ids, cancelReason }: { ids: string[]; cancelReason?: string }) => bulkCancelContracts(ids, cancelReason),
+    onSuccess: (data, variables) => {
+      showBulkDeleteToast(unwrapResponse(data).data, variables.ids.length, "huỷ");
+      invalidateAfterAction(queryClient);
+    },
+    onError: (error) => toast.error(parseApiError(error).message),
+  });
+}
+
+/** [DEV-087] Khôi phục hàng loạt — Batch Action Bar. */
+export function useBulkRestoreContracts() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => bulkRestoreContracts(ids),
+    onSuccess: (data, ids) => {
+      showBulkDeleteToast(unwrapResponse(data).data, ids.length, "khôi phục");
+      invalidateAfterAction(queryClient);
     },
     onError: (error) => toast.error(parseApiError(error).message),
   });

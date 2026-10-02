@@ -6,6 +6,15 @@ interface FilterBarProps {
   children: ReactNode;
   onReset?: () => void;
   className?: string;
+  /**
+   * [MỚI Pass 3a, `docs/frontend/UI_DESIGN_SYSTEM.md` Mục 4/9.3, FE-27] —
+   * `"standalone"` (mặc định) giữ NGUYÊN hành vi cũ (khung border+bg-card
+   * riêng) cho mọi trang chưa thí điểm. `"embedded"` bỏ border/bo góc/bg
+   * riêng — dùng khi FilterBar được đặt trong CÙNG 1 khung viền ngoài với
+   * `DataTable` bên dưới nó (xem `UsersListPage` — trang thí điểm đầu tiên),
+   * để 2 khối không còn hiện thành 2 "card" ngang hàng độc lập.
+   */
+  variant?: "standalone" | "embedded";
 }
 
 /**
@@ -16,9 +25,16 @@ interface FilterBarProps {
  * Departments/Documents..., xây engine chung lúc này là over-engineer khi
  * mới có 2 domain dùng — FE_UI_DEVELOPMENT_ROADMAP.md Mục 31).
  */
-export function FilterBar({ children, onReset, className }: FilterBarProps) {
+export function FilterBar({ children, onReset, className, variant = "standalone" }: FilterBarProps) {
   return (
-    <div className={cn("flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4", className)}>
+    <div
+      className={cn(
+        "flex flex-wrap items-end gap-3 p-4",
+        variant === "standalone" && "rounded-lg border border-border bg-card",
+        variant === "embedded" && "bg-muted/30",
+        className,
+      )}
+    >
       <div className="flex flex-1 flex-wrap items-end gap-3">{children}</div>
       {onReset && (
         <Button type="button" variant="ghost" size="sm" onClick={onReset}>

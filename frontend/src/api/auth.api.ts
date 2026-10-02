@@ -14,6 +14,7 @@ import type {
   RefreshTokenResponseData,
   ResetPasswordRequest,
   UpdateMeRequest,
+  UpdateAvatarRequest,
   Session,
 } from "@/types/auth.types";
 
@@ -77,6 +78,16 @@ export function getMe(): Promise<AxiosResponse<{ success: unknown; data: Current
  */
 export function updateMe(body: UpdateMeRequest): Promise<AxiosResponse<{ success: boolean; message: string; data: unknown }>> {
   return axiosInstance.patch("/users/me", body);
+}
+
+/** [MỚI DEV-079] `PATCH /users/me/avatar` — self-service, KHÔNG cần permission (mirror `updateMe`). */
+export function updateMyAvatar(body: UpdateAvatarRequest): Promise<AxiosResponse<{ message: string; data: CurrentUser }>> {
+  return axiosInstance.patch("/users/me/avatar", body);
+}
+
+/** [MỚI DEV-079] `DELETE /users/me/avatar` — self-service. */
+export function deleteMyAvatar(): Promise<AxiosResponse<{ message: string; data: CurrentUser }>> {
+  return axiosInstance.delete("/users/me/avatar");
 }
 
 /**

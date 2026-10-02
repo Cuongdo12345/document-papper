@@ -18,10 +18,12 @@ import type { AssetMaintenancePlan } from "@/types/assetMaintenancePlan.types";
 
 const WEEKDAY_LABELS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
+// [FE-29] "completed" dùng text-success-strong (không phải text-success) — chữ text-xs trên nền
+// bg-success/10 đo được contrast 3.32:1, dưới ngưỡng AA 4.5:1 (cùng lỗi StatusBadge, FE-28 Mục 1).
 const PILL_CLASS_BY_STATE: Record<"overdue" | "planned" | "completed" | "cancelled", string> = {
   overdue: "bg-destructive/10 text-destructive",
   planned: "bg-primary/10 text-primary",
-  completed: "bg-success/10 text-success",
+  completed: "bg-success/10 text-success-strong",
   cancelled: "bg-muted text-muted-foreground line-through",
 };
 

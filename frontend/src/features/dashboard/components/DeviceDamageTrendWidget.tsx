@@ -17,6 +17,8 @@ export function DeviceDamageTrendWidget() {
 
   return (
     <MonthlyTrendBars
+      label="Số báo cáo hư hỏng theo tháng"
+      emptyMessage="Chưa có báo cáo kiểm tra hư hỏng nào."
       categories={items.map((i) => i.monthLabel)}
       series={[{ label: "Báo cáo hư hỏng", color: "primary", data: items.map((i) => ({ label: i.monthLabel, value: i.totalReports })) }]}
     />

@@ -9,6 +9,20 @@ import { cn } from "@/lib/utils";
 type NavBlock = { type: "single"; item: NavItem } | { type: "group"; group: string; items: NavItem[] };
 
 /**
+ * FE-32 — map tường minh (KHÔNG ghép chuỗi `text-module-${...}`) vì Tailwind
+ * v4 quét class name TĨNH trong source, không chạy runtime — class ghép động
+ * sẽ không được sinh ra trong CSS output (cùng lý do `StatusBadge`/
+ * `ASSET_STATUS_MAP` dùng bảng tra cứu literal, không nội suy chuỗi).
+ */
+const MODULE_COLOR_CLASS: Record<NonNullable<NavItem["moduleColor"]>, string> = {
+  overview: "text-module-overview",
+  documents: "text-module-documents",
+  assets: "text-module-assets",
+  vendors: "text-module-vendors",
+  admin: "text-module-admin",
+};
+
+/**
  * FE-21 — gom `visibleItems` (ĐÃ lọc permission, thứ tự KHÔNG đổi) thành khối
  * đơn lẻ/nhóm liền kề, phục vụ accordion thu gọn/mở riêng từng nhóm. Không
  * sắp xếp lại — `NAV_ITEMS` vốn đã liền kề theo domain (xem `navigation.ts`).
@@ -88,6 +102,11 @@ export function Sidebar({ variant = "desktop", onNavigate }: SidebarProps) {
 
   function renderNavItem(item: NavItem) {
     const Icon = item.icon;
+    // FE-32 — icon giữ MÀU RIÊNG theo module bất kể active/hover (đè lên
+    // `currentColor` kế thừa từ NavLink cha), text label GIỮ NGUYÊN màu
+    // trung tính (dataviz skill: "text wears text tokens, never the series
+    // color") — chỉ icon mang identity màu, không đổi cách đọc label.
+    const iconColorClass = item.moduleColor ? MODULE_COLOR_CLASS[item.moduleColor] : undefined;
     return (
       <NavLink
         key={item.path}
@@ -106,10 +125,11 @@ export function Sidebar({ variant = "desktop", onNavigate }: SidebarProps) {
         title={isCollapsed ? item.label : undefined}
       >
         {/* FE-21 — `transition-colors` riêng trên icon (KHÔNG chỉ ở NavLink
-            cha) để màu icon (kế thừa currentColor) đổi MƯỢT theo active/hover,
-            thay vì đổi tức thì — dùng đúng token --sidebar-accent hiện có,
-            không thêm màu mới ngoài hệ thống. */}
-        <Icon className="size-4 shrink-0 transition-colors" aria-hidden="true" />
+            cha) để đổi màu MƯỢT thay vì tức thì. [FE-32] Icon nay dùng màu cố
+            định theo module (`iconColorClass`, token `--module-*`) thay vì kế
+            thừa `currentColor` — vẫn giữ `transition-colors` cho hiệu ứng khi
+            active/hover chạm border/bg xung quanh. */}
+        <Icon className={cn("size-4 shrink-0 transition-colors", iconColorClass)} aria-hidden="true" />
         {!isCollapsed && <span className="truncate">{item.label}</span>}
       </NavLink>
     );

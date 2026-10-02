@@ -42,6 +42,9 @@ import { FilesListPage } from "@/features/files/pages/FilesListPage";
 // DEV-073/FE-24: code-split qua React.lazy — wrapper tách riêng file, xem
 // `SystemDesignPage.lazy.tsx` (lý do: tránh warning only-export-components).
 import { SystemDesignPage } from "@/routes/SystemDesignPage.lazy";
+// DEV-075/FE-26 — cùng lý do: `react-markdown`/`remark-gfm` chỉ tải khi vào
+// đúng route `/app/project-docs`, không nằm trong bundle chính.
+import { ProjectDocsPage } from "@/routes/ProjectDocsPage.lazy";
 import { ForbiddenPage } from "@/pages/ForbiddenPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -332,6 +335,18 @@ export const router = createBrowserRouter([
                 element: (
                   <Suspense fallback={<LoadingState variant="spinner" label="Đang tải System Design..." />}>
                     <SystemDesignPage />
+                  </Suspense>
+                ),
+              },
+              {
+                // DEV-075/FE-26 (2026-09-21) — "Tài liệu dự án": 12 tài liệu
+                // phân tích tổng quan gốc 01-13, dùng LẠI permission
+                // `SYSTEM_DESIGN_VIEW` (cùng đối tượng dev/admin, cùng
+                // `ProtectedRoute` cha ở trên — không cần bọc riêng).
+                path: "project-docs",
+                element: (
+                  <Suspense fallback={<LoadingState variant="spinner" label="Đang tải Tài liệu dự án..." />}>
+                    <ProjectDocsPage />
                   </Suspense>
                 ),
               },

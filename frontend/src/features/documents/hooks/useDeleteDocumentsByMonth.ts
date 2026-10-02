@@ -15,10 +15,15 @@ export function useDeleteDocumentsByMonth() {
   return useMutation({
     mutationFn: (body: DeleteDocumentsByMonthRequest) => deleteDocumentsByMonth(body),
     onSuccess: (response) => {
-      const { deletedCount, skippedCount } = response.data.data;
+      const { deletedCount, skippedCount, skippedPendingWorkflowCount = 0 } = response.data.data;
+      // BR-11 (DEV-098): backend bỏ qua thêm tài liệu có workflow chờ duyệt thật.
+      const skipped = [
+        skippedCount > 0 && `${skippedCount} đề xuất còn biên bản tham chiếu`,
+        skippedPendingWorkflowCount > 0 && `${skippedPendingWorkflowCount} tài liệu đang chờ duyệt`,
+      ].filter(Boolean);
       toast.success(
-        skippedCount > 0
-          ? `Đã ẩn ${deletedCount} tài liệu (bỏ qua ${skippedCount} đề xuất còn biên bản tham chiếu)`
+        skipped.length > 0
+          ? `Đã ẩn ${deletedCount} tài liệu (bỏ qua ${skipped.join(", ")})`
           : `Đã ẩn ${deletedCount} tài liệu`,
       );
       queryClient.invalidateQueries({ queryKey: ["documents", "list"] });

@@ -1,19 +1,13 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useNavigate } from "react-router-dom";
-import { Menu, LogOut, User as UserIcon, UserCog } from "lucide-react";
+import { Menu, LogOut, UserCog, Sun, Moon } from "lucide-react";
 import { useUIStore } from "@/stores/uiStore";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useLogout } from "@/features/auth/hooks/useLogout";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { Avatar } from "@/components/shared/Avatar";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 import { cn } from "@/lib/utils";
-
-function getInitials(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/);
-  const last = parts[parts.length - 1]?.[0] ?? "";
-  const first = parts.length > 1 ? parts[0]?.[0] ?? "" : "";
-  return (first + last).toUpperCase() || "?";
-}
 
 /**
  * App Shell — Header (Mục 20/21 FE-01): breadcrumb đã có riêng ở
@@ -24,6 +18,8 @@ function getInitials(fullName: string): string {
 export function Header() {
   const navigate = useNavigate();
   const openMobileNav = useUIStore((s) => s.openMobileNav);
+  const theme = useUIStore((s) => s.theme);
+  const toggleTheme = useUIStore((s) => s.toggleTheme);
   const { data: user } = useCurrentUser();
   const logout = useLogout();
 
@@ -41,6 +37,15 @@ export function Header() {
       <div className="hidden lg:block" />
 
       <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="rounded-md p-2 text-muted-foreground hover:bg-muted"
+          aria-label={theme === "dark" ? "Chuyển sang giao diện sáng" : "Chuyển sang giao diện tối"}
+        >
+          {theme === "dark" ? <Sun className="size-5" /> : <Moon className="size-5" />}
+        </button>
+
         <NotificationBell />
 
         <DropdownMenu.Root>
@@ -50,12 +55,7 @@ export function Header() {
               className="flex items-center gap-2 rounded-md p-1.5 pr-2 text-sm hover:bg-muted"
               aria-label="Menu tài khoản"
             >
-              <span
-                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
-                aria-hidden="true"
-              >
-                {user ? getInitials(user.fullName) : <UserIcon className="size-4" />}
-              </span>
+              <Avatar avatar={user?.avatar} fullName={user?.fullName} size="sm" />
               <span className="hidden max-w-[10rem] truncate font-medium sm:inline">{user?.fullName ?? "..."}</span>
             </button>
           </DropdownMenu.Trigger>

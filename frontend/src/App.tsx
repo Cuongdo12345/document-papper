@@ -5,6 +5,7 @@ import { queryClient } from "@/lib/queryClient";
 import { router } from "@/routes";
 import { Toaster } from "@/components/shared/Toaster";
 import { useAuthBootstrap } from "@/hooks/useAuthBootstrap";
+import { useThemeSync } from "@/hooks/useThemeSync";
 import { LoadingState } from "@/components/shared/LoadingState";
 
 /**
@@ -22,6 +23,7 @@ import { LoadingState } from "@/components/shared/LoadingState";
  */
 function App() {
   const isInitializing = useAuthBootstrap();
+  useThemeSync();
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -4,6 +4,7 @@ import type { Pagination } from "@/types/shared.types";
 import type { ExportDocumentsExcelParams, DocumentImportPreviewRow } from "@/types/document.types";
 import type { ExcelImportResult } from "@/components/shared/ExcelImportWizard";
 import type { ImportHistoryItem, GetImportHistoryParams } from "@/types/importHistory.types";
+import type { DepartmentSyncResult } from "@/types/department.types";
 
 /**
  * API layer domain Excel — Document (mount `/api/export`, `excel.route.ts`,
@@ -57,15 +58,19 @@ export function getImportHistory(
  * `POST /export/departments/sync-from-excel` (permission `EXCEL_DEPARTMENT_SYNC`)
  * — mount CHUNG router Excel Document (`/export`) dù nghiệp vụ thuộc
  * Department, đặt ở đây để khớp đúng file route backend, `features/departments`
- * import thẳng hàm này. KHÔNG hỗ trợ `dryRun` (khác import Document/Asset —
- * xác nhận `syncDepartmentFromExcel()` không nhận tham số này).
+ * import thẳng hàm này.
+ * [DEV-089] `dryRun: true` → chỉ xem trước. Tạo thật kèm `names` → chỉ tạo các
+ * khoa đã tick (gửi dạng chuỗi JSON vì multipart không có mảng chuẩn).
  */
 export function syncDepartmentsFromExcel(
   file: File,
-): Promise<AxiosResponse<{ success: boolean; message: string; data: { totalInFile: number; created: number; existed: number } }>> {
+  options: { dryRun?: boolean; names?: string[] } = {},
+): Promise<AxiosResponse<{ success: boolean; message: string; data: DepartmentSyncResult }>> {
   const formData = new FormData();
   formData.append("file", file);
+  if (!options.dryRun && options.names) formData.append("names", JSON.stringify(options.names));
   return axiosInstance.post("/export/departments/sync-from-excel", formData, {
+    params: options.dryRun ? { dryRun: true } : undefined,
     headers: { "Content-Type": "multipart/form-data" },
     timeout: 60_000,
   });

@@ -74,7 +74,10 @@ export function TwoFactorSection({ user }: TwoFactorSectionProps) {
           </p>
         </div>
         {user.twoFactorEnabled ? (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-success">
+          // [FE-29] text-success-strong (không phải text-success) — chữ text-xs trên nền bg-card
+          // (không phải tint) đo được contrast 3.72:1, vẫn dưới ngưỡng AA 4.5:1 (khác StatusBadge:
+          // nền không phải tint nhưng chữ vẫn quá nhạt).
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-success-strong">
             <ShieldCheck className="size-4" /> Đã bật
           </span>
         ) : (

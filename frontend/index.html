@@ -13,6 +13,19 @@
     <title>Document Papper</title>
   </head>
   <body>
+    <!--
+      [FE-30] Chạy TRƯỚC React mount để tránh FOUC (nháy sáng rồi mới chuyển
+      tối). Đọc THẲNG key `dp_ui_prefs` (zustand persist, `stores/uiStore.ts`)
+      — phải đồng bộ 2 nơi nếu đổi tên key/cấu trúc persist. try/catch vì
+      localStorage có thể bị chặn (private mode/policy trình duyệt).
+    -->
+    <script>
+      try {
+        var raw = localStorage.getItem("dp_ui_prefs");
+        var theme = raw ? JSON.parse(raw)?.state?.theme : null;
+        if (theme === "dark") document.documentElement.classList.add("dark");
+      } catch (e) {}
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

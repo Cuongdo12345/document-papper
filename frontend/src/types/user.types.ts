@@ -23,6 +23,13 @@ export interface UserListItem {
   denyPermissions?: string[];
   /** [MỚI 2026-09-19, Roadmap C1] Chỉ tự bật được qua `POST /auths/2fa/enable`+`/confirm` — xem `TwoFactorSection.tsx`. */
   twoFactorEnabled?: boolean;
+  /**
+   * [MỚI DEV-079] Data URI base64 — field `select:false` ở backend, CHỈ có
+   * mặt ở response `GET /users/{id}` (chi tiết), KHÔNG có ở `GET /users`
+   * (list, tránh phồng payload) — `undefined` ở hầu hết `UserListItem` lấy
+   * từ danh sách, chỉ thật sự có giá trị khi lấy qua `getUserById()`.
+   */
+  avatar?: string;
   createdAt?: string;
   updatedAt?: string;
 }

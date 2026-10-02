@@ -48,3 +48,51 @@ test.describe("FE-17 — Visual regression snapshot", () => {
     await expect(page).toHaveScreenshot("create-user-drawer.png");
   });
 });
+
+/**
+ * [FE-30] Baseline RIÊNG cho dark mode — lặp lại đúng 4 màn ở trên, bật dark
+ * mode qua click nút toggle thật (`Header.tsx`, giống `a11y.spec.ts`), snapshot
+ * file KHÁC tên (hậu tố `-dark`) để không đè lên baseline light mode. Cùng lưu
+ * ý baseline nhạy OS/font-rendering như mô tả ở đầu file.
+ */
+async function toggleDarkMode(page: import("@playwright/test").Page) {
+  await page.getByRole("button", { name: "Chuyển sang giao diện tối" }).click();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+}
+
+test.describe("FE-30 — Dark mode visual regression snapshot", () => {
+  test("Dashboard", async ({ page }) => {
+    await page.goto("/app");
+    await expect(page.getByRole("heading", { name: "Tổng quan hệ thống" })).toBeVisible();
+    await toggleDarkMode(page);
+    await page.waitForLoadState("networkidle");
+    await expect(page).toHaveScreenshot("dashboard-dark.png", { fullPage: true });
+  });
+
+  test("DataTable — Người dùng", async ({ page }) => {
+    await page.goto("/app/users");
+    await expect(page.getByRole("heading", { name: "Người dùng" })).toBeVisible();
+    await toggleDarkMode(page);
+    await page.waitForLoadState("networkidle");
+    const createdAtColumn = page.locator("table tbody td:nth-last-child(1)");
+    await expect(page).toHaveScreenshot("users-datatable-dark.png", { fullPage: true, mask: [createdAtColumn] });
+  });
+
+  test("Modal — Đặt lại mật khẩu", async ({ page }) => {
+    await page.goto("/app/users");
+    await page.waitForLoadState("networkidle");
+    await toggleDarkMode(page);
+    await page.getByRole("button", { name: "Đặt lại mật khẩu" }).first().click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page).toHaveScreenshot("reset-password-modal-dark.png");
+  });
+
+  test("Drawer — Tạo user", async ({ page }) => {
+    await page.goto("/app/users");
+    await page.waitForLoadState("networkidle");
+    await toggleDarkMode(page);
+    await page.getByRole("button", { name: "Tạo mới" }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page).toHaveScreenshot("create-user-drawer-dark.png");
+  });
+});

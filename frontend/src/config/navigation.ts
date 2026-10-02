@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { LayoutDashboard, FileText, ClipboardCheck, Boxes, Users, Building2, ShieldCheck, ScrollText, Bell, Paperclip, Package, Handshake, FileSignature, Laptop, Network } from "lucide-react";
+import { LayoutDashboard, FileText, ClipboardCheck, Boxes, Users, Building2, ShieldCheck, ScrollText, Bell, Paperclip, Package, Handshake, FileSignature, Laptop, Network, BookOpen } from "lucide-react";
 import { PERMISSIONS, type Permission } from "@/constants/permissions";
 
 export interface NavItem {
@@ -19,6 +19,13 @@ export interface NavItem {
    * này ghi đè ràng buộc đó, đúng chỉ định mới của user).
    */
   group?: string;
+  /**
+   * FE-32 — màu icon riêng theo module (xem token `--module-*` ở
+   * `index.css`), ĐỘC LẬP với `group` (chỉ dùng để render label nhóm) — mọi
+   * item cùng 1 nhóm liền kề dùng CHUNG 1 `moduleColor`, item đứng riêng
+   * ("Tổng quan") có màu riêng của nó.
+   */
+  moduleColor?: "overview" | "documents" | "assets" | "vendors" | "admin";
 }
 
 /**
@@ -28,8 +35,15 @@ export interface NavItem {
  * placeholder route + FE task sau chỉ cần thêm page thật, không sửa Sidebar.
  */
 export const NAV_ITEMS: NavItem[] = [
-  { label: "Tổng quan", path: "/app", icon: LayoutDashboard, permission: PERMISSIONS.DASHBOARD_READ },
-  { label: "Tài liệu", path: "/app/documents", icon: FileText, permission: PERMISSIONS.DOCUMENT_VIEW, group: "Tài liệu" },
+  { label: "Tổng quan", path: "/app", icon: LayoutDashboard, permission: PERMISSIONS.DASHBOARD_READ, moduleColor: "overview" },
+  {
+    label: "Tài liệu",
+    path: "/app/documents",
+    icon: FileText,
+    permission: PERMISSIONS.DOCUMENT_VIEW,
+    group: "Tài liệu",
+    moduleColor: "documents",
+  },
   // FE-05 (roadmap Mục 11) — hộp thư chờ duyệt. Đổi nhãn "Chờ duyệt" →
   // "Duyệt tài liệu" (2026-09-10) — trang đích giờ có thêm tab "Lịch sử"
   // (xem `PendingApprovalsPage.tsx`), nhãn cũ không còn phản ánh đủ phạm vi.
@@ -39,9 +53,17 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ClipboardCheck,
     permission: PERMISSIONS.WORKFLOW_VIEW,
     group: "Tài liệu",
+    moduleColor: "documents",
   },
   // FE-06 (roadmap Mục 12) — Assets Core UI.
-  { label: "Tài sản", path: "/app/assets", icon: Boxes, permission: PERMISSIONS.ASSET_VIEW, group: "Tài sản & Vật tư" },
+  {
+    label: "Tài sản",
+    path: "/app/assets",
+    icon: Boxes,
+    permission: PERMISSIONS.ASSET_VIEW,
+    group: "Tài sản & Vật tư",
+    moduleColor: "assets",
+  },
   // Roadmap B3 (Quản lý vật tư tiêu hao, 2026-09-15) — module MỚI, tách biệt
   // hoàn toàn với "Tài sản" (Asset) nên có mục sidebar riêng, không lồng con.
   {
@@ -50,20 +72,36 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Package,
     permission: PERMISSIONS.CONSUMABLE_VIEW,
     group: "Tài sản & Vật tư",
+    moduleColor: "assets",
   },
   // Roadmap B4 (Quản lý nhà cung cấp & hợp đồng bảo trì, 2026-09-16) — 2 mục
   // riêng (khác gate permission: VENDOR_VIEW vs CONTRACT_VIEW), dù liên quan
   // chặt (1 Contract luôn thuộc 1 Vendor) — cùng cách "Tài sản"/"Vật tư tiêu
   // hao" tách riêng dù cùng nhóm quản lý tài sản-vật tư.
-  { label: "Nhà cung cấp", path: "/app/vendors", icon: Handshake, permission: PERMISSIONS.VENDOR_VIEW, group: "Nhà cung cấp" },
+  {
+    label: "Nhà cung cấp",
+    path: "/app/vendors",
+    icon: Handshake,
+    permission: PERMISSIONS.VENDOR_VIEW,
+    group: "Nhà cung cấp",
+    moduleColor: "vendors",
+  },
   {
     label: "Hợp đồng bảo trì",
     path: "/app/contracts",
     icon: FileSignature,
     permission: PERMISSIONS.CONTRACT_VIEW,
     group: "Nhà cung cấp",
+    moduleColor: "vendors",
   },
-  { label: "Người dùng", path: "/app/users", icon: Users, permission: PERMISSIONS.USER_VIEW, group: "Quản trị hệ thống" },
+  {
+    label: "Người dùng",
+    path: "/app/users",
+    icon: Users,
+    permission: PERMISSIONS.USER_VIEW,
+    group: "Quản trị hệ thống",
+    moduleColor: "admin",
+  },
   // Roadmap C3 (Giám sát phiên đăng nhập toàn hệ thống, DEV-070, 2026-09-19)
   // — trang RIÊNG, dùng LẠI permission SESSION_VIEW_ALL (đã có từ C2).
   {
@@ -72,6 +110,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Laptop,
     permission: PERMISSIONS.SESSION_VIEW_ALL,
     group: "Quản trị hệ thống",
+    moduleColor: "admin",
   },
   {
     label: "Khoa/Phòng",
@@ -79,6 +118,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Building2,
     permission: PERMISSIONS.DEPARTMENT_VIEW,
     group: "Quản trị hệ thống",
+    moduleColor: "admin",
   },
   // FE-08 (roadmap Mục 16) — RBAC Admin UI. `path:"/app/rbac"` (KHÔNG phải
   // "/app/rbac/roles") để Sidebar NavLink (`end=false` mặc định) vẫn giữ
@@ -86,13 +126,21 @@ export const NAV_ITEMS: NavItem[] = [
   // Roles — router tự `Navigate` "/app/rbac" -> "/app/rbac/roles" (index
   // route). Gate bằng `ROLE_VIEW` — thực tế chỉ ADMIN giữ permission này
   // (xem `ROUTE_PERMISSION_MAP.md`), nav item tự ẩn với mọi role khác.
-  { label: "Phân quyền", path: "/app/rbac", icon: ShieldCheck, permission: PERMISSIONS.ROLE_VIEW, group: "Quản trị hệ thống" },
+  {
+    label: "Phân quyền",
+    path: "/app/rbac",
+    icon: ShieldCheck,
+    permission: PERMISSIONS.ROLE_VIEW,
+    group: "Quản trị hệ thống",
+    moduleColor: "admin",
+  },
   {
     label: "Nhật ký audit",
     path: "/app/audit-logs",
     icon: ScrollText,
     permission: PERMISSIONS.AUDIT_VIEW,
     group: "Quản trị hệ thống",
+    moduleColor: "admin",
   },
   // FE-12/FE-13 — Notifications. KHÔNG gán `permission` (self-scoped, route
   // backend chỉ `authenticate` — mọi user đăng nhập đều có hộp thư riêng,
@@ -109,18 +157,44 @@ export const NAV_ITEMS: NavItem[] = [
   // [SỬA FE-22, 2026-09-20] Dời từ vị trí đứng riêng (sau "Duyệt tài liệu")
   // xuống đây, gán `group: "Quản trị hệ thống"` theo chỉ định trực tiếp của
   // user — KHÔNG đổi path/permission.
-  { label: "Thông báo", path: "/app/notifications", icon: Bell, group: "Quản trị hệ thống" },
+  { label: "Thông báo", path: "/app/notifications", icon: Bell, group: "Quản trị hệ thống", moduleColor: "admin" },
   // FE-15 (roadmap Mục 20) — thư viện file độc lập (KHÔNG gắn với
   // Document/Asset nào, xem `types/file.types.ts` comment gốc). [SỬA FE-22,
   // 2026-09-20] Dời từ vị trí đứng riêng cuối danh sách lên đây, gán
   // `group: "Quản trị hệ thống"` theo chỉ định trực tiếp của user — KHÔNG
   // đổi path/permission.
-  { label: "Tệp tin", path: "/app/files", icon: Paperclip, permission: PERMISSIONS.VIEW_FILES, group: "Quản trị hệ thống" },
+  {
+    label: "Tệp tin",
+    path: "/app/files",
+    icon: Paperclip,
+    permission: PERMISSIONS.VIEW_FILES,
+    group: "Quản trị hệ thống",
+    moduleColor: "admin",
+  },
   // DEV-072/FE-23 (2026-09-21) — "System Design": bản đồ module + quan hệ dữ
   // liệu nội bộ, CHỈ dev/admin (permission mới `SYSTEM_DESIGN_VIEW`, gán cho
   // IT — role kỹ thuật gần nghĩa "dev" nhất trong 6 role hiện có; ADMIN có
   // qua wildcard). Đặt CUỐI dãy liền kề "Quản trị hệ thống" (yêu cầu user:
   // xếp vào nhóm này) — không chèn giữa để tránh xáo trộn thứ tự FE-22 vừa
   // chỉnh.
-  { label: "System Design", path: "/app/system-design", icon: Network, permission: PERMISSIONS.SYSTEM_DESIGN_VIEW, group: "Quản trị hệ thống" },
+  {
+    label: "System Design",
+    path: "/app/system-design",
+    icon: Network,
+    permission: PERMISSIONS.SYSTEM_DESIGN_VIEW,
+    group: "Quản trị hệ thống",
+    moduleColor: "admin",
+  },
+  // DEV-075/FE-26 (2026-09-21) — "Tài liệu dự án": 12 tài liệu phân tích tổng
+  // quan gốc (01-13), dùng LẠI permission `SYSTEM_DESIGN_VIEW` (cùng đối
+  // tượng dev/admin với "System Design" — nội dung có cả tài liệu bảo mật
+  // chi tiết, không public). Đặt liền kề "System Design" trong cùng nhóm.
+  {
+    label: "Tài liệu dự án",
+    path: "/app/project-docs",
+    icon: BookOpen,
+    permission: PERMISSIONS.SYSTEM_DESIGN_VIEW,
+    group: "Quản trị hệ thống",
+    moduleColor: "admin",
+  },
 ];

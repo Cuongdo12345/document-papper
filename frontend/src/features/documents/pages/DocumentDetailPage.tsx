@@ -120,8 +120,14 @@ export function DocumentDetailPage() {
   // `workflowQuery.notSubmitted` (flag riêng, chính xác hơn `!workflowQuery.data`
   // — không bị "nhấp nháy" hiện nhầm lúc query đang loading) thay vì suy ra
   // từ `workflowStatus`.
+  //
+  // BR-02 (DEV-091/FE-39, 2026-09-29): backend `submitWorkflow()` giờ chỉ
+  // cho người CÙNG KHOA với tài liệu hoặc ADMIN gửi duyệt (403 nếu khác) —
+  // ẩn nút với role xem được tài liệu khoa khác (`DOCUMENT_VIEW_ALL_DEPARTMENTS`,
+  // vd IT) thay vì để họ bấm rồi nhận lỗi.
   const canSubmitWorkflow =
-    workflowQuery.notSubmitted || document.workflowStatus === "rejected" || document.workflowStatus === "cancelled";
+    (isAdmin || sameDepartment) &&
+    (workflowQuery.notSubmitted || document.workflowStatus === "rejected" || document.workflowStatus === "cancelled");
 
   return (
     <div className="space-y-4">

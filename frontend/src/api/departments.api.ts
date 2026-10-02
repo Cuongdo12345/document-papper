@@ -1,6 +1,6 @@
 import type { AxiosResponse } from "axios";
 import { axiosInstance } from "@/api/axios";
-import type { Pagination } from "@/types/shared.types";
+import type { Pagination, BulkDeleteResult } from "@/types/shared.types";
 import type { CreateDepartmentRequest, Department, GetDepartmentsParams, UpdateDepartmentRequest } from "@/types/department.types";
 
 /**
@@ -33,7 +33,22 @@ export function updateDepartment(
   return axiosInstance.put(`/departments/${id}`, body);
 }
 
-/** Hard delete — backend tự chặn (400) nếu còn user/document/asset thuộc khoa này. */
+/** [SỬA DEV-086] Xoá MỀM (trước đây hard delete) — backend tự chặn (400) nếu còn user/document/asset thuộc khoa này, hành vi chặn giữ nguyên. */
 export function deleteDepartment(id: string): Promise<AxiosResponse<{ message: string }>> {
   return axiosInstance.delete(`/departments/${id}`);
+}
+
+/** [MỚI DEV-086] Khôi phục khoa đã xoá mềm — permission RIÊNG DEPARTMENT_RESTORE. */
+export function restoreDepartment(id: string): Promise<AxiosResponse<{ message: string; data: Department }>> {
+  return axiosInstance.patch(`/departments/${id}/restore`);
+}
+
+/** [MỚI DEV-086] Xoá mềm hàng loạt — chọn nhiều dòng ở danh sách. */
+export function bulkDeleteDepartments(ids: string[]): Promise<AxiosResponse<{ message: string; data: BulkDeleteResult }>> {
+  return axiosInstance.post("/departments/bulk-delete", { ids });
+}
+
+/** [MỚI DEV-086] Khôi phục hàng loạt — permission RIÊNG DEPARTMENT_RESTORE. */
+export function bulkRestoreDepartments(ids: string[]): Promise<AxiosResponse<{ message: string; data: BulkDeleteResult }>> {
+  return axiosInstance.post("/departments/bulk-restore", { ids });
 }

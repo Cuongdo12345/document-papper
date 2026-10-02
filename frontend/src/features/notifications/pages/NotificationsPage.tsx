@@ -135,7 +135,9 @@ export function NotificationsPage() {
         </TabsList>
 
         <TabsContent value="my" className="space-y-4">
-          <FilterBar onReset={resetFilters}>
+          {/* [Pass 3b, FE-27/FE-28, UI_DESIGN_SYSTEM.md Mục 4/9.3] Gộp FilterBar+DataTable vào 1 khung viền ngoài. */}
+          <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+          <FilterBar variant="embedded" onReset={resetFilters}>
             <div className="min-w-40 space-y-1.5">
               <label htmlFor="notif-isRead" className="text-xs font-medium text-muted-foreground">
                 Trạng thái
@@ -179,6 +181,7 @@ export function NotificationsPage() {
           </FilterBar>
 
           <DataTable
+            className="rounded-none border-0"
             columns={columns}
             data={items}
             keyExtractor={(row) => row._id}
@@ -209,6 +212,7 @@ export function NotificationsPage() {
               );
             }}
           />
+          </div>
 
           {query.data && query.data.totalPages > 1 && (
             <Pagination page={query.data.page} limit={query.data.limit} total={query.data.total} totalPages={query.data.totalPages} onPageChange={setPage} />

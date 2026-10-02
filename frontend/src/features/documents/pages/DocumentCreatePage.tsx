@@ -11,6 +11,7 @@ import { DocumentMetaFields } from "@/features/documents/components/DocumentMeta
 import { useCreateDocument } from "@/features/documents/hooks/useCreateDocument";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import { usePermission } from "@/hooks/usePermission";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { PERMISSIONS } from "@/constants/permissions";
 import { formValuesToMeta, metaFieldsSchema, type MetaFormValues } from "@/features/documents/utils/documentMeta";
 import { parseApiError } from "@/utils/parseApiError";
@@ -72,7 +73,15 @@ export function DocumentCreatePage() {
   // còn IT (role duy nhất khác có `DOCUMENT_CREATE`) đã có sẵn `DEPARTMENT_VIEW`
   // vì cần tạo đề xuất/sửa chữa CHO KHOA KHÁC (thiết bị của khoa đó, không
   // phải khoa IT) — giữ nguyên dropdown đầy đủ cho riêng role này.
-  const canBrowseDepartments = hasPermission(PERMISSIONS.DEPARTMENT_VIEW);
+  //
+  // BR-03 (DEV-092/FE-40, 2026-09-29): backend giờ CHỈ cho tạo vào khoa khác
+  // khi là ADMIN hoặc có `DOCUMENT_CREATE_ALL_DEPARTMENTS` (403 nếu không) —
+  // `DEPARTMENT_VIEW` một mình KHÔNG còn đủ (vd Phòng Vật tư-TTB có quyền xem
+  // danh mục khoa). Vẫn cần `DEPARTMENT_VIEW` để tải danh sách khoa cho dropdown.
+  const isAdmin = useIsAdmin();
+  const canBrowseDepartments =
+    (isAdmin || hasPermission(PERMISSIONS.DOCUMENT_CREATE_ALL_DEPARTMENTS)) &&
+    hasPermission(PERMISSIONS.DEPARTMENT_VIEW);
   const departmentsQuery = useDepartments({ limit: 100 }, { enabled: canBrowseDepartments });
   const [assetLabel, setAssetLabel] = useState<string>();
 
@@ -177,7 +186,7 @@ export function DocumentCreatePage() {
                 ))}
               </select>
             ) : user?.department ? (
-              // Không có `DEPARTMENT_VIEW` — khoá cứng về khoa của chính người
+              // Không được tạo cho khoa khác — khoá cứng về khoa của chính người
               // tạo (xem giải thích ở khai báo `canBrowseDepartments` phía trên).
               <>
                 <input type="hidden" {...register("department")} />

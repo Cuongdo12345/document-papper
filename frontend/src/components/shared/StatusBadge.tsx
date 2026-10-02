@@ -8,7 +8,11 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default: "border-border bg-muted text-muted-foreground",
-        success: "border-success/20 bg-success/10 text-success",
+        // [FE-28] `text-success` (mặc định) trên `bg-success/10` đo được
+        // contrast 3.24:1 (axe-core, FE-17 Mục 5) — dưới ngưỡng AA 4.5:1.
+        // Đổi riêng CHỮ sang `--success-strong` (đậm hơn, không đổi
+        // border/nền, không đụng token `--success` gốc dùng ở nơi khác).
+        success: "border-success/20 bg-success/10 text-success-strong",
         warning: "border-warning/30 bg-warning/10 text-warning",
         destructive: "border-destructive/20 bg-destructive/10 text-destructive",
         info: "border-info/20 bg-info/10 text-info",

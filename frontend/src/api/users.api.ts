@@ -2,6 +2,7 @@ import type { AxiosResponse } from "axios";
 import { axiosInstance } from "@/api/axios";
 import type { Pagination, BulkDeleteResult } from "@/types/shared.types";
 import type { Session, SessionWithUser } from "@/types/auth.types";
+import type { UpdateAvatarRequest } from "@/types/auth.types";
 import type {
   AssignUserRoleRequest,
   CreateUserRequest,
@@ -39,6 +40,18 @@ export function updateUser(
   body: UpdateUserRequest,
 ): Promise<AxiosResponse<{ message: string; data: UserListItem }>> {
   return axiosInstance.put(`/users/${id}`, body);
+}
+
+/** [MỚI DEV-079] ADMIN sửa/xoá avatar hộ user khác (permission USER_UPDATE — dùng lại, không permission riêng). */
+export function updateUserAvatar(
+  id: string,
+  body: UpdateAvatarRequest,
+): Promise<AxiosResponse<{ message: string; data: UserListItem }>> {
+  return axiosInstance.patch(`/users/${id}/avatar`, body);
+}
+
+export function deleteUserAvatar(id: string): Promise<AxiosResponse<{ message: string; data: UserListItem }>> {
+  return axiosInstance.delete(`/users/${id}/avatar`);
 }
 
 /** `PATCH /users/:id/role` — endpoint RIÊNG cho gán role (USER_ASSIGN_ROLE), tách khỏi updateUser. */

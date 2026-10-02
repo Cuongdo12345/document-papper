@@ -59,3 +59,51 @@ test.describe("FE-17 — WCAG AA accessibility scan", () => {
     await scan(page);
   });
 });
+
+/**
+ * [FE-30] Dark mode giờ là tính năng THẬT (toggle ở `Header.tsx`, trước đây
+ * chỉ là token CSS chưa reachable — xem `docs/frontend/tasks/FE-29.md` Mục 2).
+ * Lặp lại đúng 4 màn ở trên nhưng bật dark mode qua click nút toggle thật
+ * (KHÔNG set `localStorage`/class thủ công) — đây là bằng chứng axe-core THẬT
+ * đầu tiên cho `--success-strong` dark mode, thay cho phép tính tay ở FE-29.
+ */
+async function toggleDarkMode(page: import("@playwright/test").Page) {
+  await page.getByRole("button", { name: "Chuyển sang giao diện tối" }).click();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+}
+
+test.describe("FE-30 — Dark mode WCAG AA accessibility scan", () => {
+  test("Dashboard", async ({ page }) => {
+    await page.goto("/app");
+    await expect(page.getByRole("heading", { name: "Tổng quan hệ thống" })).toBeVisible();
+    await toggleDarkMode(page);
+    await page.waitForLoadState("networkidle");
+    await scan(page);
+  });
+
+  test("DataTable — Người dùng", async ({ page }) => {
+    await page.goto("/app/users");
+    await expect(page.getByRole("heading", { name: "Người dùng" })).toBeVisible();
+    await toggleDarkMode(page);
+    await page.waitForLoadState("networkidle");
+    await scan(page);
+  });
+
+  test("Modal — Đặt lại mật khẩu", async ({ page }) => {
+    await page.goto("/app/users");
+    await page.waitForLoadState("networkidle");
+    await toggleDarkMode(page);
+    await page.getByRole("button", { name: "Đặt lại mật khẩu" }).first().click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await scan(page);
+  });
+
+  test("Drawer — Tạo user", async ({ page }) => {
+    await page.goto("/app/users");
+    await page.waitForLoadState("networkidle");
+    await toggleDarkMode(page);
+    await page.getByRole("button", { name: "Tạo mới" }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await scan(page);
+  });
+});

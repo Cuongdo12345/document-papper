@@ -107,7 +107,9 @@ export function AdminNotificationsTab() {
 
       {canViewAll && (
         <>
-          <FilterBar onReset={resetFilters}>
+          {/* [Pass 3b, FE-27/FE-28, UI_DESIGN_SYSTEM.md Mục 4/9.3] Gộp FilterBar+DataTable vào 1 khung viền ngoài. */}
+          <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+          <FilterBar variant="embedded" onReset={resetFilters}>
             {canBrowseUsers && (
               <div className="min-w-44 space-y-1.5">
                 <label htmlFor="admin-notif-recipient" className="text-xs font-medium text-muted-foreground">
@@ -175,6 +177,7 @@ export function AdminNotificationsTab() {
           </FilterBar>
 
           <DataTable
+            className="rounded-none border-0"
             columns={columns}
             data={items}
             keyExtractor={(row) => row._id}
@@ -185,6 +188,7 @@ export function AdminNotificationsTab() {
             emptyTitle="Chưa có thông báo nào"
             emptyMessage="Không có bản ghi nào khớp bộ lọc hiện tại."
           />
+          </div>
 
           {query.data && query.data.totalPages > 1 && (
             <Pagination page={query.data.page} limit={query.data.limit} total={query.data.total} totalPages={query.data.totalPages} onPageChange={setPage} />

@@ -210,6 +210,26 @@ export interface CalibrationDueItem {
   };
 }
 
+/** [MỚI DEV-084] Khớp `getMedicalDevicesByClassListService` — modal "Xem danh sách" theo phân loại. */
+export interface MedicalDeviceByClassItem {
+  deviceClass: MedicalDeviceClass;
+  registrationNumber?: string;
+  nextCalibrationDueDate?: string;
+  asset: {
+    _id: string;
+    name: string;
+    assetCode: string;
+    status: AssetStatus;
+    department: { _id: string; code: string; name: string };
+  };
+}
+
+export interface GetMedicalDevicesByClassParams {
+  deviceClass: MedicalDeviceClass;
+  page?: number;
+  limit?: number;
+}
+
 // ================= WORKFLOW DASHBOARD (Roadmap B1) =================
 
 /** Khớp `OverdueApprovalInfo` (backend `workflowSlaAlerts.service.ts`). */

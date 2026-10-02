@@ -114,6 +114,10 @@ export interface GetAssetCategoriesParams {
   limit?: number;
   keyword?: string;
   isActive?: boolean;
+  /** DEV-081: chỉ danh mục thuộc nhánh của nhóm này (mọi cấp con cháu, không gồm chính nó). */
+  group?: string;
+  /** DEV-081: `leaf` = chỉ danh mục con (cấp cuối), `group` = chỉ danh mục nhóm. */
+  level?: "leaf" | "group";
 }
 
 /** Khớp `CreateAssetCategoryDTO`. */
@@ -127,7 +131,8 @@ export interface CreateAssetCategoryRequest {
 /** Khớp `UpdateAssetCategoryDTO` — CHỦ Ý KHÔNG có `code` (`ASSET_CATEGORY_UPDATE_WHITELIST` không nhận field này, mã danh mục bất biến sau khi tạo) và KHÔNG có `isActive` (đổi qua action Xoá/Khôi phục riêng, không qua form sửa — tránh 2 đường đổi trạng thái cùng lúc, xem `AssetCategoryFormModal.tsx`). */
 export interface UpdateAssetCategoryRequest {
   name?: string;
-  parentCategory?: string;
+  /** DEV-080: `null` = gỡ danh mục cha (đưa lên cấp gốc). */
+  parentCategory?: string | null;
   defaultWarrantyMonths?: number;
 }
 

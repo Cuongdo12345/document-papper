@@ -154,6 +154,14 @@ export function SystemDesignPage() {
     setDrawerState({ kind: "edge", relation });
   }, []);
 
+  const handleModuleClick = useCallback(
+    (moduleName: string) => {
+      const module = query.data?.modules.find((m) => m.name === moduleName);
+      if (module) setDrawerState({ kind: "module", module });
+    },
+    [query.data],
+  );
+
   const handlePaneClick = useCallback(() => setSelectedModelName(null), []);
 
   return (
@@ -182,6 +190,7 @@ export function SystemDesignPage() {
               onShowAllModules={handleShowAllModules}
               onModelClick={handleModelClick}
               onEdgeClick={handleEdgeClick}
+              onModuleClick={handleModuleClick}
               onPaneClick={handlePaneClick}
             />
           </ReactFlowProvider>

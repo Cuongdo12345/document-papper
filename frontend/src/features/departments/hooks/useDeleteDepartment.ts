@@ -3,7 +3,7 @@ import { deleteDepartment } from "@/api/departments.api";
 import { toast } from "@/stores/toastStore";
 import { parseApiError } from "@/utils/parseApiError";
 
-/** Quick action (ConfirmDialog) — toast trong hook. Backend tự chặn (400) nếu còn user/document/asset thuộc khoa. */
+/** [SỬA DEV-086] Xoá MỀM (trước đây hard delete). Quick action (ConfirmDialog) — toast trong hook. Backend tự chặn (400) nếu còn user/document/asset thuộc khoa. */
 export function useDeleteDepartment() {
   const queryClient = useQueryClient();
 

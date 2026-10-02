@@ -23,6 +23,7 @@ interface SystemDesignCanvasProps {
   onShowAllModules: () => void;
   onModelClick: (nodeId: string) => void;
   onEdgeClick: (relation: SystemDesignRelationship) => void;
+  onModuleClick: (moduleName: string) => void;
   onPaneClick: () => void;
 }
 
@@ -43,6 +44,7 @@ export function SystemDesignCanvas({
   onShowAllModules,
   onModelClick,
   onEdgeClick,
+  onModuleClick,
   onPaneClick,
 }: SystemDesignCanvasProps) {
   const { fitView } = useReactFlow();
@@ -51,11 +53,12 @@ export function SystemDesignCanvas({
     (_event, node) => {
       if (node.type === MODULE_NODE_TYPE) {
         fitView({ nodes: [{ id: node.id }], duration: 400, padding: 0.25 });
+        onModuleClick(node.id.replace(/^module:/, ""));
       } else if (node.type === MODEL_NODE_TYPE) {
         onModelClick(node.id);
       }
     },
-    [fitView, onModelClick],
+    [fitView, onModelClick, onModuleClick],
   );
 
   const handleEdgeClick: EdgeMouseHandler = useCallback(

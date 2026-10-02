@@ -14,6 +14,8 @@ interface FileUploadProps {
   /** Danh sách đuôi file hợp lệ để validate lại (input `accept` chỉ lọc ở dialog chọn file, KHÔNG chặn drag/drop) — vd `[".xlsx",".xls"]`. */
   allowedExtensions?: string[];
   maxSizeBytes?: number;
+  /** Số file tối đa được chọn cùng lúc (chỉ có nghĩa khi `multiple`). Vượt thì báo lỗi ngay, không thêm file nào. */
+  maxFiles?: number;
   multiple?: boolean;
   disabled?: boolean;
   /** Controlled — component KHÔNG tự giữ state file đã chọn, để nơi gọi tự quyết định submit/reset (cùng nguyên tắc controlled input của react-hook-form trong dự án). */
@@ -33,6 +35,7 @@ export function FileUpload({
   accept,
   allowedExtensions,
   maxSizeBytes,
+  maxFiles,
   multiple = false,
   disabled = false,
   value,
@@ -58,6 +61,11 @@ export function FileUpload({
         setError(`File "${file.name}" vượt quá ${formatBytes(maxSizeBytes)}`);
         return;
       }
+    }
+
+    if (multiple && maxFiles && value.length + files.length > maxFiles) {
+      setError(`Chỉ được chọn tối đa ${maxFiles} file mỗi lần tải lên`);
+      return;
     }
 
     onChange(multiple ? [...value, ...files] : files.slice(0, 1));

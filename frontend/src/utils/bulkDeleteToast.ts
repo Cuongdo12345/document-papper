@@ -10,7 +10,12 @@ import type { BulkDeleteResult } from "@/types/shared.types";
 // `action` tuỳ chọn — [MỞ RỘNG 2026-09-17, DEV-061] cho phép tái dùng đúng
 // toast này cho "khôi phục hàng loạt" (Document), mặc định giữ nguyên "xoá"
 // để KHÔNG đổi behavior 6 domain đã dùng trước đó.
-export function showBulkDeleteToast(result: BulkDeleteResult, totalRequested: number, action: "xoá" | "khôi phục" = "xoá") {
+// [DEV-087] Thêm "huỷ" — hợp đồng không có xoá, thao tác hàng loạt là huỷ.
+export function showBulkDeleteToast(
+  result: BulkDeleteResult,
+  totalRequested: number,
+  action: "xoá" | "khôi phục" | "huỷ" = "xoá",
+) {
   const { deletedIds, failed } = result;
 
   if (failed.length === 0) {

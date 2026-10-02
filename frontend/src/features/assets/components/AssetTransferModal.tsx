@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import { useUsers } from "@/features/users/hooks/useUsers";
 import { useTransferAsset } from "@/features/assets/hooks/useAssetAssignmentActions";
+import { AssigneeOptions } from "@/features/assets/components/AssigneeOptions";
 import { usePermission } from "@/hooks/usePermission";
 import { PERMISSIONS } from "@/constants/permissions";
 import { parseApiError } from "@/utils/parseApiError";
@@ -47,11 +48,13 @@ export function AssetTransferModal({ open, onClose, asset }: AssetTransferModalP
   const { register, handleSubmit, control, formState } = form;
   const toDepartment = useWatch({ control, name: "toDepartment" });
 
-  // Danh sách user để chọn theo khoa MỚI nếu có chọn, ngược lại theo khoa HIỆN TẠI của asset.
-  const usersQuery = useUsers(
-    { department: toDepartment || asset.department._id, limit: 100 },
-    { enabled: canBrowseUsers },
-  );
+  // [FE-38] Lấy MỌI user đang hoạt động; `AssigneeOptions` đưa người thuộc khoa MỚI
+  // (nếu có chọn), ngược lại khoa HIỆN TẠI của asset, lên đầu — trước đây CHỈ liệt kê
+  // người của khoa đó nên khoa chưa có tài khoản thì không chọn được ai.
+  const usersQuery = useUsers({ isActive: "true", limit: 100 }, { enabled: canBrowseUsers && open });
+  const users = usersQuery.data?.data ?? [];
+  const targetDepartment = toDepartment || asset.department._id;
+  const departmentHasNoUsers = usersQuery.isSuccess && !users.some((u) => u.department?._id === targetDepartment);
 
   const apiError = transferMutation.error ? parseApiError(transferMutation.error) : null;
 
@@ -98,12 +101,13 @@ export function AssetTransferModal({ open, onClose, asset }: AssetTransferModalP
             >
               <option value="">-- Giữ nguyên người dùng hiện tại --</option>
               <option value={CLEAR_USER_SENTINEL}>-- Bỏ gán (khoa/phòng quản lý chung) --</option>
-              {usersQuery.data?.data.map((u) => (
-                <option key={u._id} value={u._id}>
-                  {u.fullName} ({u.username})
-                </option>
-              ))}
+              <AssigneeOptions users={users} departmentId={targetDepartment} />
             </select>
+            {departmentHasNoUsers && (
+              <p className="text-xs text-muted-foreground">
+                Khoa/phòng này chưa có người dùng nào. Có thể giữ nguyên, bỏ gán, hoặc chọn người ở khoa/phòng khác.
+              </p>
+            )}
           </div>
         )}
 

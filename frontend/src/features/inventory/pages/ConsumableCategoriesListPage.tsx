@@ -23,6 +23,7 @@ import {
 } from "@/features/inventory/hooks/useConsumableCategoryActions";
 import { useDebounce } from "@/hooks/useDebounce";
 import { parseApiError } from "@/utils/parseApiError";
+import { splitSelectionByActive } from "@/utils/splitSelectionByActive";
 import type { ConsumableCategory } from "@/types/consumableCategory.types";
 
 const LIMIT = 10;
@@ -76,6 +77,7 @@ export function ConsumableCategoriesListPage() {
   const categories = query.data?.data ?? [];
   const pagination = query.data?.pagination;
   const selection = useRowSelection(categories.map((c) => c._id));
+  const { activeIds, inactiveIds } = splitSelectionByActive(categories, selection.selectedIds, (r) => r.isActive !== false);
 
   const columns: DataTableColumn<ConsumableCategory>[] = [
     { key: "code", header: "Mã nhóm", className: "font-mono" },
@@ -108,7 +110,19 @@ export function ConsumableCategoriesListPage() {
 
       <InventorySectionTabs />
 
-      <FilterBar onReset={resetFilters}>
+      {canBulkAct && (
+        <BatchActionBar
+          count={selection.selectedIds.size}
+          onClear={selection.clear}
+          onDelete={canBulkDelete && activeIds.length > 0 ? () => setBatchDeleteOpen(true) : undefined}
+          onRestore={canBulkRestore && inactiveIds.length > 0 ? () => setBatchRestoreOpen(true) : undefined}
+          isLoading={bulkDeleteMutation.isPending || bulkRestoreMutation.isPending}
+        />
+      )}
+
+      {/* [Pass 3b, FE-27/FE-28, UI_DESIGN_SYSTEM.md Mục 4/9.3] Gộp FilterBar+DataTable vào 1 khung viền ngoài. */}
+      <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+      <FilterBar variant="embedded" onReset={resetFilters}>
         <div className="min-w-48 space-y-1.5">
           <label htmlFor="cc-search" className="text-xs font-medium text-muted-foreground">
             Tìm kiếm (mã/tên)
@@ -142,17 +156,8 @@ export function ConsumableCategoriesListPage() {
         </div>
       </FilterBar>
 
-      {canBulkAct && (
-        <BatchActionBar
-          count={selection.selectedIds.size}
-          onClear={selection.clear}
-          onDelete={canBulkDelete ? () => setBatchDeleteOpen(true) : undefined}
-          onRestore={canBulkRestore ? () => setBatchRestoreOpen(true) : undefined}
-          isLoading={bulkDeleteMutation.isPending || bulkRestoreMutation.isPending}
-        />
-      )}
-
       <DataTable
+        className="rounded-none border-0"
         columns={columns}
         data={categories}
         keyExtractor={(row) => row._id}
@@ -192,6 +197,7 @@ export function ConsumableCategoriesListPage() {
           )
         }
       />
+      </div>
 
       {pagination && (
         <Pagination page={pagination.page} limit={pagination.limit} total={pagination.total} totalPages={pagination.totalPages} onPageChange={setPage} />
@@ -233,7 +239,7 @@ export function ConsumableCategoriesListPage() {
         open={batchDeleteOpen}
         onClose={() => setBatchDeleteOpen(false)}
         onConfirm={() => {
-          bulkDeleteMutation.mutate([...selection.selectedIds], {
+          bulkDeleteMutation.mutate(activeIds, {
             onSuccess: () => {
               setBatchDeleteOpen(false);
               selection.clear();
@@ -241,7 +247,7 @@ export function ConsumableCategoriesListPage() {
           });
         }}
         title="Xoá nhóm vật tư đã chọn"
-        message={`Ẩn ${selection.selectedIds.size} nhóm đã chọn? Backend sẽ từ chối nhóm nào còn vật tư/nhóm con tham chiếu.`}
+        message={`Ẩn ${activeIds.length} nhóm đã chọn? Backend sẽ từ chối nhóm nào còn vật tư/nhóm con tham chiếu.`}
         danger
         isLoading={bulkDeleteMutation.isPending}
       />
@@ -250,7 +256,7 @@ export function ConsumableCategoriesListPage() {
         open={batchRestoreOpen}
         onClose={() => setBatchRestoreOpen(false)}
         onConfirm={() => {
-          bulkRestoreMutation.mutate([...selection.selectedIds], {
+          bulkRestoreMutation.mutate(inactiveIds, {
             onSuccess: () => {
               setBatchRestoreOpen(false);
               selection.clear();
@@ -258,7 +264,7 @@ export function ConsumableCategoriesListPage() {
           });
         }}
         title="Khôi phục nhóm vật tư đã chọn"
-        message={`Khôi phục ${selection.selectedIds.size} nhóm đã chọn?`}
+        message={`Khôi phục ${inactiveIds.length} nhóm đã chọn?`}
         isLoading={bulkRestoreMutation.isPending}
       />
     </div>

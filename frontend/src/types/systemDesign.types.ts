@@ -3,9 +3,22 @@
  * (`backend/src/services/systemDesign/systemDesign.service.ts`), không suy đoán field.
  */
 
+export interface SystemDesignRelatedDoc {
+  /** Đường dẫn repo-relative, VD "docs/development/tasks/DEV-057.md". */
+  path: string;
+  /** URL GitHub blob thật — mở tab mới khi click. */
+  url: string;
+}
+
 export interface SystemDesignModule {
   name: string;
   models: string[];
+  /** DEV-074 — chỉ có khi module này có entry trong `moduleDescriptions.ts` (backend). */
+  description?: string;
+  /** DEV-074 — cùng điều kiện với `description`. */
+  features?: string[];
+  /** DEV-074 — luôn có (mảng rỗng nếu không tìm thấy task nào nhắc module này). */
+  relatedDocs: SystemDesignRelatedDoc[];
 }
 
 export interface SystemDesignModel {

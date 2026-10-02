@@ -3,6 +3,7 @@ import { AppModal } from "@/components/shared/AppModal";
 import { Button } from "@/components/ui/button";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import { useAssetCategories } from "@/features/assets/hooks/useAssetCategories";
+import { AssetCategoryOptions } from "@/features/assets/components/AssetCategoryOptions";
 import { useExportAssetsExcel } from "@/features/assets/hooks/useExportAssetsExcel";
 import { ASSET_STATUSES, type AssetStatus } from "@/types/asset.types";
 
@@ -23,7 +24,7 @@ interface ExportAssetsExcelModalProps {
 /** Filter export — khớp `exportAssetsExcelPRO` (`assetExcel.service.ts`): department/category/status/keyword, không ràng buộc theo ADMIN như Document (Asset export không tự khoá theo khoa người gọi). */
 export function ExportAssetsExcelModal({ open, onClose }: ExportAssetsExcelModalProps) {
   const departmentsQuery = useDepartments({ limit: 100 }, { enabled: open });
-  const categoriesQuery = useAssetCategories({ limit: 100 }, { enabled: open });
+  const categoriesQuery = useAssetCategories({ limit: 300 }, { enabled: open });
   const exportMutation = useExportAssetsExcel();
 
   const [department, setDepartment] = useState("");
@@ -89,11 +90,7 @@ export function ExportAssetsExcelModal({ open, onClose }: ExportAssetsExcelModal
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <option value="">Tất cả</option>
-              {categoriesQuery.data?.data.map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.name}
-                </option>
-              ))}
+              <AssetCategoryOptions categories={categoriesQuery.data?.data ?? []} mode="tree" />
             </select>
           </div>
         </div>

@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { useCreateAssetCategory } from "@/features/assets/hooks/useCreateAssetCategory";
 import { useUpdateAssetCategory } from "@/features/assets/hooks/useUpdateAssetCategory";
 import { useAssetCategories } from "@/features/assets/hooks/useAssetCategories";
+import { AssetCategoryOptions } from "@/features/assets/components/AssetCategoryOptions";
+import { getDescendantIds } from "@/features/assets/utils/categoryTree";
 import { parseApiError } from "@/utils/parseApiError";
 import { toast } from "@/stores/toastStore";
 import type { AssetCategory } from "@/types/asset.types";
@@ -45,11 +47,12 @@ export function AssetCategoryFormModal({ open, onClose, category }: AssetCategor
   const updateMutation = useUpdateAssetCategory();
   const mutation = isEdit ? updateMutation : createMutation;
 
-  // Dropdown chọn danh mục cha — loại trừ chính danh mục đang sửa (khớp check
-  // `parentCategory === id` → 400 "không thể là cha của chính nó" ở backend,
-  // tránh để user chọn rồi mới nhận lỗi).
-  const categoriesQuery = useAssetCategories({ limit: 100, isActive: true });
-  const parentOptions = (categoriesQuery.data?.data ?? []).filter((c) => c._id !== category?._id);
+  // Dropdown chọn danh mục cha — loại trừ chính danh mục đang sửa VÀ toàn bộ con
+  // cháu của nó (DEV-080: backend chặn vòng lặp A→B→A, không chỉ "cha là chính
+  // nó" — loại sẵn ở UI để user không chọn rồi mới nhận lỗi).
+  const categoriesQuery = useAssetCategories({ limit: 300, isActive: true });
+  const allCategories = categoriesQuery.data?.data ?? [];
+  const excludeIds = category ? getDescendantIds(allCategories, category._id) : undefined;
 
   const defaultValues: AssetCategoryFormValues = {
     code: category?.code ?? "",
@@ -82,7 +85,9 @@ export function AssetCategoryFormModal({ open, onClose, category }: AssetCategor
 
     if (isEdit) {
       updateMutation.mutate(
-        { id: category._id, body },
+        // DEV-080: khi sửa, chọn "Không có" gửi `null` (gỡ cha) — `undefined` bị
+        // bỏ qua nên trước đây đã gán cha thì không gỡ ra được qua UI.
+        { id: category._id, body: { ...body, parentCategory: values.parentCategory || null } },
         {
           onSuccess: () => {
             toast.success("Đã cập nhật danh mục tài sản");
@@ -171,13 +176,10 @@ export function AssetCategoryFormModal({ open, onClose, category }: AssetCategor
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
               {...register("parentCategory")}
             >
-              <option value="">Không có</option>
-              {parentOptions.map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.code} — {c.name}
-                </option>
-              ))}
+              <option value="">Không có (danh mục gốc)</option>
+              <AssetCategoryOptions categories={allCategories} mode="tree" excludeIds={excludeIds} />
             </select>
+            <p className="text-xs text-muted-foreground">Chỉ danh mục cấp cuối (không có danh mục con) mới gán được tài sản.</p>
           </div>
 
           <div className="space-y-1.5">

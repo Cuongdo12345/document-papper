@@ -63,7 +63,10 @@ export function SessionsMonitorPage() {
         description="Toàn bộ phiên đăng nhập còn hiệu lực của mọi user trong hệ thống — hữu ích khi cần rà soát tài khoản nghi bị lộ."
       />
 
+      {/* [Pass 3b, FE-27/FE-28, UI_DESIGN_SYSTEM.md Mục 4/9.3] Gộp FilterBar+DataTable vào 1 khung viền ngoài. */}
+      <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
       <FilterBar
+        variant="embedded"
         onReset={() => {
           setSearch("");
           setPage(1);
@@ -87,6 +90,7 @@ export function SessionsMonitorPage() {
       </FilterBar>
 
       <DataTable
+        className="rounded-none border-0"
         columns={columns}
         data={sessions}
         keyExtractor={(row) => row._id}
@@ -102,6 +106,7 @@ export function SessionsMonitorPage() {
           </Button>
         )}
       />
+      </div>
 
       {pagination && (
         <Pagination

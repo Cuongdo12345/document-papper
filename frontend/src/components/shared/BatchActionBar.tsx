@@ -20,6 +20,8 @@ interface BatchActionBarProps {
    * nguyên (chỉ nút Xoá).
    */
   onRestore?: () => void;
+  /** [DEV-087] Nhãn nút xoá — mặc định "Xoá"; Contract dùng "Huỷ hợp đồng" (không có xoá, chỉ có huỷ). */
+  deleteLabel?: string;
 }
 
 /**
@@ -29,7 +31,7 @@ interface BatchActionBarProps {
  * hàng loạt TỪNG DÒNG đã có sẵn ở mỗi trang, không thêm hành động mới ngoài
  * yêu cầu — `onRestore` (DEV-061) mirror đúng nút "Khôi phục" từng dòng.
  */
-export function BatchActionBar({ count, onDelete, onClear, isLoading, onRestore }: BatchActionBarProps) {
+export function BatchActionBar({ count, onDelete, onClear, isLoading, onRestore, deleteLabel = "Xoá" }: BatchActionBarProps) {
   if (count === 0) return null;
 
   return (
@@ -46,7 +48,7 @@ export function BatchActionBar({ count, onDelete, onClear, isLoading, onRestore 
         )}
         {onDelete && (
           <Button variant="destructive" size="sm" onClick={onDelete} loading={isLoading}>
-            <Trash2 /> Xoá
+            <Trash2 /> {deleteLabel}
           </Button>
         )}
       </div>

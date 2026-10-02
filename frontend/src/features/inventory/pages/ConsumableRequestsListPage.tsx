@@ -113,7 +113,10 @@ export function ConsumableRequestsListPage() {
 
       <InventorySectionTabs />
 
+      {/* [Pass 3b, FE-27/FE-28, UI_DESIGN_SYSTEM.md Mục 4/9.3] Gộp FilterBar+DataTable vào 1 khung viền ngoài. */}
+      <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
       <FilterBar
+        variant="embedded"
         onReset={() => {
           setDepartment("");
           setStatus("");
@@ -166,6 +169,7 @@ export function ConsumableRequestsListPage() {
       </FilterBar>
 
       <DataTable
+        className="rounded-none border-0"
         columns={columns}
         data={requests}
         keyExtractor={(row) => row._id}
@@ -195,6 +199,7 @@ export function ConsumableRequestsListPage() {
           </div>
         )}
       />
+      </div>
 
       {pagination && (
         <Pagination

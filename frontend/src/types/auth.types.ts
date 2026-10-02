@@ -35,6 +35,13 @@ export interface CurrentUser {
   subscribedToWeeklyReport?: boolean;
   /** [MỚI 2026-09-19, Roadmap C1] CHỈ tự bật được qua `POST /auths/2fa/enable`+`/confirm` — xem `useTwoFactorActions.ts`. */
   twoFactorEnabled?: boolean;
+  /**
+   * [MỚI DEV-079] Data URI base64 đầy đủ (`data:image/<jpeg|png|webp>;base64,...`)
+   * — sẵn sàng dùng thẳng làm `<img src>`, không cần request thêm. Sửa qua
+   * `PATCH /users/me/avatar`, xoá qua `DELETE /users/me/avatar` — xem
+   * `AvatarModal.tsx`.
+   */
+  avatar?: string;
   /** Effective permission (đã tính sẵn ở backend) — NGUỒN DUY NHẤT cho `usePermission()`. */
   permissions: string[];
   /** ObjectId THÔ — KHÔNG dùng để tự tính permission ở FE (xem `permissions[]`). */
@@ -123,6 +130,11 @@ export interface UpdateMeRequest {
   username?: string;
   /** [MỚI 2026-09-18, Roadmap B7] Bật/tắt nhận "Báo cáo tuần" qua email — chỉ có tác dụng thật với role BAN_GIAM_DOC/TRUONG_KHOA. */
   subscribedToWeeklyReport?: boolean;
+}
+
+/** [MỚI DEV-079] Khớp `UpdateAvatarDTO` (backend) — dùng chung cho self (`/me/avatar`) và admin (`/:id/avatar`). */
+export interface UpdateAvatarRequest {
+  avatar: string;
 }
 
 /** Khớp `ChangePasswordDTO` (`PATCH /users/change-password`) — tự đổi mật khẩu CỦA CHÍNH MÌNH (`req.user!._id`, không nhận id khác). */

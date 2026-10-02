@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, Eye, Pencil, Trash2, RotateCcw, ListX, Search, ChevronDown, ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
@@ -25,6 +25,7 @@ import { useBulkRestoreDocument } from "@/features/documents/hooks/useBulkRestor
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import { useDebounce } from "@/hooks/useDebounce";
 import { parseApiError } from "@/utils/parseApiError";
+import { splitSelectionByActive } from "@/utils/splitSelectionByActive";
 import {
   DOCUMENT_CATEGORIES,
   SUB_TYPES_BY_CATEGORY,
@@ -67,6 +68,19 @@ export function DocumentsListPage() {
   // KHÔNG chỉ permission), Khôi phục cần permission DOCUMENT_UPDATE.
   const canBulkRestore = hasPermission(PERMISSIONS.DOCUMENT_UPDATE);
   const canBulkAct = isAdmin || canBulkRestore;
+  // [FE-37] Ô lọc "Khoa/Phòng" giờ hiện cho cả người có `DOCUMENT_VIEW_ALL_DEPARTMENTS`
+  // (VD IT) — backend đã KHÔNG ép khoa với họ từ DEV-040 nên lọc có tác dụng thật
+  // (lý do ẩn gốc ở DEV-030 chỉ còn đúng với người KHÔNG có quyền này). Cần kèm
+  // `DEPARTMENT_VIEW` để nạp được danh sách khoa cho dropdown.
+  const canFilterDepartment =
+    isAdmin || (hasPermission(PERMISSIONS.DOCUMENT_VIEW_ALL_DEPARTMENTS) && hasPermission(PERMISSIONS.DEPARTMENT_VIEW));
+
+  // [FE-37] Đọc `?category=`/`?department=` 1 LẦN lúc mở trang (cùng cách
+  // `AssetsListPage` DEV-083) — cho thẻ KPI ở Dashboard mở thẳng danh sách đã
+  // lọc sẵn. Đổi bộ lọc sau đó KHÔNG ghi ngược lại URL.
+  const [searchParams] = useSearchParams();
+  const initialCategory = searchParams.get("category");
+  const initialDepartment = canFilterDepartment ? (searchParams.get("department") ?? "") : "";
 
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState("");
@@ -75,9 +89,11 @@ export function DocumentsListPage() {
   // dùng). Khi có giá trị, backend bỏ qua sortBy/order, sort theo mức độ
   // liên quan (xem `getAllDocumentsService`).
   const [contentSearch, setContentSearch] = useState("");
-  const [category, setCategory] = useState<DocumentCategory | "">("");
+  const [category, setCategory] = useState<DocumentCategory | "">(() =>
+    initialCategory && (DOCUMENT_CATEGORIES as readonly string[]).includes(initialCategory) ? (initialCategory as DocumentCategory) : "",
+  );
   const [subType, setSubType] = useState<DocumentSubType | "">("");
-  const [department, setDepartment] = useState("");
+  const [department, setDepartment] = useState(initialDepartment);
   const [workflowStatus, setWorkflowStatus] = useState<WorkflowStatus | "">("");
   const [isActive, setIsActive] = useState<"true" | "false" | "">("true");
   const [fromDate, setFromDate] = useState("");
@@ -88,7 +104,8 @@ export function DocumentsListPage() {
   // chi tiết/Khoa/Trạng thái duyệt/Từ-Đến ngày) ẩn sau nút "Bộ lọc nâng cao",
   // mặc định đóng. 2 ô tìm kiếm + "Hiển thị" luôn hiện vì dùng thường xuyên
   // nhất (user chọn hướng này qua AskUserQuestion, không phải suy đoán).
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  // [FE-37] Mở sẵn khi vào từ link có bộ lọc — để thấy ngay đang lọc gì.
+  const [advancedOpen, setAdvancedOpen] = useState(() => !!(category || department));
   const advancedFilterCount = [category, subType, department, workflowStatus, fromDate, toDate].filter(Boolean).length;
   const debouncedKeyword = useDebounce(keyword);
   const debouncedContentSearch = useDebounce(contentSearch);
@@ -127,7 +144,7 @@ export function DocumentsListPage() {
   // (xem block JSX bên dưới, DEV-030); tắt hẳn query cho non-admin thay vì
   // gọi ngầm 1 request `GET /departments` chắc chắn 403 với role USER (chỉ
   // IT mới có `DEPARTMENT_VIEW`) mà không dùng kết quả vào đâu.
-  const departmentsQuery = useDepartments({ limit: 100 }, { enabled: isAdmin });
+  const departmentsQuery = useDepartments({ limit: 100 }, { enabled: canFilterDepartment });
   const query = useDocuments({
     page,
     limit: LIMIT,
@@ -153,6 +170,7 @@ export function DocumentsListPage() {
   const documents = query.data?.data ?? [];
   const pagination = query.data?.pagination;
   const selection = useRowSelection(documents.map((d) => d._id));
+  const { activeIds, inactiveIds } = splitSelectionByActive(documents, selection.selectedIds, (r) => !!r.isActive);
 
   const columns: DataTableColumn<Document>[] = [
     { key: "documentCode", header: "Mã", className: "font-mono", sortKey: "documentCode" },
@@ -222,7 +240,21 @@ export function DocumentsListPage() {
         đây). Luôn hiện: 2 ô tìm kiếm + Hiển thị (dùng thường xuyên nhất).
         6 field còn lại ẩn sau nút "Bộ lọc nâng cao", mặc định đóng.
       */}
-      <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+
+      {canBulkAct && (
+        <BatchActionBar
+          count={selection.selectedIds.size}
+          onClear={selection.clear}
+          onDelete={isAdmin && activeIds.length > 0 ? () => setBatchDeleteOpen(true) : undefined}
+          onRestore={canBulkRestore && inactiveIds.length > 0 ? () => setBatchRestoreOpen(true) : undefined}
+          isLoading={bulkDeleteMutation.isPending || bulkRestoreMutation.isPending}
+        />
+      )}
+
+      {/* [Pass 3b/FE-31, UI_DESIGN_SYSTEM.md Mục 4/9.3] Gộp khung filter (custom, không dùng
+          FilterBar chung) + DataTable vào 1 khung viền ngoài — cùng pattern 17 trang khác. */}
+      <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+      <div className="space-y-3 bg-muted/30 p-4">
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-48 flex-1 space-y-1.5">
             <label htmlFor="doc-search" className="text-xs font-medium text-muted-foreground">
@@ -346,9 +378,10 @@ export function DocumentsListPage() {
               với non-admin sẽ luôn vô hiệu (chọn khoa khác cũng chỉ trả về
               đúng khoa của họ), gây hiểu nhầm "lọc mà không đổi kết quả".
               Ẩn hẳn với non-admin, chỉ ADMIN mới cần lọc theo khoa (xem toàn
-              bộ dữ liệu).
+              bộ dữ liệu). [FE-37] Mở thêm cho người có quyền xem mọi khoa — xem
+              `canFilterDepartment` ở đầu component.
             */}
-            {isAdmin && (
+            {canFilterDepartment && (
               <div className="min-w-40 space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">Khoa/Phòng</label>
                 <select
@@ -416,17 +449,8 @@ export function DocumentsListPage() {
         )}
       </div>
 
-      {canBulkAct && (
-        <BatchActionBar
-          count={selection.selectedIds.size}
-          onClear={selection.clear}
-          onDelete={isAdmin ? () => setBatchDeleteOpen(true) : undefined}
-          onRestore={canBulkRestore ? () => setBatchRestoreOpen(true) : undefined}
-          isLoading={bulkDeleteMutation.isPending || bulkRestoreMutation.isPending}
-        />
-      )}
-
       <DataTable
+        className="rounded-none border-0"
         columns={columns}
         data={documents}
         keyExtractor={(row) => row._id}
@@ -472,6 +496,7 @@ export function DocumentsListPage() {
           </div>
         )}
       />
+      </div>
 
       {pagination && (
         <Pagination page={pagination.page} limit={pagination.limit} total={pagination.total} totalPages={pagination.totalPages} onPageChange={setPage} />
@@ -508,7 +533,7 @@ export function DocumentsListPage() {
         open={batchDeleteOpen}
         onClose={() => setBatchDeleteOpen(false)}
         onConfirm={() => {
-          bulkDeleteMutation.mutate([...selection.selectedIds], {
+          bulkDeleteMutation.mutate(activeIds, {
             onSuccess: () => {
               setBatchDeleteOpen(false);
               selection.clear();
@@ -516,7 +541,7 @@ export function DocumentsListPage() {
           });
         }}
         title="Xoá tài liệu đã chọn"
-        message={`Ẩn ${selection.selectedIds.size} tài liệu đã chọn? Mục còn biên bản tham chiếu hoặc workflow đang chờ duyệt sẽ bị bỏ qua kèm lý do.`}
+        message={`Ẩn ${activeIds.length} tài liệu đã chọn? Mục còn biên bản tham chiếu hoặc workflow đang chờ duyệt sẽ bị bỏ qua kèm lý do.`}
         danger
         isLoading={bulkDeleteMutation.isPending}
       />
@@ -525,7 +550,7 @@ export function DocumentsListPage() {
         open={batchRestoreOpen}
         onClose={() => setBatchRestoreOpen(false)}
         onConfirm={() => {
-          bulkRestoreMutation.mutate([...selection.selectedIds], {
+          bulkRestoreMutation.mutate(inactiveIds, {
             onSuccess: () => {
               setBatchRestoreOpen(false);
               selection.clear();
@@ -533,7 +558,7 @@ export function DocumentsListPage() {
           });
         }}
         title="Khôi phục tài liệu đã chọn"
-        message={`Khôi phục ${selection.selectedIds.size} tài liệu đã chọn? Chỉ ADMIN hoặc người tạo mới khôi phục được từng mục — mục không đủ quyền sẽ bị bỏ qua kèm lý do.`}
+        message={`Khôi phục ${inactiveIds.length} tài liệu đã chọn? Chỉ ADMIN hoặc người tạo mới khôi phục được từng mục — mục không đủ quyền sẽ bị bỏ qua kèm lý do.`}
         isLoading={bulkRestoreMutation.isPending}
       />
 

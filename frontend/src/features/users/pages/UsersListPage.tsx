@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Pencil, ShieldCheck, ShieldOff, KeyRound, Laptop, Ban, RotateCcw } from "lucide-react";
+import { Plus, Pencil, ShieldCheck, ShieldOff, KeyRound, Laptop, Ban, RotateCcw, ImageUp } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { FilterBar } from "@/components/shared/FilterBar";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
@@ -21,10 +21,12 @@ import { useRoles } from "@/features/rbac/hooks/useRoles";
 import { UserFormDrawer } from "@/features/users/components/UserFormDrawer";
 import { AssignRoleModal } from "@/features/users/components/AssignRoleModal";
 import { ResetPasswordModal } from "@/features/users/components/ResetPasswordModal";
+import { UserAvatarModal } from "@/features/users/components/UserAvatarModal";
 import { useResetUserTwoFactor } from "@/features/users/hooks/useResetUserTwoFactor";
 import { UserSessionsModal } from "@/features/users/components/UserSessionsModal";
 import { useDebounce } from "@/hooks/useDebounce";
 import { parseApiError } from "@/utils/parseApiError";
+import { splitSelectionByActive } from "@/utils/splitSelectionByActive";
 import type { GetUsersParams, UserListItem } from "@/types/user.types";
 
 const LIMIT = 10;
@@ -59,6 +61,7 @@ export function UsersListPage() {
   const [formState, setFormState] = useState<{ open: boolean; user?: UserListItem }>({ open: false });
   const [assignRoleTarget, setAssignRoleTarget] = useState<UserListItem | null>(null);
   const [resetPasswordTarget, setResetPasswordTarget] = useState<UserListItem | null>(null);
+  const [avatarTarget, setAvatarTarget] = useState<UserListItem | null>(null);
   const [resetTwoFactorTarget, setResetTwoFactorTarget] = useState<UserListItem | null>(null);
   const [sessionsTarget, setSessionsTarget] = useState<UserListItem | null>(null);
   const [disableTarget, setDisableTarget] = useState<UserListItem | null>(null);
@@ -85,6 +88,7 @@ export function UsersListPage() {
   const users = query.data?.data ?? [];
   const pagination = query.data?.pagination;
   const selection = useRowSelection(users.map((u) => u._id));
+  const { activeIds, inactiveIds } = splitSelectionByActive(users, selection.selectedIds, (r) => !!r.isActive);
   // `GET /users` KHÔNG populate `role` (chỉ ObjectId thô) — resolve tên qua
   // danh sách Role riêng (types/user.types.ts).
   const roleNameById = new Map((rolesQuery.data ?? []).map((r) => [r._id, r.name]));
@@ -124,7 +128,27 @@ export function UsersListPage() {
         }
       />
 
+      {canBulkAct && (
+        <BatchActionBar
+          count={selection.selectedIds.size}
+          onClear={selection.clear}
+          onDelete={canBulkDelete && activeIds.length > 0 ? () => setBatchDeleteOpen(true) : undefined}
+          onRestore={canBulkRestore && inactiveIds.length > 0 ? () => setBatchRestoreOpen(true) : undefined}
+          isLoading={bulkDeleteMutation.isPending || bulkRestoreMutation.isPending}
+        />
+      )}
+
+      {/*
+        [Pass 3a, UI_DESIGN_SYSTEM.md Mục 4/9.3, FE-27] — THÍ ĐIỂM: FilterBar
+        + DataTable gộp vào 1 khung viền ngoài duy nhất (thay vì 2 "card"
+        riêng cách đều nhau) — filter là toolbar điều khiển bảng bên dưới nó,
+        không phải khối ngang hàng độc lập. `divide-y` tự chèn 1 border-b
+        đúng ranh giới filter/bảng. Chỉ trang này dùng pattern mới — 31 trang
+        khác giữ nguyên `FilterBar` "standalone" mặc định.
+      */}
+      <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
       <FilterBar
+        variant="embedded"
         onReset={() => {
           setKeyword("");
           setRoleFilter("");
@@ -190,17 +214,8 @@ export function UsersListPage() {
         </div>
       </FilterBar>
 
-      {canBulkAct && (
-        <BatchActionBar
-          count={selection.selectedIds.size}
-          onClear={selection.clear}
-          onDelete={canBulkDelete ? () => setBatchDeleteOpen(true) : undefined}
-          onRestore={canBulkRestore ? () => setBatchRestoreOpen(true) : undefined}
-          isLoading={bulkDeleteMutation.isPending || bulkRestoreMutation.isPending}
-        />
-      )}
-
       <DataTable
+        className="rounded-none border-0"
         columns={columns}
         data={users}
         keyExtractor={(row) => row._id}
@@ -223,6 +238,12 @@ export function UsersListPage() {
             <PermissionGuard permission={PERMISSIONS.USER_UPDATE}>
               <Button variant="ghost" size="sm" onClick={() => setFormState({ open: true, user: row })} aria-label="Sửa">
                 <Pencil />
+              </Button>
+            </PermissionGuard>
+            {/* [MỚI DEV-079] Dùng lại permission USER_UPDATE — cùng nhóm quyền với nút "Sửa" ở trên. */}
+            <PermissionGuard permission={PERMISSIONS.USER_UPDATE}>
+              <Button variant="ghost" size="sm" onClick={() => setAvatarTarget(row)} aria-label="Ảnh đại diện">
+                <ImageUp />
               </Button>
             </PermissionGuard>
             <PermissionGuard permission={PERMISSIONS.USER_ASSIGN_ROLE}>
@@ -263,6 +284,7 @@ export function UsersListPage() {
           </div>
         )}
       />
+      </div>
 
       {pagination && (
         <Pagination
@@ -277,6 +299,7 @@ export function UsersListPage() {
       <UserFormDrawer open={formState.open} onClose={() => setFormState({ open: false })} user={formState.user} />
       <AssignRoleModal open={!!assignRoleTarget} onClose={() => setAssignRoleTarget(null)} user={assignRoleTarget} />
       <ResetPasswordModal open={!!resetPasswordTarget} onClose={() => setResetPasswordTarget(null)} user={resetPasswordTarget} />
+      <UserAvatarModal open={!!avatarTarget} onClose={() => setAvatarTarget(null)} user={avatarTarget} />
       <UserSessionsModal open={!!sessionsTarget} onClose={() => setSessionsTarget(null)} user={sessionsTarget} />
 
       <ConfirmDialog
@@ -309,7 +332,7 @@ export function UsersListPage() {
         open={batchDeleteOpen}
         onClose={() => setBatchDeleteOpen(false)}
         onConfirm={() => {
-          bulkDeleteMutation.mutate([...selection.selectedIds], {
+          bulkDeleteMutation.mutate(activeIds, {
             onSuccess: () => {
               setBatchDeleteOpen(false);
               selection.clear();
@@ -317,7 +340,7 @@ export function UsersListPage() {
           });
         }}
         title="Vô hiệu hoá user đã chọn"
-        message={`Vô hiệu hoá ${selection.selectedIds.size} tài khoản đã chọn? Các user sẽ bị đăng xuất khỏi mọi thiết bị ngay lập tức. Tài khoản ADMIN sẽ không bị ảnh hưởng.`}
+        message={`Vô hiệu hoá ${activeIds.length} tài khoản đã chọn? Các user sẽ bị đăng xuất khỏi mọi thiết bị ngay lập tức. Tài khoản ADMIN sẽ không bị ảnh hưởng.`}
         danger
         isLoading={bulkDeleteMutation.isPending}
       />
@@ -326,7 +349,7 @@ export function UsersListPage() {
         open={batchRestoreOpen}
         onClose={() => setBatchRestoreOpen(false)}
         onConfirm={() => {
-          bulkRestoreMutation.mutate([...selection.selectedIds], {
+          bulkRestoreMutation.mutate(inactiveIds, {
             onSuccess: () => {
               setBatchRestoreOpen(false);
               selection.clear();
@@ -334,7 +357,7 @@ export function UsersListPage() {
           });
         }}
         title="Khôi phục user đã chọn"
-        message={`Khôi phục ${selection.selectedIds.size} tài khoản đã chọn?`}
+        message={`Khôi phục ${inactiveIds.length} tài khoản đã chọn?`}
         isLoading={bulkRestoreMutation.isPending}
       />
     </div>

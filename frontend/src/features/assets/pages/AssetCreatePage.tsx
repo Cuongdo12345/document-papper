@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { useCreateAsset } from "@/features/assets/hooks/useCreateAsset";
 import { useAssetCategories } from "@/features/assets/hooks/useAssetCategories";
+import { AssetCategoryOptions } from "@/features/assets/components/AssetCategoryOptions";
+import { getCategoryAncestorNames } from "@/features/assets/utils/categoryTree";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import { usePermission } from "@/hooks/usePermission";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -51,7 +53,8 @@ export function AssetCreatePage() {
   const canBrowseDepartments = hasPermission(PERMISSIONS.DEPARTMENT_VIEW);
   const canBrowseCategories = hasPermission(PERMISSIONS.ASSET_CATEGORY_VIEW);
   const departmentsQuery = useDepartments({ limit: 100 }, { enabled: canBrowseDepartments });
-  const categoriesQuery = useAssetCategories({ limit: 100 }, { enabled: canBrowseCategories });
+  // DEV-080: limit 300 — dựng cây cần ĐỦ mọi danh mục (thiếu cha thì con bị đẩy lên gốc).
+  const categoriesQuery = useAssetCategories({ limit: 300 }, { enabled: canBrowseCategories });
 
   const form = useForm<CreateAssetFormValues>({
     resolver: zodResolver(createAssetSchema),
@@ -70,7 +73,10 @@ export function AssetCreatePage() {
     },
   });
 
-  const { register, handleSubmit, formState } = form;
+  const { register, handleSubmit, formState, control } = form;
+  // DEV-082: chú thích nhóm của danh mục đang chọn (chỉ hiển thị).
+  const selectedCategory = useWatch({ control, name: "category" });
+  const categoryGroupPath = getCategoryAncestorNames(categoriesQuery.data?.data ?? [], selectedCategory);
   const apiError = createMutation.error ? parseApiError(createMutation.error) : null;
   const isLoadingRefData = (canBrowseDepartments && departmentsQuery.isLoading) || (canBrowseCategories && categoriesQuery.isLoading);
 
@@ -129,19 +135,21 @@ export function AssetCreatePage() {
                 <select
                   id="asset-category"
                   aria-invalid={!!formState.errors.category}
+                  aria-describedby={categoryGroupPath.length ? "asset-category-group" : undefined}
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   {...register("category")}
                 >
                   <option value="">-- Chọn danh mục --</option>
-                  {categoriesQuery.data?.data.map((c) => (
-                    <option key={c._id} value={c._id}>
-                      {c.name}
-                    </option>
-                  ))}
+                  <AssetCategoryOptions categories={categoriesQuery.data?.data ?? []} mode="leaf" />
                 </select>
               ) : (
                 <p role="alert" className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   Tài khoản của bạn không có quyền xem danh mục tài sản — liên hệ quản trị viên.
+                </p>
+              )}
+              {canBrowseCategories && categoryGroupPath.length > 0 && (
+                <p id="asset-category-group" className="text-xs text-muted-foreground">
+                  Nhóm: {categoryGroupPath.join(" › ")}
                 </p>
               )}
               {formState.errors.category && <p className="text-xs text-destructive">{formState.errors.category.message}</p>}

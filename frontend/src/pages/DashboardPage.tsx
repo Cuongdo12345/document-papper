@@ -12,7 +12,12 @@ import {
   Trophy,
   CalendarRange,
   Timer,
+  RefreshCw,
 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { useIsFetching, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { useDashboardAlertCount } from "@/features/dashboard/hooks/useDashboardAlertCount";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePermission } from "@/hooks/usePermission";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
@@ -36,6 +41,56 @@ import { CalibrationDueWidget } from "@/features/dashboard/components/Calibratio
 import { WorkflowOverdueApprovalsWidget } from "@/features/dashboard/components/WorkflowOverdueApprovalsWidget";
 
 const SECTION_CLASS = "space-y-3 rounded-lg border border-border bg-card p-4";
+
+const TAB_VALUES = ["overview", "assets", "medical-devices", "trends", "alerts"] as const;
+type DashboardTab = (typeof TAB_VALUES)[number];
+
+/**
+ * [FE-37] Nút "Làm mới" + giờ cập nhật. Làm mới = invalidate MỌI query `["dashboard", ...]`
+ * (tab đang mở tải lại ngay, tab khác tải lại khi mở). Giờ hiển thị = lần tải
+ * thành công gần nhất trong số các query dashboard. Lưu ý: backend vẫn cache
+ * mỗi API dashboard 30 giây (`DASHBOARD_CACHE_TTL_MS`) — bấm liên tục trong
+ * 30 giây sẽ nhận lại cùng số liệu (đã ghi ở mô tả trang).
+ */
+function DashboardRefreshControl() {
+  const queryClient = useQueryClient();
+  const fetchingCount = useIsFetching({ queryKey: ["dashboard"] });
+  // `fetchingCount` đổi mỗi khi bắt đầu/xong 1 lần tải → component render lại → giờ luôn mới nhất.
+  const lastUpdated = Math.max(0, ...queryClient.getQueryCache().findAll({ queryKey: ["dashboard"] }).map((q) => q.state.dataUpdatedAt));
+  const isFetching = fetchingCount > 0;
+
+  return (
+    <div className="flex items-center gap-3">
+      {lastUpdated > 0 && (
+        <span className="text-xs text-muted-foreground" aria-live="polite">
+          Cập nhật lúc {new Date(lastUpdated).toLocaleTimeString("vi-VN")}
+        </span>
+      )}
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={() => queryClient.invalidateQueries({ queryKey: ["dashboard"] })}
+        disabled={isFetching}
+      >
+        <RefreshCw className={isFetching ? "animate-spin" : undefined} aria-hidden="true" />
+        Làm mới
+      </Button>
+    </div>
+  );
+}
+
+/** [FE-37] Số mục cảnh báo trên tab "Cảnh báo" — ẩn khi đang tải hoặc = 0. */
+function AlertCountBadge() {
+  const count = useDashboardAlertCount();
+  if (!count) return null;
+  return (
+    // Nền đặc + `warning-foreground` (không dùng `text-warning` trên nền nhạt: chỉ ~2:1, dưới chuẩn AA).
+    <span className="ml-0.5 rounded-full bg-warning px-1.5 py-px text-xs font-semibold tabular-nums text-warning-foreground">
+      {count.toLocaleString("vi-VN")}
+      <span className="sr-only"> mục</span>
+    </span>
+  );
+}
 
 /**
  * FE-09 (nâng cấp UI, 2026-09-08) — theo yêu cầu user: chuyển layout xếp
@@ -70,6 +125,14 @@ export function DashboardPage() {
   // KHÔNG đụng tới, xem DEV-043.md lựa chọn #3 KHÔNG được chọn).
   const canDrilldownOtherDepartments = isAdmin || hasPermission(PERMISSIONS.DOCUMENT_VIEW_ALL_DEPARTMENTS);
 
+  // [FE-37] Tab đang xem nằm trên URL (`?tab=alerts`) — bấm vào 1 dòng trong tab rồi
+  // Back / F5 / gửi link vẫn về đúng tab (trước đây luôn về "Tổng quan").
+  // `replace`: đổi tab không tạo thêm mục lịch sử, Back vẫn rời Dashboard như cũ.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const activeTab: DashboardTab = (TAB_VALUES as readonly string[]).includes(tabParam ?? "") ? (tabParam as DashboardTab) : "overview";
+  const changeTab = (value: string) => setSearchParams(value === "overview" ? {} : { tab: value }, { replace: true });
+
   if (isLoading) return <LoadingState label="Đang tải thông tin tài khoản..." />;
 
   if (!canViewDashboard) {
@@ -98,9 +161,13 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Tổng quan hệ thống" description="Số liệu cập nhật theo thời gian thực (cache 30 giây)." />
+      <PageHeader
+        title="Tổng quan hệ thống"
+        description="Số liệu cập nhật theo thời gian thực (cache 30 giây)."
+        actions={<DashboardRefreshControl />}
+      />
 
-      <Tabs defaultValue="overview">
+      <Tabs value={activeTab} onValueChange={changeTab}>
         <TabsList>
           <TabsTrigger value="overview">
             <LayoutDashboard className="size-4" aria-hidden="true" />
@@ -121,6 +188,7 @@ export function DashboardPage() {
           <TabsTrigger value="alerts">
             <AlertTriangle className="size-4" aria-hidden="true" />
             Cảnh báo
+            <AlertCountBadge />
           </TabsTrigger>
         </TabsList>
 

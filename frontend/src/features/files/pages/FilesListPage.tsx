@@ -22,6 +22,7 @@ import type { UploadedFile } from "@/types/file.types";
 
 const LIMIT = 20;
 const MAX_SIZE_BYTES = 10 * 1024 * 1024; // khớp `createUploader({maxSize:...})` mặc định (upload.middleware.ts)
+const MAX_FILES = 10; // khớp `MAX_FILES_PER_REQUEST` (upload.middleware.ts, BR-15/DEV-103)
 const ACCEPT = ".pdf,.jpg,.jpeg,.png,.docx,.xlsx";
 const ALLOWED_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".docx", ".xlsx"];
 
@@ -163,7 +164,9 @@ export function FilesListPage() {
         }
       />
 
-      <FilterBar onReset={resetFilters}>
+      {/* [Pass 3b, FE-27/FE-28, UI_DESIGN_SYSTEM.md Mục 4/9.3] Gộp FilterBar+DataTable vào 1 khung viền ngoài. */}
+      <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+      <FilterBar variant="embedded" onReset={resetFilters}>
         <div className="min-w-48 space-y-1.5">
           <label htmlFor="file-search" className="text-xs font-medium text-muted-foreground">
             Tìm theo tên file
@@ -260,6 +263,7 @@ export function FilesListPage() {
       </FilterBar>
 
       <DataTable
+        className="rounded-none border-0"
         columns={columns}
         data={items}
         keyExtractor={(row) => row._id}
@@ -293,6 +297,7 @@ export function FilesListPage() {
           </div>
         )}
       />
+      </div>
 
       {query.data?.pagination && query.data.pagination.totalPages > 1 && (
         <Pagination
@@ -310,11 +315,12 @@ export function FilesListPage() {
             accept={ACCEPT}
             allowedExtensions={ALLOWED_EXTENSIONS}
             maxSizeBytes={MAX_SIZE_BYTES}
+            maxFiles={MAX_FILES}
             multiple
             disabled={uploadMutation.isPending}
             value={pendingFiles}
             onChange={setPendingFiles}
-            helperText="PDF, ảnh, Word, Excel — tối đa 10MB/file"
+            helperText="PDF, ảnh, Word, Excel — tối đa 10 file mỗi lần, 10MB/file"
           />
 
           {uploadMutation.isPending && progress !== null && (

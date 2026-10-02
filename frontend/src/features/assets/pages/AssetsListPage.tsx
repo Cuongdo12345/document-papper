@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, Eye, Pencil, Trash2, RotateCcw, ScanLine, CalendarDays } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { FilterBar } from "@/components/shared/FilterBar";
@@ -16,6 +16,7 @@ import { useRowSelection } from "@/hooks/useRowSelection";
 import { PERMISSIONS } from "@/constants/permissions";
 import { useAssets } from "@/features/assets/hooks/useAssets";
 import { useAssetCategories } from "@/features/assets/hooks/useAssetCategories";
+import { AssetCategoryOptions } from "@/features/assets/components/AssetCategoryOptions";
 import { useDeleteAsset } from "@/features/assets/hooks/useDeleteAsset";
 import { useBulkDeleteAsset } from "@/features/assets/hooks/useBulkDeleteAsset";
 import { useRestoreAsset } from "@/features/assets/hooks/useRestoreAsset";
@@ -23,21 +24,14 @@ import { useBulkRestoreAsset } from "@/features/assets/hooks/useBulkRestoreAsset
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import { useDebounce } from "@/hooks/useDebounce";
 import { parseApiError } from "@/utils/parseApiError";
+import { splitSelectionByActive } from "@/utils/splitSelectionByActive";
 import { AssetStatusBadge } from "@/features/assets/components/AssetStatusBadge";
+import { ASSET_STATUS_MAP } from "@/features/assets/constants/assetStatus.constants";
 import { AssetSectionTabs } from "@/features/assets/components/AssetSectionTabs";
 import { AssetExcelMenu } from "@/features/assets/components/AssetExcelMenu";
 import { ASSET_STATUSES, type AssetListItem, type AssetStatus } from "@/types/asset.types";
 
 const LIMIT = 10;
-
-const STATUS_LABEL: Record<AssetStatus, string> = {
-  IN_STOCK: "Trong kho",
-  IN_USE: "Đang sử dụng",
-  UNDER_MAINTENANCE: "Đang bảo trì",
-  RESERVED: "Đã giữ chỗ",
-  DISPOSED: "Đã thanh lý",
-  LOST: "Thất lạc/mất",
-};
 
 /**
  * DEV-035 (fix FE-06 Remaining Issue #1): `QueryAssetDTO`/`getAllAssetsService`
@@ -62,11 +56,20 @@ export function AssetsListPage() {
   const canBulkRestore = hasPermission(PERMISSIONS.ASSET_UPDATE);
   const canBulkAct = canBulkDelete || canBulkRestore;
 
+  // DEV-083: đọc `?status=` từ URL lúc mở trang — cho phép các nơi khác
+  // (KPI "Tài sản" ở Dashboard) liên kết thẳng tới danh sách đã lọc sẵn theo
+  // trạng thái. CHỈ đọc 1 LẦN lúc mount (lazy initializer) — đổi bộ lọc sau
+  // đó KHÔNG ghi ngược lại URL, giữ đúng phạm vi yêu cầu (chỉ cần click từ
+  // Dashboard ra danh sách đã lọc, không cần deep-link đầy đủ 2 chiều).
+  const [searchParams] = useSearchParams();
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState("");
   const [department, setDepartment] = useState("");
   const [category, setCategory] = useState("");
-  const [status, setStatus] = useState<AssetStatus | "">("");
+  const [status, setStatus] = useState<AssetStatus | "">(() => {
+    const fromUrl = searchParams.get("status");
+    return fromUrl && (ASSET_STATUSES as readonly string[]).includes(fromUrl) ? (fromUrl as AssetStatus) : "";
+  });
   const [isActive, setIsActive] = useState<"true" | "false" | "">("true");
   const [sortBy, setSortBy] = useState<"createdAt" | "name" | "assetCode">("createdAt");
   const [order, setOrder] = useState<"asc" | "desc">("desc");
@@ -97,7 +100,7 @@ export function AssetsListPage() {
   }
 
   const departmentsQuery = useDepartments({ limit: 100 }, { enabled: canBrowseDepartments });
-  const categoriesQuery = useAssetCategories({ limit: 100 }, { enabled: canBrowseCategories });
+  const categoriesQuery = useAssetCategories({ limit: 300 }, { enabled: canBrowseCategories });
   const query = useAssets({
     page,
     limit: LIMIT,
@@ -117,6 +120,7 @@ export function AssetsListPage() {
   const assets = query.data?.data ?? [];
   const pagination = query.data?.pagination;
   const selection = useRowSelection(assets.map((a) => a._id));
+  const { activeIds, inactiveIds } = splitSelectionByActive(assets, selection.selectedIds, (r) => r.isActive !== false);
 
   const columns: DataTableColumn<AssetListItem>[] = [
     { key: "assetCode", header: "Mã tài sản", className: "font-mono", sortKey: "assetCode" },
@@ -174,7 +178,19 @@ export function AssetsListPage() {
 
       <AssetSectionTabs />
 
-      <FilterBar onReset={resetFilters}>
+      {canBulkAct && (
+        <BatchActionBar
+          count={selection.selectedIds.size}
+          onClear={selection.clear}
+          onDelete={canBulkDelete && activeIds.length > 0 ? () => setBatchDeleteOpen(true) : undefined}
+          onRestore={canBulkRestore && inactiveIds.length > 0 ? () => setBatchRestoreOpen(true) : undefined}
+          isLoading={bulkDeleteMutation.isPending || bulkRestoreMutation.isPending}
+        />
+      )}
+
+      {/* [Pass 3b, FE-27/FE-28, UI_DESIGN_SYSTEM.md Mục 4/9.3] Gộp FilterBar+DataTable vào 1 khung viền ngoài. */}
+      <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+      <FilterBar variant="embedded" onReset={resetFilters}>
         <div className="min-w-48 space-y-1.5">
           <label htmlFor="asset-search" className="text-xs font-medium text-muted-foreground">
             Tìm kiếm (mã/tên/serial)
@@ -224,11 +240,8 @@ export function AssetsListPage() {
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <option value="">Tất cả</option>
-              {categoriesQuery.data?.data.map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.name}
-                </option>
-              ))}
+              {/* DEV-080: chọn danh mục nhóm → backend lọc gồm cả con cháu. */}
+              <AssetCategoryOptions categories={categoriesQuery.data?.data ?? []} mode="tree" />
             </select>
           </div>
         )}
@@ -246,7 +259,7 @@ export function AssetsListPage() {
             <option value="">Tất cả</option>
             {ASSET_STATUSES.map((s) => (
               <option key={s} value={s}>
-                {STATUS_LABEL[s]}
+                {ASSET_STATUS_MAP[s].label}
               </option>
             ))}
           </select>
@@ -269,17 +282,8 @@ export function AssetsListPage() {
         </div>
       </FilterBar>
 
-      {canBulkAct && (
-        <BatchActionBar
-          count={selection.selectedIds.size}
-          onClear={selection.clear}
-          onDelete={canBulkDelete ? () => setBatchDeleteOpen(true) : undefined}
-          onRestore={canBulkRestore ? () => setBatchRestoreOpen(true) : undefined}
-          isLoading={bulkDeleteMutation.isPending || bulkRestoreMutation.isPending}
-        />
-      )}
-
       <DataTable
+        className="rounded-none border-0"
         columns={columns}
         data={assets}
         keyExtractor={(row) => row._id}
@@ -325,6 +329,7 @@ export function AssetsListPage() {
           )
         }
       />
+      </div>
 
       {pagination && (
         <Pagination page={pagination.page} limit={pagination.limit} total={pagination.total} totalPages={pagination.totalPages} onPageChange={setPage} />
@@ -359,7 +364,7 @@ export function AssetsListPage() {
         open={batchDeleteOpen}
         onClose={() => setBatchDeleteOpen(false)}
         onConfirm={() => {
-          bulkDeleteMutation.mutate([...selection.selectedIds], {
+          bulkDeleteMutation.mutate(activeIds, {
             onSuccess: () => {
               setBatchDeleteOpen(false);
               selection.clear();
@@ -367,7 +372,7 @@ export function AssetsListPage() {
           });
         }}
         title="Xoá tài sản đã chọn"
-        message={`Ẩn ${selection.selectedIds.size} tài sản đã chọn? Có thể khôi phục lại sau bằng bộ lọc "Hiển thị: Đã ẩn".`}
+        message={`Ẩn ${activeIds.length} tài sản đã chọn? Có thể khôi phục lại sau bằng bộ lọc "Hiển thị: Đã ẩn".`}
         danger
         isLoading={bulkDeleteMutation.isPending}
       />
@@ -376,7 +381,7 @@ export function AssetsListPage() {
         open={batchRestoreOpen}
         onClose={() => setBatchRestoreOpen(false)}
         onConfirm={() => {
-          bulkRestoreMutation.mutate([...selection.selectedIds], {
+          bulkRestoreMutation.mutate(inactiveIds, {
             onSuccess: () => {
               setBatchRestoreOpen(false);
               selection.clear();
@@ -384,7 +389,7 @@ export function AssetsListPage() {
           });
         }}
         title="Khôi phục tài sản đã chọn"
-        message={`Khôi phục ${selection.selectedIds.size} tài sản đã chọn?`}
+        message={`Khôi phục ${inactiveIds.length} tài sản đã chọn?`}
         isLoading={bulkRestoreMutation.isPending}
       />
     </div>

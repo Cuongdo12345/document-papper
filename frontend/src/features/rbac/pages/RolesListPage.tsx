@@ -91,7 +91,9 @@ export function RolesListPage() {
 
       <RbacSectionTabs />
 
-      <FilterBar onReset={() => setKeyword("")}>
+      {/* [Pass 3b, FE-27/FE-28, UI_DESIGN_SYSTEM.md Mục 4/9.3] Gộp FilterBar+DataTable vào 1 khung viền ngoài. */}
+      <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+      <FilterBar variant="embedded" onReset={() => setKeyword("")}>
         <div className="min-w-48 space-y-1.5">
           <label htmlFor="role-search" className="text-xs font-medium text-muted-foreground">
             Tìm kiếm (tên role)
@@ -110,6 +112,7 @@ export function RolesListPage() {
       </FilterBar>
 
       <DataTable
+        className="rounded-none border-0"
         columns={columns}
         data={roles}
         keyExtractor={(row) => row._id}
@@ -145,6 +148,7 @@ export function RolesListPage() {
           </div>
         )}
       />
+      </div>
 
       {pagination && (
         <Pagination page={pagination.page} limit={pagination.limit} total={pagination.total} totalPages={pagination.totalPages} onPageChange={setPage} />

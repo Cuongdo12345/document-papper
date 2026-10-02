@@ -11,7 +11,15 @@ export type MedicalDeviceClass = (typeof MEDICAL_DEVICE_CLASSES)[number];
 
 export interface MedicalDeviceProfile {
   _id: string;
-  asset: string | { _id: string; assetCode: string; name: string };
+  asset:
+    | string
+    | {
+        _id: string;
+        assetCode: string;
+        name: string;
+        /** [MỚI, DEV-077] Backend LUÔN populate (`medicalDevice.service.ts:PROFILE_POPULATE`) — trước đây thiếu ở type này. Dùng để lấy danh sách người đủ điều kiện vận hành theo danh mục. */
+        category?: { _id: string; code: string; name: string };
+      };
   deviceClass: MedicalDeviceClass;
   registrationNumber?: string;
   licenseExpiredAt?: string;
@@ -20,6 +28,8 @@ export interface MedicalDeviceProfile {
   lastCalibrationDate?: string;
   nextCalibrationDueDate?: string;
   calibrationAlertSentAt?: string;
+  /** [MỚI] Cảnh báo hết hạn giấy phép lưu hành — chỉ server set, không gửi qua request body. */
+  licenseAlertSentAt?: string;
   operatorCertificateRequired: boolean;
   createdAt: string;
   updatedAt: string;

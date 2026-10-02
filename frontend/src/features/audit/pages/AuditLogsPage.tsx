@@ -157,7 +157,9 @@ export function AuditLogsPage() {
         </TabsList>
 
         <TabsContent value="logs" className="space-y-4">
-          <FilterBar onReset={resetFilters}>
+          {/* [Pass 3b, FE-27/FE-28, UI_DESIGN_SYSTEM.md Mục 4/9.3] Gộp FilterBar+DataTable vào 1 khung viền ngoài. */}
+          <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+          <FilterBar variant="embedded" onReset={resetFilters}>
             <div className="min-w-40 space-y-1.5">
               <label htmlFor="audit-from" className="text-xs font-medium text-muted-foreground">
                 Từ ngày
@@ -301,6 +303,7 @@ export function AuditLogsPage() {
           </FilterBar>
 
           <DataTable
+            className="rounded-none border-0"
             columns={columns}
             data={logs}
             keyExtractor={(row) => row._id}
@@ -316,6 +319,7 @@ export function AuditLogsPage() {
               </Button>
             )}
           />
+          </div>
 
           {pagination && (
             <Pagination page={pagination.page} limit={pagination.limit} total={pagination.total} totalPages={pagination.totalPages} onPageChange={setPage} />

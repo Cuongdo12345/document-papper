@@ -17,6 +17,8 @@ import type {
   GetAlertListParams,
   MedicalDeviceDashboardSummary,
   CalibrationDueItem,
+  MedicalDeviceByClassItem,
+  GetMedicalDevicesByClassParams,
   DashboardPagination,
   OverdueApprovalItem,
 } from "@/types/dashboard.types";
@@ -105,6 +107,13 @@ export function getMedicalDeviceCalibrationDue(
   params: GetAlertListParams & { sortBy?: "nextCalibrationDueDate" | "deviceClass"; sortOrder?: "asc" | "desc" },
 ): Promise<AxiosResponse<{ success: boolean; data: CalibrationDueItem[]; pagination: DashboardPagination }>> {
   return axiosInstance.get("/dashboard/medical-devices/calibration-due", { params: { daysAhead, ...params } });
+}
+
+/** [MỚI DEV-084] Danh sách thiết bị y tế theo phân loại A/B/C/D — modal "Xem danh sách" ở `MedicalDeviceSummaryWidget`. */
+export function getMedicalDevicesByClass(
+  params: GetMedicalDevicesByClassParams,
+): Promise<AxiosResponse<{ success: boolean; data: MedicalDeviceByClassItem[]; pagination: DashboardPagination }>> {
+  return axiosInstance.get("/dashboard/medical-devices/by-class", { params });
 }
 
 /** Roadmap B1 (SLA & nhắc việc Workflow) — "Đề xuất trễ hạn". */

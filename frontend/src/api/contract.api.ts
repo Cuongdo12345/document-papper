@@ -1,6 +1,6 @@
 import type { AxiosResponse } from "axios";
 import { axiosInstance } from "@/api/axios";
-import type { Pagination } from "@/types/shared.types";
+import type { Pagination, BulkDeleteResult } from "@/types/shared.types";
 import type {
   Contract,
   CreateContractRequest,
@@ -53,4 +53,17 @@ export function cancelContract(
 /** [MỚI 2026-09-16, DEV-058] Khôi phục hợp đồng đã huỷ — permission CONTRACT_RESTORE riêng. */
 export function restoreContract(id: string): Promise<AxiosResponse<{ message: string; data: Contract }>> {
   return axiosInstance.patch(`/contracts/${id}/restore`);
+}
+
+/** [DEV-087] Huỷ hàng loạt — cùng permission CONTRACT_UPDATE với huỷ từng dòng; `cancelReason` áp chung. */
+export function bulkCancelContracts(
+  ids: string[],
+  cancelReason?: string,
+): Promise<AxiosResponse<{ message: string; data: BulkDeleteResult }>> {
+  return axiosInstance.post("/contracts/bulk-cancel", { ids, cancelReason });
+}
+
+/** [DEV-087] Khôi phục hàng loạt — permission CONTRACT_RESTORE. */
+export function bulkRestoreContracts(ids: string[]): Promise<AxiosResponse<{ message: string; data: BulkDeleteResult }>> {
+  return axiosInstance.post("/contracts/bulk-restore", { ids });
 }

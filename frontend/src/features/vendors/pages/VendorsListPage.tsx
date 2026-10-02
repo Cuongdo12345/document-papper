@@ -18,6 +18,7 @@ import { useUpdateVendor, useBulkDeleteVendor, useBulkRestoreVendor } from "@/fe
 import { CreateVendorModal } from "@/features/vendors/components/CreateVendorModal";
 import { EditVendorModal } from "@/features/vendors/components/EditVendorModal";
 import { parseApiError } from "@/utils/parseApiError";
+import { splitSelectionByActive } from "@/utils/splitSelectionByActive";
 import type { Vendor } from "@/types/vendor.types";
 
 const LIMIT = 10;
@@ -56,6 +57,7 @@ export function VendorsListPage() {
   const vendors = query.data?.data ?? [];
   const pagination = query.data?.pagination;
   const selection = useRowSelection(vendors.map((v) => v._id));
+  const { activeIds, inactiveIds } = splitSelectionByActive(vendors, selection.selectedIds, (r) => !!r.isActive);
 
   const columns: DataTableColumn<Vendor>[] = [
     {
@@ -95,7 +97,19 @@ export function VendorsListPage() {
         }
       />
 
-      <FilterBar onReset={resetFilters}>
+      <PermissionGuard permission={PERMISSIONS.VENDOR_UPDATE}>
+        <BatchActionBar
+          count={selection.selectedIds.size}
+          onClear={selection.clear}
+          onDelete={activeIds.length > 0 ? () => setBatchDeleteOpen(true) : undefined}
+          onRestore={inactiveIds.length > 0 ? () => setBatchRestoreOpen(true) : undefined}
+          isLoading={bulkDeleteMutation.isPending || bulkRestoreMutation.isPending}
+        />
+      </PermissionGuard>
+
+      {/* [Pass 3b, FE-27/FE-28, UI_DESIGN_SYSTEM.md Mục 4/9.3] Gộp FilterBar+DataTable vào 1 khung viền ngoài. */}
+      <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+      <FilterBar variant="embedded" onReset={resetFilters}>
         <div className="min-w-48 space-y-1.5">
           <label htmlFor="v-search" className="text-xs font-medium text-muted-foreground">
             Tìm kiếm (tên)
@@ -129,17 +143,8 @@ export function VendorsListPage() {
         </div>
       </FilterBar>
 
-      <PermissionGuard permission={PERMISSIONS.VENDOR_UPDATE}>
-        <BatchActionBar
-          count={selection.selectedIds.size}
-          onClear={selection.clear}
-          onDelete={() => setBatchDeleteOpen(true)}
-          onRestore={() => setBatchRestoreOpen(true)}
-          isLoading={bulkDeleteMutation.isPending || bulkRestoreMutation.isPending}
-        />
-      </PermissionGuard>
-
       <DataTable
+        className="rounded-none border-0"
         columns={columns}
         data={vendors}
         keyExtractor={(row) => row._id}
@@ -174,6 +179,7 @@ export function VendorsListPage() {
           </div>
         )}
       />
+      </div>
 
       {pagination && (
         <Pagination page={pagination.page} limit={pagination.limit} total={pagination.total} totalPages={pagination.totalPages} onPageChange={setPage} />
@@ -220,7 +226,7 @@ export function VendorsListPage() {
         open={batchDeleteOpen}
         onClose={() => setBatchDeleteOpen(false)}
         onConfirm={() => {
-          bulkDeleteMutation.mutate([...selection.selectedIds], {
+          bulkDeleteMutation.mutate(activeIds, {
             onSuccess: () => {
               setBatchDeleteOpen(false);
               selection.clear();
@@ -228,7 +234,7 @@ export function VendorsListPage() {
           });
         }}
         title="Ngừng hợp tác nhà cung cấp đã chọn"
-        message={`Ngừng hợp tác với ${selection.selectedIds.size} nhà cung cấp đã chọn? Có thể khôi phục lại sau bằng bộ lọc "Hiển thị: Đã ngừng".`}
+        message={`Ngừng hợp tác với ${activeIds.length} nhà cung cấp đã chọn? Có thể khôi phục lại sau bằng bộ lọc "Hiển thị: Đã ngừng".`}
         danger
         isLoading={bulkDeleteMutation.isPending}
       />
@@ -237,7 +243,7 @@ export function VendorsListPage() {
         open={batchRestoreOpen}
         onClose={() => setBatchRestoreOpen(false)}
         onConfirm={() => {
-          bulkRestoreMutation.mutate([...selection.selectedIds], {
+          bulkRestoreMutation.mutate(inactiveIds, {
             onSuccess: () => {
               setBatchRestoreOpen(false);
               selection.clear();
@@ -245,7 +251,7 @@ export function VendorsListPage() {
           });
         }}
         title="Khôi phục nhà cung cấp đã chọn"
-        message={`Khôi phục hợp tác với ${selection.selectedIds.size} nhà cung cấp đã chọn?`}
+        message={`Khôi phục hợp tác với ${inactiveIds.length} nhà cung cấp đã chọn?`}
         isLoading={bulkRestoreMutation.isPending}
       />
     </div>

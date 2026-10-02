@@ -27,6 +27,7 @@ import { InventorySectionTabs } from "@/features/inventory/components/InventoryS
 import { CreateConsumableItemModal } from "@/features/inventory/components/CreateConsumableItemModal";
 import { EditConsumableItemModal } from "@/features/inventory/components/EditConsumableItemModal";
 import { parseApiError } from "@/utils/parseApiError";
+import { splitSelectionByActive } from "@/utils/splitSelectionByActive";
 import type { ConsumableItem } from "@/types/consumable.types";
 
 const LIMIT = 10;
@@ -86,6 +87,7 @@ export function ConsumablesListPage() {
   const items = query.data?.data ?? [];
   const pagination = query.data?.pagination;
   const selection = useRowSelection(items.map((i) => i._id));
+  const { activeIds, inactiveIds } = splitSelectionByActive(items, selection.selectedIds, (r) => !!r.isActive);
 
   const columns: DataTableColumn<ConsumableItem>[] = [
     {
@@ -138,7 +140,19 @@ export function ConsumablesListPage() {
 
       <InventorySectionTabs />
 
-      <FilterBar onReset={resetFilters}>
+      <PermissionGuard permission={PERMISSIONS.CONSUMABLE_UPDATE}>
+        <BatchActionBar
+          count={selection.selectedIds.size}
+          onClear={selection.clear}
+          onDelete={activeIds.length > 0 ? () => setBatchDeleteOpen(true) : undefined}
+          onRestore={inactiveIds.length > 0 ? () => setBatchRestoreOpen(true) : undefined}
+          isLoading={bulkDeleteMutation.isPending || bulkRestoreMutation.isPending}
+        />
+      </PermissionGuard>
+
+      {/* [Pass 3b, FE-27/FE-28, UI_DESIGN_SYSTEM.md Mục 4/9.3] Gộp FilterBar+DataTable vào 1 khung viền ngoài. */}
+      <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+      <FilterBar variant="embedded" onReset={resetFilters}>
         <div className="min-w-48 space-y-1.5">
           <label htmlFor="ci-search" className="text-xs font-medium text-muted-foreground">
             Tìm kiếm (tên)
@@ -227,17 +241,8 @@ export function ConsumablesListPage() {
         </div>
       </FilterBar>
 
-      <PermissionGuard permission={PERMISSIONS.CONSUMABLE_UPDATE}>
-        <BatchActionBar
-          count={selection.selectedIds.size}
-          onClear={selection.clear}
-          onDelete={() => setBatchDeleteOpen(true)}
-          onRestore={() => setBatchRestoreOpen(true)}
-          isLoading={bulkDeleteMutation.isPending || bulkRestoreMutation.isPending}
-        />
-      </PermissionGuard>
-
       <DataTable
+        className="rounded-none border-0"
         columns={columns}
         data={items}
         keyExtractor={(row) => row._id}
@@ -272,6 +277,7 @@ export function ConsumablesListPage() {
           </div>
         )}
       />
+      </div>
 
       {pagination && (
         <Pagination page={pagination.page} limit={pagination.limit} total={pagination.total} totalPages={pagination.totalPages} onPageChange={setPage} />
@@ -318,7 +324,7 @@ export function ConsumablesListPage() {
         open={batchDeleteOpen}
         onClose={() => setBatchDeleteOpen(false)}
         onConfirm={() => {
-          bulkDeleteMutation.mutate([...selection.selectedIds], {
+          bulkDeleteMutation.mutate(activeIds, {
             onSuccess: () => {
               setBatchDeleteOpen(false);
               selection.clear();
@@ -326,7 +332,7 @@ export function ConsumablesListPage() {
           });
         }}
         title="Ngừng theo dõi vật tư đã chọn"
-        message={`Ngừng theo dõi ${selection.selectedIds.size} vật tư đã chọn? Có thể khôi phục lại sau bằng bộ lọc "Hiển thị: Đã ngừng".`}
+        message={`Ngừng theo dõi ${activeIds.length} vật tư đã chọn? Có thể khôi phục lại sau bằng bộ lọc "Hiển thị: Đã ngừng".`}
         danger
         isLoading={bulkDeleteMutation.isPending}
       />
@@ -335,7 +341,7 @@ export function ConsumablesListPage() {
         open={batchRestoreOpen}
         onClose={() => setBatchRestoreOpen(false)}
         onConfirm={() => {
-          bulkRestoreMutation.mutate([...selection.selectedIds], {
+          bulkRestoreMutation.mutate(inactiveIds, {
             onSuccess: () => {
               setBatchRestoreOpen(false);
               selection.clear();
@@ -343,7 +349,7 @@ export function ConsumablesListPage() {
           });
         }}
         title="Khôi phục vật tư đã chọn"
-        message={`Khôi phục theo dõi ${selection.selectedIds.size} vật tư đã chọn?`}
+        message={`Khôi phục theo dõi ${inactiveIds.length} vật tư đã chọn?`}
         isLoading={bulkRestoreMutation.isPending}
       />
     </div>

@@ -89,7 +89,10 @@ export function PoliciesListPage() {
         cùng khoa/phòng), không phải để thay thế RBAC thông thường.
       </p>
 
+      {/* [Pass 3b, FE-27/FE-28, UI_DESIGN_SYSTEM.md Mục 4/9.3] Gộp FilterBar+DataTable vào 1 khung viền ngoài. */}
+      <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
       <FilterBar
+        variant="embedded"
         onReset={() => {
           setKeyword("");
           setResource("");
@@ -128,6 +131,7 @@ export function PoliciesListPage() {
       </FilterBar>
 
       <DataTable
+        className="rounded-none border-0"
         columns={columns}
         data={policies}
         keyExtractor={(row) => row._id}
@@ -155,6 +159,7 @@ export function PoliciesListPage() {
           </div>
         )}
       />
+      </div>
 
       {pagination && (
         <Pagination page={pagination.page} limit={pagination.limit} total={pagination.total} totalPages={pagination.totalPages} onPageChange={setPage} />

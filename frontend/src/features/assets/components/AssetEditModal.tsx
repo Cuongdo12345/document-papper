@@ -1,10 +1,12 @@
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { AppModal } from "@/components/shared/AppModal";
 import { Button } from "@/components/ui/button";
 import { useUpdateAsset } from "@/features/assets/hooks/useUpdateAsset";
 import { useAssetCategories } from "@/features/assets/hooks/useAssetCategories";
+import { AssetCategoryOptions } from "@/features/assets/components/AssetCategoryOptions";
+import { getCategoryAncestorNames } from "@/features/assets/utils/categoryTree";
 import { usePermission } from "@/hooks/usePermission";
 import { PERMISSIONS } from "@/constants/permissions";
 import { parseApiError } from "@/utils/parseApiError";
@@ -48,7 +50,8 @@ export function AssetEditModal({ open, onClose, asset }: AssetEditModalProps) {
   const updateMutation = useUpdateAsset();
   const { hasPermission } = usePermission();
   const canBrowseCategories = hasPermission(PERMISSIONS.ASSET_CATEGORY_VIEW);
-  const categoriesQuery = useAssetCategories({ limit: 100 }, { enabled: canBrowseCategories });
+  // DEV-080: limit 300 — dựng cây cần ĐỦ mọi danh mục (thiếu cha thì con bị đẩy lên gốc).
+  const categoriesQuery = useAssetCategories({ limit: 300 }, { enabled: canBrowseCategories });
 
   const form = useForm<EditAssetFormValues>({
     resolver: zodResolver(editAssetSchema),
@@ -66,8 +69,11 @@ export function AssetEditModal({ open, onClose, asset }: AssetEditModalProps) {
     },
   });
 
-  const { register, handleSubmit, formState } = form;
+  const { register, handleSubmit, formState, control } = form;
   const apiError = updateMutation.error ? parseApiError(updateMutation.error) : null;
+  // DEV-082: chú thích nhóm của danh mục đang chọn (dữ liệu không đổi — chỉ hiển thị).
+  const selectedCategory = useWatch({ control, name: "category" });
+  const categoryGroupPath = getCategoryAncestorNames(categoriesQuery.data?.data ?? [], selectedCategory);
 
   function onSubmit(values: EditAssetFormValues) {
     updateMutation.mutate(
@@ -117,26 +123,34 @@ export function AssetEditModal({ open, onClose, asset }: AssetEditModalProps) {
             <label htmlFor="asset-category" className="text-sm font-medium text-foreground">
               Danh mục
             </label>
-            {canBrowseCategories ? (
+            {/* DEV-082: CHỈ render <select> khi danh mục ĐÃ tải xong — trước đây
+                select mount khi chưa có option, option đến sau thì trình duyệt tự
+                hiện option ĐẦU TIÊN trong khi giá trị form vẫn là danh mục thật
+                (hiển thị sai danh mục dù dữ liệu lưu đúng). Mount lúc đã có
+                option → react-hook-form gán đúng giá trị hiện tại vào select. */}
+            {canBrowseCategories && categoriesQuery.data ? (
               <select
                 id="asset-category"
                 aria-invalid={!!formState.errors.category}
+                aria-describedby={categoryGroupPath.length ? "asset-category-group" : undefined}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 {...register("category")}
               >
-                {categoriesQuery.data?.data.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.name}
-                  </option>
-                ))}
+                <AssetCategoryOptions categories={categoriesQuery.data?.data ?? []} mode="leaf" />
               </select>
             ) : (
               <>
                 <input type="hidden" {...register("category")} />
                 <div className="w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">
                   {asset.category.name}
+                  {canBrowseCategories && categoriesQuery.isLoading && " — đang tải danh sách danh mục…"}
                 </div>
               </>
+            )}
+            {canBrowseCategories && categoryGroupPath.length > 0 && (
+              <p id="asset-category-group" className="text-xs text-muted-foreground">
+                Nhóm: {categoryGroupPath.join(" › ")}
+              </p>
             )}
             {formState.errors.category && <p className="text-xs text-destructive">{formState.errors.category.message}</p>}
           </div>

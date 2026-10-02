@@ -21,6 +21,8 @@ interface KpiCardInput {
    * chính (`size="display"`), field này bị bỏ qua với card đó.
    */
   group?: string;
+  /** [FE-37] Đường dẫn danh sách tương ứng (caller tự bỏ trống nếu user không có quyền mở trang đích). */
+  to?: string;
 }
 
 interface DashboardSummaryLayoutProps {
@@ -67,12 +69,14 @@ export function DashboardSummaryLayout({ kpiCards, proposalsByMonth, reportsByMo
             icon={primary.icon}
             tone={primary.tone}
             size="display"
+            to={primary.to}
+            countUp
             className="sm:w-72 sm:shrink-0"
           />
         )}
 
         {secondary.length > 0 && (
-          <div className="flex flex-1 flex-wrap rounded-lg bg-muted">
+          <div className="flex flex-1 flex-wrap overflow-hidden rounded-lg bg-muted">
             {secondary.map((card, i) => {
               const startsNewGroup = i > 0 && secondary[i - 1].group !== card.group;
               return (
@@ -82,6 +86,8 @@ export function DashboardSummaryLayout({ kpiCards, proposalsByMonth, reportsByMo
                   value={card.value}
                   icon={card.icon}
                   tone={card.tone}
+                  to={card.to}
+                  countUp
                   className={cn(
                     "basis-1/2 rounded-none border-0 bg-transparent p-3 shadow-none hover:shadow-none sm:flex-1 sm:basis-auto",
                     startsNewGroup && "border-t border-border sm:border-t-0 sm:border-l",
@@ -99,6 +105,8 @@ export function DashboardSummaryLayout({ kpiCards, proposalsByMonth, reportsByMo
           Xu hướng Đề xuất / Báo cáo theo tháng (năm nay)
         </h3>
         <MonthlyTrendBars
+          label="Số đề xuất và báo cáo theo tháng, năm nay"
+          emptyMessage="Năm nay chưa có đề xuất hay báo cáo nào."
           categories={MONTH_LABELS}
           series={[
             { label: "Đề xuất", color: "primary", data: fillMonths(proposalsByMonth) },

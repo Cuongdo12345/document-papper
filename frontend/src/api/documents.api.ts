@@ -86,7 +86,14 @@ export interface DeleteDocumentsByMonthRequest {
 }
 export function deleteDocumentsByMonth(
   body: DeleteDocumentsByMonthRequest,
-): Promise<AxiosResponse<{ success: true; message: string; data: { deletedCount: number; skippedCount: number } }>> {
+): Promise<
+  AxiosResponse<{
+    success: true;
+    message: string;
+    // `skippedPendingWorkflowCount` MỚI (BR-11/DEV-098): số tài liệu bỏ qua vì có workflow chờ duyệt thật.
+    data: { deletedCount: number; skippedCount: number; skippedPendingWorkflowCount: number };
+  }>
+> {
   return axiosInstance.delete("/documents/delete-by-month", { data: body });
 }
 

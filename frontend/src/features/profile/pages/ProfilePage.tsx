@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { Pencil, KeyRound } from "lucide-react";
+import { Pencil, KeyRound, ImageUp } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { Avatar } from "@/components/shared/Avatar";
 import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { ProfileEditModal } from "@/features/profile/components/ProfileEditModal";
 import { ChangePasswordModal } from "@/features/profile/components/ChangePasswordModal";
+import { AvatarModal } from "@/features/profile/components/AvatarModal";
 import { TwoFactorSection } from "@/features/profile/components/TwoFactorSection";
 import { SessionsSection } from "@/features/profile/components/SessionsSection";
 import { useUpdateProfile } from "@/features/profile/hooks/useUpdateProfile";
@@ -47,6 +49,7 @@ export function ProfilePage() {
   const { data: user, isLoading, isError, refetch } = useCurrentUser();
   const [editOpen, setEditOpen] = useState(false);
   const [pwdOpen, setPwdOpen] = useState(false);
+  const [avatarOpen, setAvatarOpen] = useState(false);
   const updateProfile = useUpdateProfile();
 
   if (isLoading) return <LoadingState label="Đang tải thông tin cá nhân..." />;
@@ -73,14 +76,22 @@ export function ProfilePage() {
 
       <div className={SECTION_CLASS}>
         <div className="flex items-center justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge variant="primary">{user.role.name}</StatusBadge>
-            {user.role.isSystemRole && <StatusBadge variant="info">System Role</StatusBadge>}
-            {user.department && <StatusBadge variant="default">{user.department.name}</StatusBadge>}
+          <div className="flex items-center gap-3">
+            <Avatar avatar={user.avatar} fullName={user.fullName} size="lg" />
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge variant="primary">{user.role.name}</StatusBadge>
+              {user.role.isSystemRole && <StatusBadge variant="info">System Role</StatusBadge>}
+              {user.department && <StatusBadge variant="default">{user.department.name}</StatusBadge>}
+            </div>
           </div>
-          <Button variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
-            <Pencil /> Sửa thông tin
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setAvatarOpen(true)}>
+              <ImageUp /> Đổi ảnh đại diện
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
+              <Pencil /> Sửa thông tin
+            </Button>
+          </div>
         </div>
 
         <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
@@ -153,6 +164,7 @@ export function ProfilePage() {
 
       <ProfileEditModal key={user._id} open={editOpen} onClose={() => setEditOpen(false)} user={user} />
       <ChangePasswordModal open={pwdOpen} onClose={() => setPwdOpen(false)} />
+      <AvatarModal open={avatarOpen} onClose={() => setAvatarOpen(false)} currentAvatar={user.avatar} fullName={user.fullName} />
     </div>
   );
 }

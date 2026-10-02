@@ -12,10 +12,10 @@ const now = new Date();
 
 /**
  * "Xoá hàng loạt theo tháng" (`DELETE /documents/delete-by-month`) — SOFT-DELETE
- * (KHÔNG phải xoá vĩnh viễn, DOCUMENT_DOMAIN_MAP.md Mục 2). Backend hiện
- * KHÔNG có guard ADMIN-only ở route (chỉ cần permission `DOCUMENT_DELETE`) —
- * caller (`DocumentsListPage`) TỰ giới hạn hiển thị nút mở modal này chỉ cho
- * ADMIN ở UI (khuyến nghị FRONTEND_RECOMMENDATION, chưa phải backend fix).
+ * (KHÔNG phải xoá vĩnh viễn, DOCUMENT_DOMAIN_MAP.md Mục 2). Backend chỉ cho
+ * ADMIN (`isSystemRole`, DEV-044); caller (`DocumentsListPage`) cũng chỉ hiện
+ * nút mở modal này cho ADMIN. BR-11 (DEV-098): backend bỏ qua đề xuất còn
+ * biên bản tham chiếu và tài liệu có workflow chờ duyệt thật, ghi 1 dòng audit.
  */
 export function DeleteByMonthModal({ open, onClose }: DeleteByMonthModalProps) {
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -47,7 +47,8 @@ export function DeleteByMonthModal({ open, onClose }: DeleteByMonthModalProps) {
     >
       <div className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          Ẩn (soft-delete) toàn bộ tài liệu tạo trong tháng đã chọn. PROPOSAL còn REPORT tham chiếu sẽ tự động được bỏ qua.
+          Ẩn (soft-delete) toàn bộ tài liệu tạo trong tháng đã chọn. Tự động bỏ qua đề xuất còn biên bản tham chiếu và
+          tài liệu đang chờ duyệt.
         </p>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
