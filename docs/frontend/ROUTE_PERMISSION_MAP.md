@@ -37,15 +37,23 @@ Access (role thực tế hiện giữ permission đó — xem AUTH_RBAC_MAP.md M
 | `/rbac/roles` | Quản trị Role | `GET /rbac/roles` | `ROLE_VIEW` | ✅ IMPLEMENTED (FE-08) |
 | `/rbac/roles/:id` | Chi tiết Role + permission matrix | `GET /rbac/roles/:id`, `POST /rbac/roles/:id/assign-permissions` | `ROLE_VIEW` (route guard); `ROLE_ASSIGN_PERMISSIONS` cho nút Lưu | ✅ IMPLEMENTED (FE-08) |
 | `/rbac/policies` | Quản trị Policy (ABAC) | `GET /rbac/policies` | `POLICY_VIEW` | ✅ IMPLEMENTED (FE-08). **[CẬP NHẬT 2026-09-07]** Ghi chú "Beta/ABAC chưa hoạt động runtime" ở bản trước đây là OUTDATED — DEV-034 đã tạo + xác minh 1 Policy thật hoạt động đúng qua HTTP (200 khi điều kiện khớp, 403 khi không) ở `authorizePermission.middleware.ts`. ABAC ĐANG hoạt động runtime, trang này KHÔNG gắn nhãn Beta. |
-| `/assets` | Danh sách Tài sản | `GET /assets` | `ASSET_VIEW` | ✅ **IMPLEMENTED (FE-06, 2026-09-06)** |
-| `/assets/create` | Thêm tài sản mới | `POST /assets` | `ASSET_CREATE` | ✅ IMPLEMENTED (FE-06) |
-| `/assets/:id` | Chi tiết Tài sản | `GET /assets/:id` | `ASSET_VIEW` (route guard, **KHÔNG** `ASSET_VIEW_DETAIL` như dự kiến ban đầu) | ✅ IMPLEMENTED (FE-06) — gồm assign/transfer/return + assignment history. **[CẬP NHẬT 2026-09-06]** `:id` chỉ kế thừa guard `ASSET_VIEW` của route cha, không gate riêng `ASSET_VIEW_DETAIL` — cùng bài học DEV-031 (route FE không nên tự gate 1 permission có thể lệch RBAC thật ở lần đổi RBAC sau, dù hiện tại mọi role có `ASSET_VIEW` cũng có `ASSET_VIEW_DETAIL`). Medical device profile/calibration **CHƯA có** ở trang này — phase riêng (roadmap Mục 13). |
-| `/asset-categories` | Danh mục Tài sản | `GET /assets/asset-categories` | `ASSET_CATEGORY_VIEW` | ⏳ Chưa implement — FE-06 chỉ dùng list tối thiểu (dropdown chọn danh mục), CRUD đầy đủ là phase riêng (roadmap Mục 14) |
+| `/it-assets` | Danh sách Thiết bị CNTT | `GET /it-assets` | `IT_ASSET_VIEW` | ✅ **FE-42 (2026-10-09)** — thay `/assets`. Trang/hook dùng chung với y tế, tham số hoá bằng loại (`AssetModuleLayout`) |
+| `/it-assets/create` | Thêm thiết bị CNTT | `POST /it-assets` | `IT_ASSET_CREATE` | ✅ FE-42 |
+| `/it-assets/categories` | Danh mục nhánh CNTT | `GET /it-assets/categories` | `IT_ASSET_CATEGORY_VIEW` | ✅ FE-42 — loại cố định theo module, không có ô chọn loại |
+| `/it-assets/scan` | Quét QR kiểm kê | `GET /it-assets/lookup/:assetCode` | `IT_ASSET_INVENTORY_CHECK` | ✅ FE-42 |
+| `/it-assets/maintenance-calendar` | Lịch bảo trì | `GET /it-assets/maintenance-plans/calendar` | `IT_ASSET_MAINTENANCE_PLAN_VIEW` | ✅ FE-42 |
+| `/it-assets/:id` | Chi tiết Thiết bị CNTT | `GET /it-assets/:id` | `IT_ASSET_VIEW` (kế thừa route cha) | ✅ FE-42/43 — gồm cấp phát/luân chuyển/thu hồi, QR, lịch sử, **hồ sơ CNTT** (`GET/PUT /it-assets/:assetId/profile`, sửa cần `IT_ASSET_UPDATE`), **bản quyền đang gán** (cần `SOFTWARE_LICENSE_VIEW`). Tài sản loại y tế → backend 404 |
+| `/medical-assets` | Danh sách Thiết bị y tế | `GET /medical-assets` | `MEDICAL_ASSET_VIEW` | ✅ FE-42 |
+| `/medical-assets/create`, `/categories`, `/scan`, `/maintenance-calendar` | Như CNTT | `/medical-assets/...` | `MEDICAL_ASSET_CREATE` / `_CATEGORY_VIEW` / `_INVENTORY_CHECK` / `_MAINTENANCE_PLAN_VIEW` | ✅ FE-42 |
+| `/medical-assets/:id` | Chi tiết Thiết bị y tế | `GET /medical-assets/:id` | `MEDICAL_ASSET_VIEW` (kế thừa route cha) | ✅ FE-42 — gồm hồ sơ y tế/kiểm định/chứng chỉ (`MEDICAL_DEVICE_*`, `OPERATOR_CERTIFICATE_*`). IT chỉ xem (DEV-117) |
+| `/software-licenses` | Bản quyền phần mềm | `GET /software-licenses` | `SOFTWARE_LICENSE_VIEW` | ✅ **FE-43 (2026-10-09)** — thêm/sửa/xoá `_CREATE/_UPDATE/_DELETE`, gán máy `_ASSIGN`, chạy tay cảnh báo `_ALERTS_TRIGGER` |
+| `/software-licenses/:id` | Chi tiết bản quyền | `GET /software-licenses/:id` | `SOFTWARE_LICENSE_VIEW` | ✅ FE-43 — máy đang dùng (gán/gỡ), chứng từ tải lên/xuống |
+| `/assets`, `/assets/*` | **ĐƯỜNG DẪN CŨ — chuyển hướng** | `GET /assets/lookup-options/:id` (với `:id`) | — (trang đích tự gate) | ✅ FE-42/44 — `LegacyAssetsRedirect`: `/assets` và trang con tĩnh → module đầu tiên người dùng xem được; `/assets/:id` → hỏi backend loại tài sản rồi chuyển tới `/it-assets/:id` hoặc `/medical-assets/:id`. Giữ link/thông báo cũ hoạt động |
 | `/uploads` | Quản lý file | `GET /upload` | `VIEW_FILES` | |
 | `/notifications` | Trung tâm thông báo | `GET /notifications` | authenticate | Mọi user, self-scoped |
 | `/audit-logs` | Nhật ký audit | `GET /user-audits` | `AUDIT_VIEW` | |
 | `/import-export/documents` | Import/Export Document Excel | `/export/*` | `DOCUMENT_EXCEL_*` | |
-| `/import-export/assets` | Import/Export Asset Excel | `/assets/import`, `/assets/export` | `ASSET_EXCEL_IMPORT/EXPORT` | |
+| `/import-export/assets` | (chưa có trang riêng) Excel tài sản nằm ở menu Excel của từng danh sách | `/it-assets|/medical-assets` + `/import`, `/export` | `IT_ASSET_EXCEL_*` / `MEDICAL_ASSET_EXCEL_*` | Theo module (FE-42) |
 | `/403` | Forbidden | — | — | Khi `ProtectedRoute` chặn do thiếu permission |
 | `/404` | Not Found | — | — | Route không khớp |
 

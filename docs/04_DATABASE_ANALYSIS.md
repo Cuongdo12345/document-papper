@@ -262,12 +262,13 @@ Không có index bổ sung ngoài unique `code`. Bảng nhỏ theo bản chất 
 | `maintenanceStartedAt`, `warrantyAlertSentAt` | Date | ❌ | — | |
 | `lastInventoryCheckAt`/`lastInventoryCheckBy` | Date / ObjectId 🔗 `User` | ❌ | — | kiểm kê QR |
 | `status` | String enum | ❌ | `IN_STOCK` | `IN_STOCK, IN_USE, UNDER_MAINTENANCE, RESERVED, DISPOSED, LOST`; `index:true` field-level |
+| `assetType` | String enum `AssetType` | ✅ | — | **[MỚI 2026-10-08, DEV-112]** `IT` / `MEDICAL`, phi chuẩn hoá từ loại của danh mục GỐC, gán ở service (client không gửi được). Dữ liệu cũ gán bằng `scripts/migrate-asset-type.ts` |
 | `isActive` | Boolean | ❌ | `true` | |
 | `specs` | Mixed | ❌ | `{}` | |
 | `createdBy`/`updatedBy`/`deletedBy` | ObjectId 🔗 `User` | ❌ | — | |
 | `deletedAt` | Date | ❌ | `undefined` | |
 
-**Index**: `{department:1, status:1}`, `{category:1, status:1}`, `{assignedTo:1}`, `{name:"text", assetCode:"text", serialNumber:"text"}` + 2 field-level (`assetCode` unique, `warrantyExpiredAt`, `status`).
+**Index**: `{department:1, status:1}`, `{category:1, status:1}`, `{assignedTo:1}`, `{name:"text", assetCode:"text", serialNumber:"text"}`, `{assetType:1, status:1, createdAt:-1}` (DEV-112) + field-level (`assetCode` unique, `warrantyExpiredAt`, `status`).
 
 ### 4.14 `AssetCategory` (`models/assets/assetCategory.model.ts`)
 
@@ -277,12 +278,13 @@ Không có index bổ sung ngoài unique `code`. Bảng nhỏ theo bản chất 
 | `name` | String | ✅ | trim |
 | `parentCategory` | ObjectId 🔗 `AssetCategory` (tự tham chiếu, cây phân cấp) | ❌ | |
 | `defaultWarrantyMonths` | Number | ❌ | `min:0` |
+| `assetType` | String enum `AssetType` | ❌ | **[MỚI DEV-112]** CHỈ trên danh mục gốc (nguồn sự thật cho loại tài sản), bắt buộc với gốc mới; con kế thừa. Đổi nhánh/đổi loại bị chặn khi nhánh còn tài sản |
 | `isActive` | Boolean | ❌ | default `true` |
 | `deletedBy`/`deletedAt` | ObjectId/Date | ❌ | soft-delete |
 
 **Index**: `{code:1}` unique, `{name:"text"}`. Không có index trên `parentCategory` dù đây là quan hệ cây (self-reference) — truy vấn con theo cha (nếu có) sẽ collection-scan (UNKNOWN — chưa xác nhận có query nào thực sự dùng `parentCategory` làm filter).
 
-### 4.15 `MedicalDeviceProfile` (`models/assets/medicalDeviceProfile.model.ts`)
+### 4.15 `MedicalDeviceProfile` (`models/medicalDevices/medicalDeviceProfile.model.ts`, chuyển từ `models/assets/` ở DEV-113)
 
 | Field | Type | Required | Ghi chú |
 |---|---|---|---|
@@ -298,7 +300,7 @@ Không có index bổ sung ngoài unique `code`. Bảng nhỏ theo bản chất 
 
 **Index**: `{asset:1}` unique (**1-1 với Asset ở tầng DB**, đúng thiết kế "mở rộng đồng hành" đã ghi trong comment — không tách collection riêng cho thiết bị y tế), `{requiresCalibration:1, nextCalibrationDueDate:1}` (phục vụ cron cảnh báo kiểm định — comment tự xác nhận mục đích).
 
-### 4.16 `CalibrationRecord` (`models/assets/calibrationRecord.model.ts`)
+### 4.16 `CalibrationRecord` (`models/medicalDevices/calibrationRecord.model.ts`, chuyển từ `models/assets/` ở DEV-113)
 
 | Field | Type | Required | Ghi chú |
 |---|---|---|---|
@@ -541,6 +543,44 @@ Roadmap A4 — lịch sử nội dung tài liệu (`title`/`meta`) TRƯỚC mỗ
 | `editedAt` | Date | ✅ | thời điểm bản ghi GỐC bị sửa (khác `createdAt` của chính version — là thời điểm snapshot được TẠO, về logic 2 giá trị này thường trùng nhau nhưng không có ràng buộc DB nào đảm bảo, UNKNOWN nếu có thể lệch trong thực tế) |
 
 **Index**: `{document:1, versionNumber:-1}` — comment nguồn tự xác nhận "mirror `CalibrationRecordSchema.index`" (mục 4.16) — liệt kê lịch sử theo 1 document, version mới nhất trước.
+
+
+### 4.32 `ItDeviceProfile` (`models/itDevices/itDeviceProfile.model.ts`) — DEV-116
+
+Hồ sơ kỹ thuật thiết bị CNTT, quan hệ 1-1 với `Asset` loại `IT` (cùng mẫu `MedicalDeviceProfile`, mục 4.15). Tạo/sửa bằng `PUT /api/it-assets/:assetId/profile` (upsert).
+
+| Field | Type | Required | Ghi chú |
+|---|---|---|---|
+| `asset` | ObjectId 🔗 `Asset` | ✅ | UNIQUE (1-1) |
+| `cpu`, `ram`, `storage`, `gpu` | String | ❌ | chuỗi tự do (dữ liệu cũ dạng "64GB", "4TB SSD RAID10") |
+| `ipAddress` | String | ❌ | IPv4/IPv6 hợp lệ (`net.isIP`); trùng thiết bị khác còn hoạt động chỉ CẢNH BÁO, không chặn (Q-A3) |
+| `macAddress` | String | ❌ | chuẩn hoá `AA:BB:CC:DD:EE:FF` |
+| `hostname` | String | ❌ | |
+| `vlan` | Number | ❌ | 1..4094 |
+| `osName`, `osVersion`, `firmwareVersion` | String | ❌ | |
+| `createdBy`, `updatedBy` | ObjectId 🔗 `User` | ❌ | |
+
+**Index**: `{asset:1}` unique; `{ipAddress:1}`; `{osName:1, osVersion:1}`. Dữ liệu cũ `Asset.specs` được SAO CHÉP sang đây bằng `scripts/migrate-specs-to-it-profile.ts` (không xoá `specs`; xem DEV-116).
+
+### 4.33 `SoftwareLicense` (`models/itDevices/softwareLicense.model.ts`) — DEV-116
+
+Danh mục bản quyền phần mềm + các máy CNTT đang dùng. **KHÔNG có trường khoá bản quyền** (Q-A2).
+
+| Field | Type | Required | Ghi chú |
+|---|---|---|---|
+| `softwareName` | String | ✅ | |
+| `edition`, `version` | String | ❌ | |
+| `licenseType` | enum `PERPETUAL`/`SUBSCRIPTION` | ✅ | thuê bao bắt buộc `expiresAt`, vĩnh viễn không có |
+| `totalSeats` | Number (int ≥ 1) | ✅ | |
+| `assets` | [ObjectId 🔗 `Asset`] | ❌ | máy đang dùng; `assets.length ≤ totalSeats` ép bằng cập nhật có điều kiện (`$expr`) khi gán và khi hạ `totalSeats`; máy thanh lý/xoá tự bị gỡ |
+| `purchaseDate`, `expiresAt` | Date | ❌ | |
+| `expiryAlertSentAt` | Date | ❌ | cờ cảnh báo 1 lần, reset khi đổi `expiresAt` |
+| `vendor` | ObjectId 🔗 `Vendor` | ❌ | |
+| `contractOrOrderNumber` | String | ❌ | |
+| `proofFileId` | ObjectId 🔗 `Upload` | ❌ | chứng từ, tải qua `GET /api/software-licenses/:id/proof-file/download` |
+| `isActive`, `deletedAt`, `deletedBy`, `createdBy`, `updatedBy` | | | xoá mềm như các module khác |
+
+**Index**: `{isActive:1, softwareName:1}`; `{isActive:1, expiresAt:1, expiryAlertSentAt:1}` (cron); `{assets:1}` (tra "máy này dùng bản quyền nào", gỡ khi thanh lý).
 
 ---
 

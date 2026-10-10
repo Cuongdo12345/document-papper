@@ -1330,7 +1330,7 @@ Authentication
 RBAC
 ```
 
-**[CẬP NHẬT 2026-09-30]** Danh sách trên là bản gốc, đã thiếu nhiều domain. Thực tế hiện có 12 thư mục domain ở `backend/src/models/` (32 model), khớp 1-1 với các key trong `moduleDescriptions.ts`:
+**[CẬP NHẬT 2026-09-30]** Danh sách trên là bản gốc, đã thiếu nhiều domain. Thực tế hiện có 14 thư mục domain ở `backend/src/models/` (34 model; **[CẬP NHẬT 2026-10-09]** thêm `medicalDevices` và `itDevices` khi tách module Tài sản thành Thiết bị CNTT / Thiết bị y tế, `DEV-111`→`DEV-116`), khớp 1-1 với các key trong `moduleDescriptions.ts`:
 
 ```text
 auth           — RefreshToken, PasswordResetToken, TwoFactorOtp
@@ -1338,7 +1338,9 @@ users          — User, UserAudit
 departments    — Department
 rbac           — Role, Permission, Policy (ABAC)
 documents      — Document, DocumentVersion, DocumentPdfExport, WorkflowTemplate, WorkflowInstance, Counter
-assets         — Asset, AssetCategory, AssetAssignmentHistory, AssetMaintenancePlan, MedicalDeviceProfile, CalibrationRecord, OperatorCertificate
+assets         — Asset, AssetCategory, AssetAssignmentHistory, AssetMaintenancePlan   (lõi dùng chung; phân loại bằng Asset.assetType = IT | MEDICAL)
+medicalDevices — MedicalDeviceProfile, CalibrationRecord, OperatorCertificate
+itDevices      — ItDeviceProfile, SoftwareLicense
 inventory      — ConsumableCategory, ConsumableItem, ConsumableTransaction, ConsumableRequest
 vendors        — Vendor, Contract
 notifications  — Notification

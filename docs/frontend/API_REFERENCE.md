@@ -174,43 +174,53 @@ Permission: `WORKFLOW_COMPLETE`. Body: `{comment?≤1000}`. Notes: đóng hẳn 
 
 ## ASSETS 🔒
 
+> **[DEV-115, 2026-10-08; GĐ 8 DEV-120, 2026-10-09] Tách module — 2 prefix:** `/api/it-assets` (Thiết bị CNTT) và `/api/medical-assets` (Thiết bị y tế). Frontend dùng từ FE-42. Các bảng dưới đây mô tả route CHUNG của cả hai module (path tương đối so với prefix); cột Permission viết `{IT,MEDICAL}_ASSET_X` = `IT_ASSET_X` ở `/api/it-assets` hoặc `MEDICAL_ASSET_X` ở `/api/medical-assets`.
+> Khác với route `/api/assets*` đã gỡ: (1) quyền `IT_ASSET_*` / `MEDICAL_ASSET_*` (danh mục: `*_ASSET_CATEGORY_*`); (2) chỉ thấy/sửa tài sản và danh mục thuộc loại của module — id loại khác (tài sản, danh mục, kế hoạch bảo trì, chứng chỉ) trả **404** kể cả với ADMIN, bulk trả id đó trong `failed`; (3) tạo tài sản/nhập Excel với danh mục khác nhánh → 400 (Excel: lỗi theo dòng); (4) `alerts/run`, `export`, lịch bảo trì chỉ xử lý loại của module.
+> Đường dẫn con (cả 2 module): `/categories` (thay `/asset-categories`), `/maintenance-plans`. Chỉ `/api/medical-assets`: `/:assetId/profile`, `/:assetId/calibration-records[...]` (thay `/medical-devices/:assetId/...`), `/calibration-alerts/run` (thay `/medical-devices/alerts/run`), `/operator-certificates[...]` (thay `/api/operator-certificates`); quyền `MEDICAL_DEVICE_*`, `OPERATOR_CERTIFICATE_*` giữ nguyên. Danh mục gốc tạo qua module tự mang loại của module.
+> **[DEV-116, Giai đoạn 5]** Thêm `GET|PUT /api/it-assets/:assetId/profile` (hồ sơ CNTT; PUT = upsert, `null`/"" xoá trường; trả `warnings[]` `DUPLICATE_IP`; GET trả `data: null` khi chưa có hồ sơ; quyền `IT_ASSET_VIEW_DETAIL`/`IT_ASSET_UPDATE`) và **`/api/software-licenses`** (quyền `SOFTWARE_LICENSE_*`): `POST|GET /`, `GET|PUT|DELETE /:id`, `PATCH /:id/restore`, `POST /:id/assign|unassign` body `{asset}` (400 khi hết slot / máy đã gán / máy không phải CNTT / máy đã thanh lý), `PUT /:id/proof-file` (multipart `proofFile`), `GET /:id/proof-file/download`, `POST /alerts/run`. Danh sách trả `usedSeats/freeSeats/isExpired` không kèm mảng máy; `?asset=<id>` lọc bản quyền của 1 máy. Thanh lý/xoá thiết bị tự gỡ khỏi mọi bản quyền.
+> **[DEV-118, Giai đoạn 6]** (1) `GET /api/dashboard/assets/summary|warranty-expiring|maintenance-overdue` nhận thêm `?assetType=IT|MEDICAL` (không truyền = cả hai loại như trước; sai giá trị -> 400; có truyền thì cần thêm quyền xem đúng loại `IT_ASSET_VIEW`/`MEDICAL_ASSET_VIEW`, thiếu -> 403); `summary` trả thêm `byAssetType`. (2) **MỚI** `GET /api/assets/lookup-options` (`?keyword&assetType&department&page&limit<=100`): tra cứu tài sản cho ô chọn ở Tài liệu/Hợp đồng; cần MỘT TRONG HAI `IT_ASSET_VIEW`/`MEDICAL_ASSET_VIEW`, chỉ trả loại người gọi xem được (yêu cầu loại không có quyền -> 403), chỉ `_id, assetCode, name, assetType, status, department, category`; route này KHÔNG bị gỡ ở Giai đoạn 8. (3) Cảnh báo: thiết bị CNTT gửi IT; thiết bị y tế (bảo hành/bảo trì/kiểm định/giấy phép/chứng chỉ vận hành) gửi Phòng Vật tư-TTB và IT, mỗi user 1 thông báo.
+> **[DEV-119, Giai đoạn 7]** Thêm `GET /api/assets/lookup-options/:id` (một trong hai quyền xem; trả 1 tài sản kèm `assetType`, kể cả đã xoá mềm với `isActive:false`; loại người gọi không xem được → 404): dùng cho link Thông báo/Tài liệu/Hợp đồng và `/app/assets/:id` cũ. `GET /api/contracts*` populate `assets.assetType`. Frontend (FE-42→44) đã chuyển toàn bộ sang `/api/it-assets`, `/api/medical-assets`, `/api/software-licenses`, `/api/assets/lookup-options`.
+> **[DEV-120, Giai đoạn 8]** Đã GỠ: `/api/assets*` (trừ `/api/assets/lookup-options[/:id]`), `/api/assets/medical-devices*`, `/api/assets/asset-categories*`, `/api/assets/maintenance-plans*`, `/api/operator-certificates*` — gọi sẽ trả 404. 20 quyền cũ `ASSET_*` / `ASSET_CATEGORY_*` cũng đã gỡ khỏi role và catalog. Chi tiết: `docs/development/tasks/DEV-115.md`, `DEV-120.md`.
+
 | Method | Path | Permission | Ghi chú |
 |---|---|---|---|
-| POST | `/` | `ASSET_CREATE` | Body: `{category,department,name,serialNumber?,model?,manufacturer?,location?,purchaseDate?,purchasePrice?,warrantyExpiredAt?,supplier?,specs?}` |
-| GET | `/` | `ASSET_VIEW` | Query: `page,limit,keyword,department,category,status(enum AssetStatus),sortBy(free string, default createdAt),order` |
-| GET | `/export` | `ASSET_EXCEL_EXPORT` | Blob response |
-| GET | `/:id` | `ASSET_VIEW_DETAIL` | |
-| PUT | `/:id` | `ASSET_UPDATE` | CHỦ Ý không cho sửa `status`/`assignedTo`/`department` — phải qua assign/transfer/return |
-| DELETE | `/:id` | `ASSET_DELETE` | Soft-delete |
-| DELETE | `/:id/permanent` | `ASSET_DELETE_PERMANENT` | Guard: chặn nếu còn `MedicalDeviceProfile` (DEV-012). Action KHÔNG THỂ HOÀN TÁC — cần confirm dialog nghiêm ngặt (xem `UI_DESIGN_SYSTEM.md` cũ/`SHARED_COMPONENTS_LIBRARY.md`) |
-| PATCH | `/:id/restore` | `ASSET_UPDATE` | |
-| POST | `/:id/assign` | `ASSET_ASSIGN` | Body: `{toDepartment, toUser?, reason?}` — từ IN_STOCK/RESERVED |
-| POST | `/:id/transfer` | `ASSET_ASSIGN` | Body: `{toDepartment?, toUser?("" để gỡ user), reason?}` — ít nhất 1 trong 2 field đích |
-| POST | `/:id/return` | `ASSET_ASSIGN` | Body: `{toDepartment?, reason?}` — thu hồi về kho |
-| GET | `/:id/assignment-history` | `ASSET_VIEW_DETAIL` | Query: `page,limit(default 20)` |
-| POST | `/alerts/run` | `ASSET_ALERTS_TRIGGER` | Chạy tay cron cảnh báo bảo hành/bảo trì |
-| GET | `/import/template` | `ASSET_EXCEL_IMPORT` | Tải file mẫu |
-| POST | `/import` | `ASSET_EXCEL_IMPORT` | Upload Excel |
-| GET | `/lookup/:assetCode` | `ASSET_INVENTORY_CHECK` | Tra cứu theo mã (quét QR) |
-| GET | `/:id/qrcode` | `ASSET_VIEW_DETAIL` | Trả ảnh/QR data |
-| POST | `/:id/check-in` | `ASSET_INVENTORY_CHECK` | Kiểm kê |
+| POST | `/` | `{IT,MEDICAL}_ASSET_CREATE` | Body: `{category,department,name,serialNumber?,model?,manufacturer?,location?,purchaseDate?,purchasePrice?,warrantyExpiredAt?,supplier?,specs?}` |
+| GET | `/` | `{IT,MEDICAL}_ASSET_VIEW` | Query: `page,limit,keyword,department,category,status(enum AssetStatus),sortBy(free string, default createdAt),order` |
+| GET | `/export` | `{IT,MEDICAL}_ASSET_EXCEL_EXPORT` | Blob response |
+| GET | `/:id` | `{IT,MEDICAL}_ASSET_VIEW_DETAIL` | |
+| PUT | `/:id` | `{IT,MEDICAL}_ASSET_UPDATE` | CHỦ Ý không cho sửa `status`/`assignedTo`/`department` — phải qua assign/transfer/return |
+| DELETE | `/:id` | `{IT,MEDICAL}_ASSET_DELETE` | Soft-delete |
+| DELETE | `/:id/permanent` | `{IT,MEDICAL}_ASSET_DELETE_PERMANENT` | Guard: chặn nếu còn `MedicalDeviceProfile` (DEV-012). Action KHÔNG THỂ HOÀN TÁC — cần confirm dialog nghiêm ngặt (xem `UI_DESIGN_SYSTEM.md` cũ/`SHARED_COMPONENTS_LIBRARY.md`) |
+| PATCH | `/:id/restore` | `{IT,MEDICAL}_ASSET_UPDATE` | |
+| POST | `/:id/assign` | `{IT,MEDICAL}_ASSET_ASSIGN` | Body: `{toDepartment, toUser?, reason?}` — từ IN_STOCK/RESERVED |
+| POST | `/:id/transfer` | `{IT,MEDICAL}_ASSET_ASSIGN` | Body: `{toDepartment?, toUser?("" để gỡ user), reason?}` — ít nhất 1 trong 2 field đích |
+| POST | `/:id/return` | `{IT,MEDICAL}_ASSET_ASSIGN` | Body: `{toDepartment?, reason?}` — thu hồi về kho |
+| GET | `/:id/assignment-history` | `{IT,MEDICAL}_ASSET_VIEW_DETAIL` | Query: `page,limit(default 20)` |
+| POST | `/alerts/run` | `{IT,MEDICAL}_ASSET_ALERTS_TRIGGER` | Chạy tay cron cảnh báo bảo hành/bảo trì |
+| GET | `/import/template` | `{IT,MEDICAL}_ASSET_EXCEL_IMPORT` | Tải file mẫu |
+| POST | `/import` | `{IT,MEDICAL}_ASSET_EXCEL_IMPORT` | Upload Excel |
+| GET | `/lookup/:assetCode` | `{IT,MEDICAL}_ASSET_INVENTORY_CHECK` | Tra cứu theo mã (quét QR) |
+| GET | `/:id/qrcode` | `{IT,MEDICAL}_ASSET_VIEW_DETAIL` | Trả ảnh/QR data |
+| POST | `/:id/check-in` | `{IT,MEDICAL}_ASSET_INVENTORY_CHECK` | Kiểm kê |
 | GET | `/:id/documents` | `DOCUMENT_VIEW` | Document liên quan tới Asset (đề xuất sửa chữa...) |
 
 `AssetStatus` enum: `IN_STOCK | IN_USE | UNDER_MAINTENANCE | RESERVED | DISPOSED | LOST`.
 
-### Asset Categories 🔒
+### Asset Categories 🔒 (`/categories`, quyền `{IT,MEDICAL}_ASSET_CATEGORY_*`)
 | Method | Path | Permission |
 |---|---|---|
-| POST | `/api/assets/asset-categories` | `ASSET_CATEGORY_CREATE` |
-| GET | `/`, `/:id` | `ASSET_CATEGORY_VIEW` |
-| PUT | `/:id` | `ASSET_CATEGORY_UPDATE` |
-| DELETE | `/:id` | `ASSET_CATEGORY_DELETE` |
-| DELETE | `/:id/permanent` | `ASSET_CATEGORY_DELETE_PERMANENT` |
-| PATCH | `/:id/restore` | `ASSET_CATEGORY_UPDATE` |
+| POST | `/categories` | `{IT,MEDICAL}_ASSET_CATEGORY_CREATE` |
+| GET | `/`, `/:id` | `{IT,MEDICAL}_ASSET_CATEGORY_VIEW` |
+| PUT | `/:id` | `{IT,MEDICAL}_ASSET_CATEGORY_UPDATE` |
+| DELETE | `/:id` | `{IT,MEDICAL}_ASSET_CATEGORY_DELETE` |
+| DELETE | `/:id/permanent` | `{IT,MEDICAL}_ASSET_CATEGORY_DELETE_PERMANENT` |
+| PATCH | `/:id/restore` | `{IT,MEDICAL}_ASSET_CATEGORY_UPDATE` |
 
-Body Create: `{code,name,parentCategory?,defaultWarrantyMonths?}`.
+Body Create: `{code,name,parentCategory?,defaultWarrantyMonths?,assetType?}`.
 
-### Medical Devices 🔒
+**[DEV-112, 2026-10-08] Loại tài sản (`assetType`: `IT` | `MEDICAL`):** danh mục gốc BẮT BUỘC có `assetType` (thiếu → 400); danh mục con KHÔNG gửi (gửi → 400), kế thừa từ gốc. PUT gỡ cha (`parentCategory: null`) phải kèm `assetType`. Đổi nhánh/đổi loại khi nhánh còn tài sản → 400. Khôi phục danh mục không thuộc nhánh nào → 400. Tài sản (`Asset.assetType`) do backend gán theo gốc danh mục; đổi `category` sang nhánh khác loại → 400; hồ sơ thiết bị y tế chỉ cho tài sản `MEDICAL`; chứng chỉ vận hành chỉ cho danh mục nhánh y tế.
+
+### Medical Devices 🔒 (chỉ `/api/medical-assets`)
 | Method | Path | Permission |
 |---|---|---|
 | POST/GET/PUT | `/:assetId/profile` | `MEDICAL_DEVICE_CREATE/VIEW/UPDATE` |

@@ -116,7 +116,7 @@ Type generation từ OpenAPI (`openapi-typescript`) — vẫn viết tay đến 
 - **Departments**: CRUD đầy đủ (kể cả xoá — hard delete, backend tự chặn nếu còn tham chiếu) — permission-aware (FE-03).
 - **Documents**: List (filter/sort đầy đủ)/Create (Proposal, 3 subType)/Detail (view/edit/xoá/khôi phục)/xoá theo tháng — permission-aware + 2 rule ẩn ADMIN-gated ở UI (xoá, khôi phục) — hiển thị workflow trạng thái + submit vào workflow (FE-04) + đầy đủ 4 action Duyệt/Từ chối/Huỷ/Hoàn tất (FE-05).
 - **Workflow**: hộp thư chờ duyệt (`/app/workflows/pending`) + action Duyệt/Từ chối/Huỷ/Hoàn tất permission-aware + state-aware (FE-05).
-- **Assets**: List (filter/sort/`isActive`)/Create/Detail (view/edit/xoá/khôi phục) + Cấp phát/Luân chuyển/Thu hồi + lịch sử cấp phát, điều kiện hiển thị action khớp đúng `assetAssignment.service.ts` (FE-06 + DEV-035/036). **Asset Categories**: CRUD đầy đủ (kể cả xoá mềm/khôi phục, trừ xoá vĩnh viễn) tại `/app/assets/categories` (FE-10). Excel import (chỉ phục vụ Document, không áp dụng Assets) và QR code (theo từng Asset, không phải theo Category) VẪN CHƯA có UI.
+- **Assets**: List (filter/sort/`isActive`)/Create/Detail (view/edit/xoá/khôi phục) + Cấp phát/Luân chuyển/Thu hồi + lịch sử cấp phát, điều kiện hiển thị action khớp đúng `assetAssignment.service.ts` (FE-06 + DEV-035/036). **Asset Categories**: CRUD đầy đủ (kể cả xoá mềm/khôi phục, trừ xoá vĩnh viễn) tại `/app/assets/categories` (FE-10). **[DEV-112, 2026-10-08]** Form danh mục có ô "Loại tài sản" (Thiết bị CNTT / Thiết bị y tế), chỉ hiện và bắt buộc với danh mục gốc; danh mục con kế thừa loại. Kiểu `AssetType` ở `types/asset.types.ts`, nhãn ở `features/assets/constants/assetType.constants.ts`. Bước đầu của kế hoạch tách module (`docs/development/ASSET_MODULE_SPLIT_PLAN.md`). Excel import (chỉ phục vụ Document, không áp dụng Assets) và QR code (theo từng Asset, không phải theo Category) VẪN CHƯA có UI.
 - **Medical Devices**: hồ sơ thiết bị y tế (phân loại pháp lý, giấy phép, chu kỳ kiểm định) + lịch sử kiểm định, nhúng trong Asset Detail (FE-07). Upload chứng nhận file thật CHƯA có UI (chỉ nhận link).
 - **RBAC Admin**: CRUD Roles (kèm permission matrix gán quyền)/Permissions/Policies (ABAC) — permission-aware, đã verify ABAC hoạt động runtime thật (FE-08).
 - **Dashboard**: 12 widget đầy đủ (Admin/Department Summary, Asset Summary, Medical Device Summary, KPI trends, 3 alert list) tại `/app` — role `USER` (duy nhất thiếu `DASHBOARD_READ`) thấy Welcome panel tối giản thay thế (FE-09).
@@ -433,6 +433,11 @@ Xem đầy đủ `docs/30_DEVELOPMENT_COMPLETION_AUDIT.md` Mục 8-9. Đáng ch�
     - FE-39: ẩn nút "Submit vào workflow" với tài liệu khoa khác (đi kèm DEV-091).
     - FE-40: ô "Khoa/Phòng" khi tạo tài liệu theo permission mới `DOCUMENT_CREATE_ALL_DEPARTMENTS` (đi kèm DEV-092).
     - FE-41 (2026-09-30): `FileUpload` thêm prop `maxFiles`; "Tải file lên" giới hạn 10 file/lần (đi kèm DEV-103).
+  - **Tách module Tài sản (2026-10-09, đi kèm DEV-111→119, `docs/development/ASSET_MODULE_SPLIT_PLAN.md`):**
+    - FE-42: nền tảng theo loại — `/app/it-assets/*`, `/app/medical-assets/*` dùng chung một bộ trang tham số hoá bằng `assetType` (`AssetModuleLayout`, `useAssetModule`, `assetModule.constants.ts`), 46 quyền mới, 3 mục sidebar, `/app/assets/*` chuyển hướng.
+    - FE-43: hồ sơ thiết bị CNTT (`ItDeviceSection`) + bản quyền phần mềm (`/app/software-licenses`, gán máy, chứng từ).
+    - FE-44: chỗ dùng chéo — ô chọn tài sản (Tài liệu/Hợp đồng) qua `lookup-options`, Dashboard hai tab CNTT/y tế, link thông báo/tài liệu/hợp đồng đúng module, `AssetNameLink`.
+    - FE-45 (Giai đoạn 8, dọn dẹp): gỡ 20 quyền cũ `ASSET_*`/`ASSET_CATEGORY_*` khỏi `constants/permissions.ts` (backend gỡ route cũ + quyền cũ ở DEV-120), test chống thêm lại; `/app/assets*` vẫn chuyển hướng (`LegacyAssetsRedirect`).
 
 ## 12. Liên kết toàn bộ tài liệu FE
 
