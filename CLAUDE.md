@@ -1,6 +1,6 @@
 # CLAUDE.md — PROJECT DEVELOPMENT RULES
 
-> **Rulebook đã rà soát khớp thực tế project đến: DEV-099 / FE-40 (2026-09-30; lần trước: DEV-056 / FE-16, 2026-09-16). [CẬP NHẬT 2026-09-19] Nếu task mới nhất trong docs/development/tasks/ hoặc docs/frontend/tasks/ lệch quá ~15 task so với 2 mốc này, DỪNG lại và báo cho user: rulebook có thể đã lệch thực tế trở lại (đúng mô hình đã xảy ra trước đây), nên audit lại §4/§9/§36/§41 trước khi tiếp tục nhận task mới — không tự ý coi rulebook là đúng tuyệt đối chỉ vì nó đang được auto-load.
+> **Rulebook đã rà soát khớp thực tế project đến: DEV-120 / FE-45 (2026-10-10; lần trước: DEV-099 / FE-40, 2026-09-30; trước nữa: DEV-056 / FE-16, 2026-09-16). Lần rà 2026-10-10 đối chiếu §1/§4/§9/§36/§41 với source: §36 khớp (14 thư mục / 34 model), danh sách doc §4 khớp; đã bổ sung `ASSET_MODULE_SPLIT_PLAN.md` vào §4. [CẬP NHẬT 2026-09-19] Nếu task mới nhất trong docs/development/tasks/ hoặc docs/frontend/tasks/ lệch quá ~15 task so với 2 mốc này, DỪNG lại và báo cho user: rulebook có thể đã lệch thực tế trở lại (đúng mô hình đã xảy ra trước đây), nên audit lại §4/§9/§36/§41 trước khi tiếp tục nhận task mới — không tự ý coi rulebook là đúng tuyệt đối chỉ vì nó đang được auto-load.
 
 ## 1. PROJECT IDENTITY
 
@@ -182,6 +182,7 @@ docs/development/
 ├── FEATURE_DEVELOPMENT_ROADMAP.md     # xem §41 — một phần ĐÃ implement, không còn "toàn bộ chưa duyệt"
 ├── PRODUCTION_DEPLOYMENT_PLAN.md      # [MỚI 2026-09-22] kế hoạch deploy production (hạ tầng free, single-instance) — trạng thái PLANNED, CHƯA triển khai, không tự ý bắt đầu Giai đoạn nào khi chưa được user chỉ định
 ├── DEV-001A_SUPER_ADMIN_IDENTITY_PLAN.md  # [2026-09-30] kế hoạch Super-Admin (`role.isSystemRole`) — ĐÃ HOÀN TẤT (DEV-001A + DEV-047), giữ làm lịch sử quyết định
+├── ASSET_MODULE_SPLIT_PLAN.md         # [2026-10-10] kế hoạch tách module Tài sản thành Thiết bị CNTT / Thiết bị y tế (Giai đoạn 0→8) — ĐÃ HOÀN TẤT (DEV-111→120, FE-42→45), giữ làm lịch sử quyết định; xem §36 (assetType, 14 domain)
 ├── changes/, decisions/               # [2026-09-30] hiện RỖNG — chưa dùng
 └── tasks/DEV-XXX.md                   # task backend thật — xem §9
 ```

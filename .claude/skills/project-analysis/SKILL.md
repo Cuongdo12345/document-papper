@@ -5,7 +5,7 @@ description: Quy tắc làm việc với dự án Document Papper sau khi đã h
 
 # SKILL V3 — PROJECT KNOWLEDGE & DEVELOPMENT
 
-> **Rulebook đã rà soát khớp thực tế project đến: `DEV-099` / `FE-40` (2026-09-30; lần trước: `DEV-056` / `FE-16`, 2026-09-16).** Nếu task mới nhất chênh lệch lớn so với 2 mốc này, đối chiếu lại §3/§8/§20 trước khi tin tuyệt đối.
+> **Rulebook đã rà soát khớp thực tế project đến: `DEV-120` / `FE-45` (2026-10-10; lần trước: `DEV-099` / `FE-40`, 2026-09-30; trước nữa: `DEV-056` / `FE-16`, 2026-09-16).** Nếu task mới nhất chênh lệch lớn so với 2 mốc này, đối chiếu lại §3/§8/§20 trước khi tin tuyệt đối.
 
 ## 1. MỤC ĐÍCH
 
@@ -97,11 +97,13 @@ Tài liệu bổ sung nếu tồn tại:
 - `docs/development/FEATURE_DEVELOPMENT_ROADMAP.md` — đề xuất tính năng, xem `docs/00_PROJECT_MEMORY.md` để biết mục nào ĐÃ implement trước khi coi là "chưa làm"
 - `docs/development/PRODUCTION_DEPLOYMENT_PLAN.md` — [2026-09-22] kế hoạch deploy production, trạng thái PLANNED, không tự ý bắt đầu Giai đoạn nào khi chưa được user chỉ định
 - `docs/development/DEV-001A_SUPER_ADMIN_IDENTITY_PLAN.md` — [2026-09-30] kế hoạch Super-Admin (`role.isSystemRole`), ĐÃ HOÀN TẤT, giữ làm lịch sử quyết định
+- `docs/development/ASSET_MODULE_SPLIT_PLAN.md` — [2026-10-10] kế hoạch tách module Tài sản thành Thiết bị CNTT / Thiết bị y tế (Giai đoạn 0→8), ĐÃ HOÀN TẤT (DEV-111→120, FE-42→45), giữ làm lịch sử quyết định
 - `docs/development/changes/`, `docs/development/decisions/` — [2026-09-30] hiện rỗng, chưa dùng
 
 **[CẬP NHẬT 2026-09-16]** Tài liệu frontend (thay cho `06_FRONTEND_ANALYSIS.md`):
 
 - `docs/frontend/FRONTEND_MEMORY.md` — index kiến thức frontend, vai trò tương đương PROJECT_MEMORY
+- `docs/frontend/API_REFERENCE.md`, `docs/frontend/ROUTE_PERMISSION_MAP.md`, `docs/frontend/AUTH_RBAC_MAP.md` — [2026-10-10] bản đồ API / route↔permission / RBAC phía frontend, cập nhật mỗi khi đổi route hoặc quyền
 - `docs/frontend/phases/` — [2026-09-30] ghi chú theo phase nhỏ, hiện có 1 file
 
 Task:
@@ -588,7 +590,7 @@ khi:
 - Cần tiếp tục session sau.
 - Context/session sắp kết thúc.
 - Có trạng thái quan trọng cần bàn giao.
-- Task VỪA DONE trọn vẹn trong cùng phiên** — đây là điều kiện quan trọng nhất trên thực tế nhưng dễ bị bỏ qua nhất, vì 4 điều kiện trên đều ngầm hiểu "task còn dở". Đã có bằng chứng SESSION_HANDOFF.md từng đứng yên 28+ task backend/12+ task frontend chỉ vì mỗi task đều DONE gọn trong 1 phiên. Chỉ cần cập nhật ngắn phần Current Task/Status/Next Action, không cần chép lại toàn bộ narrative.
+- Task VỪA DONE trọn vẹn trong cùng phiên — đây là điều kiện quan trọng nhất trên thực tế nhưng dễ bị bỏ qua nhất, vì 4 điều kiện trên đều ngầm hiểu "task còn dở". Đã có bằng chứng SESSION_HANDOFF.md từng đứng yên 28+ task backend/12+ task frontend chỉ vì mỗi task đều DONE gọn trong 1 phiên. Chỉ cần cập nhật ngắn phần Current Task/Status/Next Action, không cần chép lại toàn bộ narrative.
 
 Tối thiểu:
 

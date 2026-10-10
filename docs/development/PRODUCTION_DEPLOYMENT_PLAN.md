@@ -16,7 +16,7 @@ giai đoạn nào (đúng tinh thần CLAUDE.md §41 áp dụng tương tự cho
 | Ràng buộc | Bằng chứng | Ảnh hưởng tới lựa chọn hosting |
 |---|---|---|
 | **Bắt buộc MongoDB Replica Set** (không chạy được transaction trên standalone) | `backend/mongodb-transaction-setup-guide.md` — dùng cho Import Excel, Asset transfer, Workflow approve, RBAC | Loại các dịch vụ Mongo free không phải replica set; Atlas M0 hoặc tự host `rs0` đều được |
-| **Cron job chạy in-process** (`node-cron`, 6 job: SLA alert, weekly report, medical device alert, contract alert, consumable alert, asset alert) | `backend/src/shared/cron/*.cron.ts` | Cần host **luôn chạy 24/7, không spin-down** — loại trừ platform free kiểu Render (ngủ sau 15 phút không request) |
+| **Cron job chạy in-process** (`node-cron`, 7 job: SLA alert, weekly report, medical device alert, contract alert, consumable alert, asset alert, software license alert — [CẬP NHẬT 2026-10-10] job thứ 7 thêm ở DEV-116) | `backend/src/shared/cron/*.cron.ts` | Cần host **luôn chạy 24/7, không spin-down** — loại trừ platform free kiểu Render (ngủ sau 15 phút không request) |
 | **Permission cache in-memory** (`Map`, TTL 5 phút, không dùng Redis) | `backend/src/services/rbac/permission.cache.ts` | Bắt buộc **1 instance backend duy nhất** — đúng khớp quy mô đã chốt, không cần đổi gì |
 | **Upload file lưu đĩa cục bộ** (`multer.diskStorage`) | `backend/src/services/upload/upload.middleware.ts:13-21` | Cần **ổ đĩa bền vững** gắn liền server — loại các platform có filesystem ephemeral (mất file sau mỗi lần redeploy) |
 | `CLIENT_URL` bắt buộc set, server fail-fast nếu thiếu | `backend/.env.example:16-21`, DEV-014 | Phải có domain/URL cố định trước khi deploy |
@@ -91,6 +91,8 @@ giai đoạn nào (đúng tinh thần CLAUDE.md §41 áp dụng tương tự cho
 - Đăng ký domain miễn phí hoặc domain đã có, trỏ Cloudflare DNS.
 
 ### Giai đoạn 1 — Deploy Backend
+
+> **[CẬP NHẬT 2026-10-10] Việc tách module Tài sản (DEV-111→120) thêm các bước DỮ LIỆU bắt buộc cho production**, chi tiết ở `docs/development/tasks/DEV-120.md` mục 2 và `DEV-111.md`→`DEV-117.md`. Các script nằm ở `backend/scripts/` (bị `.gitignore`, không có trên git — phải mang theo riêng): `migrate-asset-type.ts` (gán `assetType`), `seed-asset-split-permissions.ts` (46 quyền mới), `migrate-specs-to-it-profile.ts` (chép `specs` sang hồ sơ CNTT), `apply-split-followups-2026-10-09.ts` (CHỈ phần gỡ 7 quyền ghi y tế khỏi role IT — phần lanIp là của máy dev, xem `DEV-117.md`), rồi `remove-legacy-asset-permissions.ts` (xem trước, sau đó `--apply`). Mỗi script đều có chế độ xem trước; **sao lưu DB trước** (`scripts/backup-mongo-ejson.ts`). Thứ tự: sao lưu → migrate/seed → gỡ quyền cũ → deploy code mới. Route `/api/assets*` cũ đã gỡ nên frontend và backend phải deploy cùng nhau.
 - `cd backend && npm run build` (đã có sẵn script: `tsc` + `copy-static-assets.js`) → deploy `dist/`
   lên VM.
 - Set toàn bộ biến môi trường prod theo `.env.example` — đặc biệt: `NODE_ENV=production`, `MONGO_URI`
