@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { AppModal } from "@/components/shared/AppModal";
@@ -11,6 +11,7 @@ import { AssetCategoryOptions } from "@/features/assets/components/AssetCategory
 import { getDescendantIds } from "@/features/assets/utils/categoryTree";
 import { parseApiError } from "@/utils/parseApiError";
 import { toast } from "@/stores/toastStore";
+import { useAssetModule } from "@/features/assets/hooks/useAssetModule";
 import type { AssetCategory } from "@/types/asset.types";
 
 /**
@@ -20,17 +21,18 @@ import type { AssetCategory } from "@/types/asset.types";
  * giữ nguyên giá trị gốc (CÙNG PATTERN `category` ở `AssetEditModal.tsx`),
  * KHÔNG gửi lên `UpdateAssetCategoryDTO` (không có field này, xem `onSubmit`).
  */
-const assetCategorySchema = z.object({
-  code: z.string().trim().min(1, "Mã danh mục không được để trống"),
-  name: z.string().trim().min(1, "Tên danh mục không được để trống"),
-  parentCategory: z.string().optional(),
-  // `z.string()` thuần (KHÔNG `z.coerce.number()`) — cùng lý do `AssetEditModal.tsx`
-  // (tránh input/output type lệch nhau ở `zodResolver`), parse thủ công lúc submit.
-  defaultWarrantyMonths: z
-    .string()
-    .optional()
-    .refine((v) => !v || (Number.isInteger(Number(v)) && Number(v) >= 0), "Số tháng bảo hành phải là số nguyên không âm"),
-});
+const assetCategorySchema = z
+  .object({
+    code: z.string().trim().min(1, "Mã danh mục không được để trống"),
+    name: z.string().trim().min(1, "Tên danh mục không được để trống"),
+    parentCategory: z.string().optional(),
+    // `z.string()` thuần (KHÔNG `z.coerce.number()`) — cùng lý do `AssetEditModal.tsx`
+    // (tránh input/output type lệch nhau ở `zodResolver`), parse thủ công lúc submit.
+    defaultWarrantyMonths: z
+      .string()
+      .optional()
+      .refine((v) => !v || (Number.isInteger(Number(v)) && Number(v) >= 0), "Số tháng bảo hành phải là số nguyên không âm"),
+  });
 
 type AssetCategoryFormValues = z.infer<typeof assetCategorySchema>;
 
@@ -42,6 +44,7 @@ interface AssetCategoryFormModalProps {
 
 /** `key={category?._id ?? "create"}` ở nơi gọi đảm bảo remount đúng khi đổi giữa tạo mới/sửa (cùng pattern `AssetEditModal`). */
 export function AssetCategoryFormModal({ open, onClose, category }: AssetCategoryFormModalProps) {
+  const assetModule = useAssetModule();
   const isEdit = !!category;
   const createMutation = useCreateAssetCategory();
   const updateMutation = useUpdateAssetCategory();
@@ -65,8 +68,10 @@ export function AssetCategoryFormModal({ open, onClose, category }: AssetCategor
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm<AssetCategoryFormValues>({ resolver: zodResolver(assetCategorySchema), defaultValues });
+  const isRoot = !useWatch({ control, name: "parentCategory" });
 
   useEffect(() => {
     if (open) reset(defaultValues);
@@ -79,6 +84,9 @@ export function AssetCategoryFormModal({ open, onClose, category }: AssetCategor
     const body = {
       name: values.name,
       parentCategory: values.parentCategory || undefined,
+      // FE-42: loại tài sản CỐ ĐỊNH theo module đang mở (không còn ô chọn). Chỉ danh mục gốc gửi loại; danh mục con
+      // kế thừa (backend từ chối nếu gửi).
+      assetType: values.parentCategory ? undefined : assetModule.type,
       defaultWarrantyMonths:
         values.defaultWarrantyMonths === "" || values.defaultWarrantyMonths == null ? undefined : Number(values.defaultWarrantyMonths),
     };
@@ -181,6 +189,12 @@ export function AssetCategoryFormModal({ open, onClose, category }: AssetCategor
             </select>
             <p className="text-xs text-muted-foreground">Chỉ danh mục cấp cuối (không có danh mục con) mới gán được tài sản.</p>
           </div>
+
+          {isRoot && (
+            <p className="text-xs text-muted-foreground">
+              Danh mục gốc thuộc nhánh <span className="font-medium text-foreground">{assetModule.label}</span>; danh mục con trong nhánh này dùng chung loại.
+            </p>
+          )}
 
           <div className="space-y-1.5">
             <label htmlFor="cat-warranty" className="text-sm font-medium text-foreground">

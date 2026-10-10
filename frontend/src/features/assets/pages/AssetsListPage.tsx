@@ -30,6 +30,7 @@ import { ASSET_STATUS_MAP } from "@/features/assets/constants/assetStatus.consta
 import { AssetSectionTabs } from "@/features/assets/components/AssetSectionTabs";
 import { AssetExcelMenu } from "@/features/assets/components/AssetExcelMenu";
 import { ASSET_STATUSES, type AssetListItem, type AssetStatus } from "@/types/asset.types";
+import { useAssetModule } from "@/features/assets/hooks/useAssetModule";
 
 const LIMIT = 10;
 
@@ -44,16 +45,17 @@ const LIMIT = 10;
  * link dẫn tới ngõ cụt, chỉ để lại đúng action dùng được (Khôi phục).
  */
 export function AssetsListPage() {
+  const assetModule = useAssetModule();
   const navigate = useNavigate();
   const { hasPermission } = usePermission();
   const isAdmin = useIsAdmin();
   const canBrowseDepartments = isAdmin || hasPermission(PERMISSIONS.DEPARTMENT_VIEW);
-  const canBrowseCategories = hasPermission(PERMISSIONS.ASSET_CATEGORY_VIEW);
+  const canBrowseCategories = hasPermission(assetModule.permissions.categoryView);
   // [MỞ RỘNG 2026-09-17, DEV-062] Khôi phục hàng loạt dùng permission KHÁC
-  // xoá hàng loạt (ASSET_UPDATE, khớp đúng guard nút Khôi phục từng dòng) —
+  // xoá hàng loạt (`*_ASSET_UPDATE`, khớp đúng guard nút Khôi phục từng dòng) —
   // 2 nút độc lập trong Batch Action Bar, cùng cách DocumentsListPage.
-  const canBulkDelete = hasPermission(PERMISSIONS.ASSET_DELETE);
-  const canBulkRestore = hasPermission(PERMISSIONS.ASSET_UPDATE);
+  const canBulkDelete = hasPermission(assetModule.permissions.delete);
+  const canBulkRestore = hasPermission(assetModule.permissions.update);
   const canBulkAct = canBulkDelete || canBulkRestore;
 
   // DEV-083: đọc `?status=` từ URL lúc mở trang — cho phép các nơi khác
@@ -129,7 +131,7 @@ export function AssetsListPage() {
       header: "Tên tài sản",
       sortKey: "name",
       render: (row) => (
-        <Link to={`/app/assets/${row._id}`} className="font-medium text-primary hover:underline">
+        <Link to={`${assetModule.routeBase}/${row._id}`} className="font-medium text-primary hover:underline">
           {row.name}
         </Link>
       ),
@@ -150,25 +152,25 @@ export function AssetsListPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Tài sản"
-        description="Quản lý tài sản, cấp phát/luân chuyển/thu hồi."
+        title={assetModule.label}
+        description="Quản lý thiết bị, cấp phát/luân chuyển/thu hồi."
         actions={
           <div className="flex gap-2">
             {/* Giai đoạn 5 (roadmap A1) — QR code kiểm kê */}
-            <PermissionGuard permission={PERMISSIONS.ASSET_INVENTORY_CHECK}>
-              <Button variant="secondary" size="sm" onClick={() => navigate("/app/assets/scan")}>
+            <PermissionGuard permission={assetModule.permissions.inventoryCheck}>
+              <Button variant="secondary" size="sm" onClick={() => navigate(`${assetModule.routeBase}/scan`)}>
                 <ScanLine /> Quét mã kiểm kê
               </Button>
             </PermissionGuard>
             {/* Roadmap B2 (2026-09-15) — Lịch bảo trì chủ động */}
-            <PermissionGuard permission={PERMISSIONS.ASSET_MAINTENANCE_PLAN_VIEW}>
-              <Button variant="secondary" size="sm" onClick={() => navigate("/app/assets/maintenance-calendar")}>
+            <PermissionGuard permission={assetModule.permissions.planView}>
+              <Button variant="secondary" size="sm" onClick={() => navigate(`${assetModule.routeBase}/maintenance-calendar`)}>
                 <CalendarDays /> Lịch bảo trì
               </Button>
             </PermissionGuard>
             <AssetExcelMenu />
-            <PermissionGuard permission={PERMISSIONS.ASSET_CREATE}>
-              <Button size="sm" onClick={() => navigate("/app/assets/create")}>
+            <PermissionGuard permission={assetModule.permissions.create}>
+              <Button size="sm" onClick={() => navigate(`${assetModule.routeBase}/create`)}>
                 <Plus /> Thêm tài sản
               </Button>
             </PermissionGuard>
@@ -304,7 +306,7 @@ export function AssetsListPage() {
         rowActions={(row) =>
           row.isActive === false ? (
             <div className="flex justify-end gap-1">
-              <PermissionGuard permission={PERMISSIONS.ASSET_UPDATE}>
+              <PermissionGuard permission={assetModule.permissions.update}>
                 <Button variant="ghost" size="sm" aria-label="Khôi phục" onClick={() => setRestoreTarget(row)}>
                   <RotateCcw />
                 </Button>
@@ -312,15 +314,15 @@ export function AssetsListPage() {
             </div>
           ) : (
             <div className="flex justify-end gap-1">
-              <Button variant="ghost" size="sm" aria-label="Xem chi tiết" onClick={() => navigate(`/app/assets/${row._id}`)}>
+              <Button variant="ghost" size="sm" aria-label="Xem chi tiết" onClick={() => navigate(`${assetModule.routeBase}/${row._id}`)}>
                 <Eye />
               </Button>
-              <PermissionGuard permission={PERMISSIONS.ASSET_UPDATE}>
-                <Button variant="ghost" size="sm" aria-label="Sửa" onClick={() => navigate(`/app/assets/${row._id}`)}>
+              <PermissionGuard permission={assetModule.permissions.update}>
+                <Button variant="ghost" size="sm" aria-label="Sửa" onClick={() => navigate(`${assetModule.routeBase}/${row._id}`)}>
                   <Pencil />
                 </Button>
               </PermissionGuard>
-              <PermissionGuard permission={PERMISSIONS.ASSET_DELETE}>
+              <PermissionGuard permission={assetModule.permissions.delete}>
                 <Button variant="ghost" size="sm" aria-label="Xoá" onClick={() => setDeleteTarget(row)}>
                   <Trash2 className="text-destructive" />
                 </Button>

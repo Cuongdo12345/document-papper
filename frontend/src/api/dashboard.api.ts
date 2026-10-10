@@ -22,7 +22,7 @@ import type {
   DashboardPagination,
   OverdueApprovalItem,
 } from "@/types/dashboard.types";
-import type { Asset } from "@/types/asset.types";
+import type { Asset, AssetType } from "@/types/asset.types";
 
 /**
  * API layer domain Dashboard (FE-09) — response shape KHÔNG ĐỒNG NHẤT, xem
@@ -43,8 +43,9 @@ export function getDepartmentDashboard(
   return axiosInstance.get(`/dashboard/department/${departmentId}`);
 }
 
-export function getAssetDashboardSummary(): Promise<AxiosResponse<{ success: boolean; data: AssetDashboardSummary }>> {
-  return axiosInstance.get("/dashboard/assets/summary");
+/** FE-44: `assetType` (tuỳ chọn) lọc theo loại; không truyền = tổng hợp cả hai loại. Có truyền thì backend cần thêm quyền xem loại đó. */
+export function getAssetDashboardSummary(assetType?: AssetType): Promise<AxiosResponse<{ success: boolean; data: AssetDashboardSummary }>> {
+  return axiosInstance.get("/dashboard/assets/summary", { params: { assetType } });
 }
 
 export function getMedicalDeviceDashboardSummary(): Promise<
@@ -91,15 +92,17 @@ export function getDashboardDeviceStats(
 export function getAssetWarrantyExpiring(
   daysAhead: number,
   params: GetAlertListParams,
+  assetType?: AssetType,
 ): Promise<AxiosResponse<{ success: boolean; data: Asset[]; pagination: DashboardPagination }>> {
-  return axiosInstance.get("/dashboard/assets/warranty-expiring", { params: { daysAhead, ...params } });
+  return axiosInstance.get("/dashboard/assets/warranty-expiring", { params: { daysAhead, ...params, assetType } });
 }
 
 export function getAssetMaintenanceOverdue(
   daysThreshold: number,
   params: GetAlertListParams,
+  assetType?: AssetType,
 ): Promise<AxiosResponse<{ success: boolean; data: MaintenanceOverdueItem[]; pagination: DashboardPagination }>> {
-  return axiosInstance.get("/dashboard/assets/maintenance-overdue", { params: { daysThreshold, ...params } });
+  return axiosInstance.get("/dashboard/assets/maintenance-overdue", { params: { daysThreshold, ...params, assetType } });
 }
 
 export function getMedicalDeviceCalibrationDue(

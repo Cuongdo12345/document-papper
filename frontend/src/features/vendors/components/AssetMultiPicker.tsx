@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
-import { useAssets } from "@/features/assets/hooks/useAssets";
+import { useAssetLookup } from "@/features/assets/hooks/useAssetLookup";
+import { ASSET_TYPE_LABELS } from "@/features/assets/constants/assetType.constants";
 import { useDebounce } from "@/hooks/useDebounce";
 
 export interface PickedAsset {
@@ -21,14 +22,14 @@ interface AssetMultiPickerProps {
  * chọn lựa khác hẳn (mảng thay vì 1 giá trị), sửa lại API của nó sẽ phá vỡ
  * mọi chỗ đang dùng single-select (Document PROPOSE_REPAIR, MaintenancePlan).
  * Component MỚI này chỉ khác biệt ở phần state (mảng + chip xoá được), phần
- * search vẫn tái dùng `useAssets` hiện có.
+ * search dùng `useAssetLookup` (FE-44: tra cứu chung hai loại, backend chỉ trả loại người dùng được xem).
  */
 export function AssetMultiPicker({ value, onChange, error }: AssetMultiPickerProps) {
   const [keyword, setKeyword] = useState("");
   const [open, setOpen] = useState(false);
   const debouncedKeyword = useDebounce(keyword);
 
-  const query = useAssets({ keyword: debouncedKeyword || undefined, limit: 20 }, open && debouncedKeyword.length > 0);
+  const query = useAssetLookup({ keyword: debouncedKeyword || undefined, limit: 20 }, open && debouncedKeyword.length > 0);
   const selectedIds = new Set(value.map((v) => v.id));
   const results = (query.data?.data ?? []).filter(
     (a) => a.status !== "DISPOSED" && a.status !== "LOST" && !selectedIds.has(a._id),
@@ -86,6 +87,7 @@ export function AssetMultiPicker({ value, onChange, error }: AssetMultiPickerPro
                 onMouseDown={() => addAsset(asset._id, `${asset.assetCode} — ${asset.name}`)}
               >
                 <span className="font-mono text-xs text-muted-foreground">{asset.assetCode}</span> — {asset.name}
+                <span className="ml-2 text-xs text-muted-foreground">({ASSET_TYPE_LABELS[asset.assetType]})</span>
               </button>
             ))}
           </div>

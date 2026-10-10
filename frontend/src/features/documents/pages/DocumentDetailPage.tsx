@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Pencil, Trash2, RotateCcw, Send, Check, X, Ban, FlagOff, FileDown } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { LoadingState } from "@/components/shared/LoadingState";
@@ -17,7 +17,8 @@ import { useRestoreDocument } from "@/features/documents/hooks/useRestoreDocumen
 import { useDocumentWorkflow } from "@/features/documents/hooks/useDocumentWorkflow";
 import { useReportsByProposal } from "@/features/documents/hooks/useReportsByProposal";
 import { useExportDocumentPdf } from "@/features/documents/hooks/useExportDocumentPdf";
-import { useAsset } from "@/features/assets/hooks/useAsset";
+import { useAssetLookupItem } from "@/features/assets/hooks/useAssetLookup";
+import { assetDetailPath, ASSET_MODULES } from "@/features/assets/constants/assetModule.constants";
 import { WorkflowStatusBadge } from "@/features/documents/components/WorkflowStatusBadge";
 import { DocumentMetaView } from "@/features/documents/components/DocumentMetaView";
 import { DocumentEditModal } from "@/features/documents/components/DocumentEditModal";
@@ -55,7 +56,11 @@ export function DocumentDetailPage() {
 
   const workflowQuery = useDocumentWorkflow(document?.isActive ? id : undefined);
   const reportsQuery = useReportsByProposal(document?._id, document?.category === "PROPOSAL");
-  const assetQuery = useAsset(document?.relatedAsset, hasPermission(PERMISSIONS.ASSET_VIEW_DETAIL));
+  // FE-44: tra cứu chung (backend chỉ trả tài sản thuộc loại người dùng được xem; loại khác → 404 → hiện id thô như trước).
+  const assetQuery = useAssetLookupItem(
+    document?.relatedAsset,
+    hasPermission(PERMISSIONS.IT_ASSET_VIEW) || hasPermission(PERMISSIONS.MEDICAL_ASSET_VIEW),
+  );
 
   const deleteMutation = useDeleteDocument();
   const restoreMutation = useRestoreDocument();
@@ -209,7 +214,17 @@ export function DocumentDetailPage() {
             <div className="sm:col-span-2">
               <dt className="text-xs text-muted-foreground">Tài sản liên quan</dt>
               <dd className="text-foreground">
-                {assetQuery.data ? `${assetQuery.data.assetCode} — ${assetQuery.data.name}` : document.relatedAsset}
+                {assetQuery.data ? (
+                  hasPermission(ASSET_MODULES[assetQuery.data.assetType].permissions.viewDetail) && assetQuery.data.isActive !== false ? (
+                    <Link to={assetDetailPath(assetQuery.data.assetType, assetQuery.data._id)} className="text-primary hover:underline">
+                      {assetQuery.data.assetCode} — {assetQuery.data.name}
+                    </Link>
+                  ) : (
+                    `${assetQuery.data.assetCode} — ${assetQuery.data.name}`
+                  )
+                ) : (
+                  document.relatedAsset
+                )}
               </dd>
             </div>
           )}

@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { restoreAsset } from "@/api/assets.api";
 import { toast } from "@/stores/toastStore";
 import { parseApiError } from "@/utils/parseApiError";
+import { useAssetModule } from "@/features/assets/hooks/useAssetModule";
 
 /**
  * DEV-035 — trước đây hook này không có consumer (không có cách nào reach
@@ -11,10 +12,11 @@ import { parseApiError } from "@/utils/parseApiError";
  * ngay trên hàng (cùng pattern `useRestoreDocument`).
  */
 export function useRestoreAsset() {
+  const { type } = useAssetModule();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => restoreAsset(id),
+    mutationFn: (id: string) => restoreAsset(type, id),
     onSuccess: () => {
       toast.success("Đã khôi phục tài sản");
       queryClient.invalidateQueries({ queryKey: ["assets", "list"] });

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getAssetQRCode } from "@/api/assets.api";
+import { useAssetModule } from "@/features/assets/hooks/useAssetModule";
 
 /**
  * Giai đoạn 5 (roadmap A1) — ảnh QR (Blob PNG) cho 1 asset, dùng hiển thị/in
@@ -7,10 +8,11 @@ import { getAssetQRCode } from "@/api/assets.api";
  * (response ảnh thô, không bọc JSON — xem comment ở đó).
  */
 export function useAssetQRCode(id: string | undefined) {
+  const { type } = useAssetModule();
   return useQuery({
     queryKey: ["assets", "qrcode", id] as const,
     queryFn: async () => {
-      const response = await getAssetQRCode(id!);
+      const response = await getAssetQRCode(type, id!);
       return response.data;
     },
     enabled: !!id,

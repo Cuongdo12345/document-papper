@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { LayoutDashboard, FileText, ClipboardCheck, Boxes, Users, Building2, ShieldCheck, ScrollText, Bell, Paperclip, Package, Handshake, FileSignature, Laptop, Network, BookOpen } from "lucide-react";
+import { LayoutDashboard, FileText, ClipboardCheck, Monitor, Stethoscope, KeyRound, Users, Building2, ShieldCheck, ScrollText, Bell, Paperclip, Package, Handshake, FileSignature, Laptop, Network, BookOpen } from "lucide-react";
 import { PERMISSIONS, type Permission } from "@/constants/permissions";
 
 export interface NavItem {
@@ -55,12 +55,28 @@ export const NAV_ITEMS: NavItem[] = [
     group: "Tài liệu",
     moduleColor: "documents",
   },
-  // FE-06 (roadmap Mục 12) — Assets Core UI.
+  // FE-42/43 (tách module Tài sản, Giai đoạn 7) — thay mục "Tài sản" cũ bằng 3 mục, mỗi mục gate bằng quyền xem RIÊNG.
   {
-    label: "Tài sản",
-    path: "/app/assets",
-    icon: Boxes,
-    permission: PERMISSIONS.ASSET_VIEW,
+    label: "Thiết bị CNTT",
+    path: "/app/it-assets",
+    icon: Monitor,
+    permission: PERMISSIONS.IT_ASSET_VIEW,
+    group: "Tài sản & Vật tư",
+    moduleColor: "assets",
+  },
+  {
+    label: "Thiết bị y tế",
+    path: "/app/medical-assets",
+    icon: Stethoscope,
+    permission: PERMISSIONS.MEDICAL_ASSET_VIEW,
+    group: "Tài sản & Vật tư",
+    moduleColor: "assets",
+  },
+  {
+    label: "Bản quyền phần mềm",
+    path: "/app/software-licenses",
+    icon: KeyRound,
+    permission: PERMISSIONS.SOFTWARE_LICENSE_VIEW,
     group: "Tài sản & Vật tư",
     moduleColor: "assets",
   },

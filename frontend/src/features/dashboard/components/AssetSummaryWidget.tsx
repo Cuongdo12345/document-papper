@@ -3,7 +3,8 @@ import { Boxes, Wallet, Tags, Landmark } from "lucide-react";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { KpiWidgetSkeleton } from "@/features/dashboard/components/DashboardSkeleton";
 import { usePermission } from "@/hooks/usePermission";
-import { PERMISSIONS } from "@/constants/permissions";
+import { ASSET_MODULES } from "@/features/assets/constants/assetModule.constants";
+import type { AssetType } from "@/types/asset.types";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { KpiCard } from "@/features/dashboard/components/KpiCard";
 import { AssetStatusBadge } from "@/features/assets/components/AssetStatusBadge";
@@ -40,9 +41,13 @@ const departmentColumns: DataTableColumn<AssetDepartmentCount>[] = [
   { key: "count", header: "Số lượng", className: "text-right" },
 ];
 
-/** FE-09 — `GET /dashboard/assets/summary`. */
-export function AssetSummaryWidget() {
-  const query = useAssetDashboardSummary();
+/**
+ * FE-09 — `GET /dashboard/assets/summary`. FE-44 (tách module Tài sản): MỖI loại một widget (`assetType`), số liệu lọc theo loại
+ * và liên kết dẫn tới danh sách đúng module (`/app/it-assets` hoặc `/app/medical-assets`).
+ */
+export function AssetSummaryWidget({ assetType }: { assetType: AssetType }) {
+  const assetModule = ASSET_MODULES[assetType];
+  const query = useAssetDashboardSummary(assetType);
   const { hasPermission } = usePermission();
 
   if (query.isLoading) return <KpiWidgetSkeleton label="Đang tải thống kê tài sản..." cards={2} />;
@@ -57,12 +62,12 @@ export function AssetSummaryWidget() {
       <div className="grid grid-cols-2 gap-3">
         {/* [FE-37] Bấm → danh sách Tài sản (mặc định chỉ tài sản đang hoạt động — khớp số đếm ở đây). */}
         <KpiCard
-          label="Tổng tài sản"
+          label={`Tổng ${assetModule.label.toLowerCase()}`}
           value={d.totalAssets}
           icon={Boxes}
           tone="primary"
           countUp
-          to={hasPermission(PERMISSIONS.ASSET_VIEW) ? "/app/assets" : undefined}
+          to={hasPermission(assetModule.permissions.view) ? assetModule.routeBase : undefined}
         />
         <KpiCard label="Tổng giá trị mua" value={`${d.totalPurchaseValue.toLocaleString("vi-VN")} đ`} icon={Wallet} tone="success" />
       </div>
@@ -73,16 +78,14 @@ export function AssetSummaryWidget() {
         `AssetsListPage` đọc `status` từ URL lúc mount để lọc sẵn (giữ nguyên
         `isActive=true` mặc định, khớp đúng số liệu widget này CHỈ đếm tài sản
         active — xem `assetDashboard.service.ts::getAssetDashboardSummaryService`).
-        Không gate permission riêng: mọi role có `DASHBOARD_READ` (tab "Tài
-        sản" mới gọi tới widget này) đã có sẵn `ASSET_VIEW` trong
-        `rolePermission.map.ts` — đã kiểm tra khớp qua toàn bộ role hiện có.
+        FE-44: widget chỉ được hiển thị cho người có quyền xem loại này (`DashboardPage` gate), nên liên kết luôn dùng được.
       */}
       <div className="flex flex-wrap gap-2">
         {d.byStatus.map((s) => (
           <Link
             key={s.status}
-            to={`/app/assets?status=${s.status}`}
-            aria-label={`Xem ${s.count} tài sản trạng thái ${ASSET_STATUS_MAP[s.status].label}`}
+            to={`${assetModule.routeBase}?status=${s.status}`}
+            aria-label={`Xem ${s.count} thiết bị trạng thái ${ASSET_STATUS_MAP[s.status].label}`}
             className="flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-sm transition-colors hover:border-primary/40 hover:bg-accent"
           >
             <AssetStatusBadge status={s.status} />

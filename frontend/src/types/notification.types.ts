@@ -15,6 +15,10 @@ export const NOTIFICATION_TYPES = [
   "ASSET_WARRANTY_EXPIRING",
   "ASSET_MAINTENANCE_OVERDUE",
   "MEDICAL_DEVICE_CALIBRATION_DUE",
+  // Tách module Tài sản (FE-44): cảnh báo giấy phép lưu hành, chứng chỉ vận hành (y tế) và bản quyền phần mềm (CNTT).
+  "MEDICAL_DEVICE_LICENSE_EXPIRING",
+  "OPERATOR_CERTIFICATE_EXPIRING",
+  "SOFTWARE_LICENSE_EXPIRING",
   // Roadmap B1 (SLA & nhắc việc Workflow) — xem trigger `workflowSlaAlerts.service.ts` (backend).
   "WORKFLOW_SLA_REMINDER",
   "WORKFLOW_SLA_ESCALATED",
@@ -31,7 +35,7 @@ export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
  * theo ID). `ImportHistory` cũng chưa có trang nào (Upload/Excel UI chưa
  * làm). 2 loại này KHÔNG build được link — xem `resolveNotificationLink.ts`.
  */
-export type NotificationResourceType = "Document" | "WorkflowInstance" | "ImportHistory" | "Asset";
+export type NotificationResourceType = "Document" | "WorkflowInstance" | "ImportHistory" | "Asset" | "SoftwareLicense";
 
 export type NotificationPriority = "low" | "normal" | "high";
 

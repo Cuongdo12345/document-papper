@@ -1,5 +1,6 @@
 import type { AxiosResponse } from "axios";
 import { axiosInstance } from "@/api/axios";
+import { MEDICAL_ASSETS_API } from "@/api/assetPaths";
 import type { Pagination } from "@/types/shared.types";
 import type {
   OperatorCertificate,
@@ -11,20 +12,20 @@ import type {
 
 /**
  * [MỚI, DEV-077] API layer domain Operator Certificate — mount tại
- * `/api/operator-certificates` (`app.ts`). Response envelope: `{message,
+ * `/api/medical-assets/operator-certificates` (GĐ 8: route cũ `/api/operator-certificates` đã gỡ). Response envelope: `{message,
  * data}` hoặc `{message, data, pagination}` — cùng convention
  * `medicalDevice.api.ts`/`vendor.api.ts`.
  */
 export function createOperatorCertificate(
   body: CreateOperatorCertificateRequest,
 ): Promise<AxiosResponse<{ message: string; data: OperatorCertificate }>> {
-  return axiosInstance.post("/operator-certificates", body);
+  return axiosInstance.post(`${MEDICAL_ASSETS_API}/operator-certificates`, body);
 }
 
 export function getOperatorCertificates(
   params: GetOperatorCertificatesParams,
 ): Promise<AxiosResponse<{ message: string; data: OperatorCertificate[]; pagination: Pagination }>> {
-  return axiosInstance.get("/operator-certificates", { params });
+  return axiosInstance.get(`${MEDICAL_ASSETS_API}/operator-certificates`, { params });
 }
 
 /**
@@ -34,7 +35,7 @@ export function getOperatorCertificates(
 export function getCertifiedUsersForCategory(
   deviceCategory: string,
 ): Promise<AxiosResponse<{ message: string; data: OperatorCertificate[] }>> {
-  return axiosInstance.get("/operator-certificates/certified-users", { params: { deviceCategory } });
+  return axiosInstance.get(`${MEDICAL_ASSETS_API}/operator-certificates/certified-users`, { params: { deviceCategory } });
 }
 
 /** [MỚI DEV-078] Sửa — CHỈ certificateNumber. */
@@ -42,7 +43,7 @@ export function updateOperatorCertificate(
   id: string,
   body: UpdateOperatorCertificateRequest,
 ): Promise<AxiosResponse<{ message: string; data: OperatorCertificate }>> {
-  return axiosInstance.patch(`/operator-certificates/${id}`, body);
+  return axiosInstance.patch(`${MEDICAL_ASSETS_API}/operator-certificates/${id}`, body);
 }
 
 /** [MỚI DEV-078] Thu hồi — bắt buộc lý do. */
@@ -50,12 +51,12 @@ export function revokeOperatorCertificate(
   id: string,
   body: RevokeOperatorCertificateRequest,
 ): Promise<AxiosResponse<{ message: string; data: OperatorCertificate }>> {
-  return axiosInstance.patch(`/operator-certificates/${id}/revoke`, body);
+  return axiosInstance.patch(`${MEDICAL_ASSETS_API}/operator-certificates/${id}/revoke`, body);
 }
 
 /** [MỚI DEV-078] Xoá mềm — lỗi nhập liệu, không bắt buộc lý do. */
 export function deleteOperatorCertificate(
   id: string,
 ): Promise<AxiosResponse<{ message: string }>> {
-  return axiosInstance.delete(`/operator-certificates/${id}`);
+  return axiosInstance.delete(`${MEDICAL_ASSETS_API}/operator-certificates/${id}`);
 }

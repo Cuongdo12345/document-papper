@@ -13,6 +13,9 @@ const NOTIFICATION_TYPE_LABEL: Record<NotificationType, string> = {
   ASSET_WARRANTY_EXPIRING: "Sắp hết bảo hành",
   ASSET_MAINTENANCE_OVERDUE: "Bảo trì quá hạn",
   MEDICAL_DEVICE_CALIBRATION_DUE: "Đến hạn kiểm định",
+  MEDICAL_DEVICE_LICENSE_EXPIRING: "Sắp hết hạn giấy phép lưu hành",
+  OPERATOR_CERTIFICATE_EXPIRING: "Sắp hết hạn chứng chỉ vận hành",
+  SOFTWARE_LICENSE_EXPIRING: "Sắp hết hạn bản quyền phần mềm",
   WORKFLOW_SLA_REMINDER: "Nhắc duyệt trễ hạn",
   WORKFLOW_SLA_ESCALATED: "Duyệt quá hạn — cần can thiệp",
 };

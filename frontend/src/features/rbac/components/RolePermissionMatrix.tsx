@@ -306,7 +306,7 @@ export function RolePermissionMatrix({ allPermissions, selectedIds, onToggle, on
                       />
                       {/* [SỬA 2026-09-16] Ưu tiên `description` tiếng Việt thật (đã có sẵn cho
                           hầu hết permission trong DB) — trước đây luôn humanize tên kỹ thuật
-                          tiếng Anh (`ASSET_CATEGORY_DELETE` -> "Asset category delete"), gây
+                          tiếng Anh (`IT_ASSET_CATEGORY_DELETE` -> "Asset category delete"), gây
                           lẫn ngôn ngữ khi set quyền. Chỉ fallback về humanize cho permission
                           hiếm gặp chưa kịp có description (VD tạo tay qua "Tạo permission"
                           chưa điền mô tả). `name` kỹ thuật gốc vẫn xem được qua tooltip. */}

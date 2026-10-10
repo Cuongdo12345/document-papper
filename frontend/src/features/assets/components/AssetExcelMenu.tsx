@@ -13,6 +13,7 @@ import { ImportHistoryDrawer } from "@/features/documents/components/ImportHisto
 import { useAssetImportTemplate } from "@/features/assets/hooks/useAssetImportTemplate";
 import { useImportAssetsExcel } from "@/features/assets/hooks/useImportAssetsExcel";
 import type { AssetImportPreviewRow } from "@/types/asset.types";
+import { useAssetModule } from "@/features/assets/hooks/useAssetModule";
 
 const PREVIEW_COLUMNS: DataTableColumn<AssetImportPreviewRow>[] = [
   { key: "row", header: "Dòng", className: "w-16" },
@@ -25,7 +26,7 @@ const PREVIEW_COLUMNS: DataTableColumn<AssetImportPreviewRow>[] = [
 /**
  * Dropdown "Excel" (`AssetsListPage`, roadmap Mục 20) — cùng pattern
  * `DocumentExcelMenu`. Asset KHÔNG có permission `_TEMPLATE` riêng — tải file
- * mẫu dùng CHUNG `ASSET_EXCEL_IMPORT` (xác nhận `asset.routes.ts`, khác
+ * mẫu dùng CHUNG `*_ASSET_EXCEL_IMPORT` của module (xác nhận `assetModule.routes.ts`, khác
  * Document có `DOCUMENT_EXCEL_TEMPLATE` tách riêng). "Lịch sử import" dùng
  * LẠI `ImportHistoryDrawer` của Document (cùng collection `ImportHistory`,
  * gate bằng `DOCUMENT_EXCEL_HISTORY` — dùng CHUNG cho cả 2 domain, tên gợi ý
@@ -35,6 +36,7 @@ const PREVIEW_COLUMNS: DataTableColumn<AssetImportPreviewRow>[] = [
  * `seed-rbac.ts`, xem `types/importHistory.types.ts`.
  */
 export function AssetExcelMenu() {
+  const assetModule = useAssetModule();
   const { hasPermission, hasAnyPermission } = usePermission();
   const queryClient = useQueryClient();
   const templateMutation = useAssetImportTemplate();
@@ -44,7 +46,7 @@ export function AssetExcelMenu() {
   const [importOpen, setImportOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  const menuPermissions = [PERMISSIONS.ASSET_EXCEL_EXPORT, PERMISSIONS.ASSET_EXCEL_IMPORT, PERMISSIONS.DOCUMENT_EXCEL_HISTORY];
+  const menuPermissions = [assetModule.permissions.excelExport, assetModule.permissions.excelImport, PERMISSIONS.DOCUMENT_EXCEL_HISTORY];
   if (!hasAnyPermission(menuPermissions)) return null;
 
   return (
@@ -65,7 +67,7 @@ export function AssetExcelMenu() {
               "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
             )}
           >
-            {hasPermission(PERMISSIONS.ASSET_EXCEL_EXPORT) && (
+            {hasPermission(assetModule.permissions.excelExport) && (
               <DropdownMenu.Item
                 onSelect={() => setExportOpen(true)}
                 className="flex cursor-pointer items-center gap-2 rounded-sm px-3 py-2 text-sm outline-none hover:bg-muted focus:bg-muted"
@@ -73,7 +75,7 @@ export function AssetExcelMenu() {
                 <Download className="size-4" /> Xuất Excel
               </DropdownMenu.Item>
             )}
-            {hasPermission(PERMISSIONS.ASSET_EXCEL_IMPORT) && (
+            {hasPermission(assetModule.permissions.excelImport) && (
               <>
                 <DropdownMenu.Item
                   onSelect={() => setImportOpen(true)}

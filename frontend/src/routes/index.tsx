@@ -27,6 +27,11 @@ import { AssetDetailPage } from "@/features/assets/pages/AssetDetailPage";
 import { AssetCategoriesListPage } from "@/features/assets/pages/AssetCategoriesListPage";
 import { AssetScanPage } from "@/features/assets/pages/AssetScanPage";
 import { MaintenanceCalendarPage } from "@/features/assets/pages/MaintenanceCalendarPage";
+import { LegacyAssetsRedirect } from "@/features/assets/pages/LegacyAssetsRedirect";
+import { AssetModuleLayout } from "@/features/assets/components/AssetModuleLayout";
+import { ASSET_MODULES } from "@/features/assets/constants/assetModule.constants";
+import { SoftwareLicensesListPage } from "@/features/softwareLicenses/pages/SoftwareLicensesListPage";
+import { SoftwareLicenseDetailPage } from "@/features/softwareLicenses/pages/SoftwareLicenseDetailPage";
 import { ConsumablesListPage } from "@/features/inventory/pages/ConsumablesListPage";
 import { ConsumableDetailPage } from "@/features/inventory/pages/ConsumableDetailPage";
 import { ConsumableCategoriesListPage } from "@/features/inventory/pages/ConsumableCategoriesListPage";
@@ -135,53 +140,63 @@ export const router = createBrowserRouter([
             element: <ProtectedRoute permission={PERMISSIONS.WORKFLOW_VIEW} />,
             children: [{ path: "workflows/pending", element: <PendingApprovalsPage /> }],
           },
+          // FE-42 (tách module Tài sản, Giai đoạn 7) — HAI module dùng chung một bộ trang, tham số hoá bằng loại tài sản
+          // (`AssetModuleLayout` cấp module cho trang/hook con): `/app/it-assets/*` (Thiết bị CNTT) và
+          // `/app/medical-assets/*` (Thiết bị y tế). Mỗi module gate bằng bộ quyền RIÊNG của nó; `:id` KHÔNG gate
+          // riêng (kế thừa quyền xem của nhóm cha) — cùng bài học DEV-031. Tài sản thuộc loại khác module → backend 404.
+          ...(["IT", "MEDICAL"] as const).map((assetType) => {
+            const m = ASSET_MODULES[assetType];
+            return {
+              element: <ProtectedRoute permission={m.permissions.view} />,
+              children: [
+                {
+                  path: m.routeBase.replace("/app/", ""),
+                  element: <AssetModuleLayout assetType={assetType} />,
+                  children: [
+                    { index: true, element: <AssetsListPage /> },
+                    {
+                      element: <ProtectedRoute permission={m.permissions.create} />,
+                      children: [{ path: "create", element: <AssetCreatePage /> }],
+                    },
+                    {
+                      // Danh mục theo NHÁNH của module (Q-B) — resource RIÊNG, gate tường minh.
+                      element: <ProtectedRoute permission={m.permissions.categoryView} />,
+                      children: [{ path: "categories", element: <AssetCategoriesListPage /> }],
+                    },
+                    {
+                      // QR code kiểm kê — gate RIÊNG theo quyền kiểm kê của module.
+                      element: <ProtectedRoute permission={m.permissions.inventoryCheck} />,
+                      children: [{ path: "scan", element: <AssetScanPage /> }],
+                    },
+                    {
+                      // Lịch bảo trì chủ động — gate RIÊNG theo quyền xem kế hoạch bảo trì của module.
+                      element: <ProtectedRoute permission={m.permissions.planView} />,
+                      children: [{ path: "maintenance-calendar", element: <MaintenanceCalendarPage /> }],
+                    },
+                    { path: ":id", element: <AssetDetailPage /> },
+                  ],
+                },
+              ],
+            };
+          }),
           {
-            // FE-06 (roadmap Mục 12) — `:id` KHÔNG gate riêng bằng
-            // `ASSET_VIEW_DETAIL` (chỉ kế thừa `ASSET_VIEW` của nhóm cha) —
-            // cùng bài học DEV-031: mọi role có `ASSET_VIEW` hiện cũng có
-            // `ASSET_VIEW_DETAIL` (`rolePermission.map.ts`, không tách ABAC
-            // như Document), nhưng tránh lặp lại việc route FE tự gate 1
-            // permission riêng có thể lệch RBAC thật ở lần đổi sau.
-            element: <ProtectedRoute permission={PERMISSIONS.ASSET_VIEW} />,
+            // FE-43 — Bản quyền phần mềm (module CNTT). Gate `SOFTWARE_LICENSE_VIEW`.
+            element: <ProtectedRoute permission={PERMISSIONS.SOFTWARE_LICENSE_VIEW} />,
             children: [
               {
-                path: "assets",
+                path: "software-licenses",
                 children: [
-                  { index: true, element: <AssetsListPage /> },
-                  {
-                    element: <ProtectedRoute permission={PERMISSIONS.ASSET_CREATE} />,
-                    children: [{ path: "create", element: <AssetCreatePage /> }],
-                  },
-                  {
-                    // Asset Categories UI (roadmap Mục 14) — resource RIÊNG
-                    // (`ASSET_CATEGORY_VIEW`, khác `ASSET_VIEW` của nhóm cha
-                    // ở trên) — gate tường minh thêm ở đây thay vì chỉ dựa
-                    // permission cha, đúng nguyên tắc mỗi resource RBAC Admin
-                    // tự gate riêng (cùng cách `rbac/{roles,permissions,policies}`).
-                    element: <ProtectedRoute permission={PERMISSIONS.ASSET_CATEGORY_VIEW} />,
-                    children: [{ path: "categories", element: <AssetCategoriesListPage /> }],
-                  },
-                  {
-                    // Giai đoạn 5 (roadmap A1) — QR code kiểm kê. Gate RIÊNG
-                    // `ASSET_INVENTORY_CHECK` (khác `ASSET_VIEW` của nhóm cha)
-                    // — cùng nguyên tắc "categories" ở trên. Đặt trước ":id"
-                    // cho dễ đọc (React Router v6 tự ưu tiên path tĩnh hơn
-                    // `:id` khi ranking route — khác Express, không bắt buộc
-                    // thứ tự khai báo để tránh bị ":id" nuốt mất).
-                    element: <ProtectedRoute permission={PERMISSIONS.ASSET_INVENTORY_CHECK} />,
-                    children: [{ path: "scan", element: <AssetScanPage /> }],
-                  },
-                  {
-                    // Roadmap B2 (2026-09-15) — Lịch bảo trì chủ động. Gate
-                    // RIÊNG `ASSET_MAINTENANCE_PLAN_VIEW`, cùng nguyên tắc
-                    // "categories"/"scan" ở trên.
-                    element: <ProtectedRoute permission={PERMISSIONS.ASSET_MAINTENANCE_PLAN_VIEW} />,
-                    children: [{ path: "maintenance-calendar", element: <MaintenanceCalendarPage /> }],
-                  },
-                  { path: ":id", element: <AssetDetailPage /> },
+                  { index: true, element: <SoftwareLicensesListPage /> },
+                  { path: ":id", element: <SoftwareLicenseDetailPage /> },
                 ],
               },
             ],
+          },
+          {
+            // FE-42 — đường dẫn CŨ `/app/assets/*` (bookmark, thông báo cũ): chuyển hướng sang module mới. Không gate
+            // quyền ở đây; trang đích tự gate bằng quyền của module.
+            path: "assets/*",
+            element: <LegacyAssetsRedirect />,
           },
           {
             // Roadmap B3 (2026-09-15) — Quản lý vật tư tiêu hao, module MỚI

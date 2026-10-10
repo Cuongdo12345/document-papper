@@ -7,7 +7,7 @@
  * `DOCUMENT_EXCEL_HISTORY`.
  *
  * RBAC gap ĐÃ FIX (2026-09-10, theo yêu cầu user): role `PHONG_VAT_TU_TTB`
- * (import Asset qua Excel được, có `ASSET_EXCEL_IMPORT`) trước đây KHÔNG có
+ * (import Asset qua Excel được, có `MEDICAL_ASSET_EXCEL_IMPORT`) trước đây KHÔNG có
  * `DOCUMENT_EXCEL_HISTORY` nên không xem được lịch sử import của chính mình.
  * Đã gán thêm permission này cho role trong `rolePermission.map.ts` + chạy
  * lại `scripts/seed-rbac.ts` (KHÔNG đổi tên permission — đi đúng tiền lệ dự

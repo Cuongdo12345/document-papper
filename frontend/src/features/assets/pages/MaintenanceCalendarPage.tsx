@@ -6,7 +6,6 @@ import { LoadingState } from "@/components/shared/LoadingState";
 import { AppModal } from "@/components/shared/AppModal";
 import { Button } from "@/components/ui/button";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
-import { PERMISSIONS } from "@/constants/permissions";
 import { cn } from "@/lib/utils";
 import { useMaintenanceCalendar } from "@/features/assets/hooks/useMaintenanceCalendar";
 import { useCompleteMaintenancePlan, useCancelMaintenancePlan } from "@/features/assets/hooks/useMaintenancePlanActions";
@@ -15,6 +14,7 @@ import { EditMaintenancePlanModal } from "@/features/assets/components/EditMaint
 import { WorkflowActionModal } from "@/features/documents/components/WorkflowActionModal";
 import { parseApiError } from "@/utils/parseApiError";
 import type { AssetMaintenancePlan } from "@/types/assetMaintenancePlan.types";
+import { useAssetModule } from "@/features/assets/hooks/useAssetModule";
 
 const WEEKDAY_LABELS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
@@ -47,6 +47,7 @@ function mondayFirstDayIndex(date: Date): number {
  * không cần kéo-thả/nhiều view phức tạp).
  */
 export function MaintenanceCalendarPage() {
+  const assetModule = useAssetModule();
   const [viewedMonth, setViewedMonth] = useState(() => {
     const now = new Date();
     return { month: now.getMonth() + 1, year: now.getFullYear() };
@@ -91,9 +92,9 @@ export function MaintenanceCalendarPage() {
       <PageHeader
         title="Lịch bảo trì"
         description="Kế hoạch bảo trì chủ động theo tháng — độc lập với luồng đề xuất sửa chữa phản ứng."
-        breadcrumb={[{ label: "Tài sản", to: "/app/assets" }, { label: "Lịch bảo trì" }]}
+        breadcrumb={[{ label: assetModule.label, to: assetModule.routeBase }, { label: "Lịch bảo trì" }]}
         actions={
-          <PermissionGuard permission={PERMISSIONS.ASSET_MAINTENANCE_PLAN_CREATE}>
+          <PermissionGuard permission={assetModule.permissions.planCreate}>
             <Button size="sm" onClick={() => setCreateOpen(true)}>
               <CalendarPlus /> Lên lịch bảo trì
             </Button>
@@ -176,7 +177,7 @@ export function MaintenanceCalendarPage() {
               </p>
             )}
             {viewingPlan.status === "planned" && (
-              <PermissionGuard permission={PERMISSIONS.ASSET_MAINTENANCE_PLAN_UPDATE}>
+              <PermissionGuard permission={assetModule.permissions.planUpdate}>
                 <div className="flex flex-wrap gap-2 border-t border-border pt-3">
                   <Button variant="secondary" size="sm" onClick={() => setEditingPlan(viewingPlan)}>
                     Sửa

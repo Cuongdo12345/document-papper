@@ -1,5 +1,7 @@
 import type { AxiosResponse } from "axios";
 import { axiosInstance } from "@/api/axios";
+import { assetApiBase } from "@/api/assetPaths";
+import type { AssetType } from "@/types/asset.types";
 import type { Pagination, BulkDeleteResult } from "@/types/shared.types";
 import type {
   AssetListItem,
@@ -14,6 +16,8 @@ import type {
   GetAssetAssignmentHistoryParams,
   ExportAssetsExcelParams,
   AssetImportPreviewRow,
+  AssetLookupItem,
+  AssetLookupParams,
 } from "@/types/asset.types";
 import type { ExcelImportResult } from "@/components/shared/ExcelImportWizard";
 
@@ -23,83 +27,81 @@ import type { ExcelImportResult } from "@/components/shared/ExcelImportWizard";
  * `asset.controller.ts`/`assetAssignment.controller.ts`, mọi action).
  */
 export function getAssets(
+  type: AssetType,
   params: GetAssetsParams,
 ): Promise<AxiosResponse<{ message: string; data: AssetListItem[]; pagination: Pagination }>> {
-  return axiosInstance.get("/assets", { params });
-}
-
-export function getAssetById(id: string): Promise<AxiosResponse<{ message: string; data: AssetListItem }>> {
-  return axiosInstance.get(`/assets/${id}`);
+  return axiosInstance.get(assetApiBase(type), { params });
 }
 
 /**
- * FE-06 — CÙNG endpoint `GET /assets/:id` với `getAssetById` ở trên (backend
- * luôn trả object đầy đủ, đã populate `category`/`department`/`assignedTo`
- * — `getAssetById`/`AssetListItem` chỉ là 1 VIEW tối thiểu của response thật,
- * không phải 1 API path khác). Hàm riêng để trang Detail (FE-06) nhận đúng
- * type `Asset` đầy đủ mà không phải sửa `getAssetById`/`AssetListItem` (đang
- * được `AssetPicker`/`useAsset` FE-04 dùng, giữ nguyên không đổi).
+ * Chi tiết đầy đủ (type Asset) — đã populate `category`/`department`/`assignedTo`. Tài sản thuộc loại khác module
+ * → 404 (backend cô lập theo loại).
  */
-export function getAssetDetail(id: string): Promise<AxiosResponse<{ message: string; data: Asset }>> {
-  return axiosInstance.get(`/assets/${id}`);
+export function getAssetDetail(type: AssetType, id: string): Promise<AxiosResponse<{ message: string; data: Asset }>> {
+  return axiosInstance.get(`${assetApiBase(type)}/${id}`);
 }
 
-/** FE-06 — Assets Core UI, dùng type `Asset` đầy đủ (khác `getAssets`/`getAssetById` ở trên, dùng `AssetListItem` tối thiểu cho `AssetPicker`). */
-export function createAsset(body: CreateAssetRequest): Promise<AxiosResponse<{ message: string; data: Asset }>> {
-  return axiosInstance.post("/assets", body);
+/** FE-06 — Assets Core UI, dùng type `Asset` đầy đủ (khác `getAssets` ở trên, dùng `AssetListItem` tối thiểu cho danh sách). */
+export function createAsset(type: AssetType, body: CreateAssetRequest): Promise<AxiosResponse<{ message: string; data: Asset }>> {
+  return axiosInstance.post(assetApiBase(type), body);
 }
 
 export function updateAsset(
+  type: AssetType,
   id: string,
   body: UpdateAssetRequest,
 ): Promise<AxiosResponse<{ message: string; data: Asset }>> {
-  return axiosInstance.put(`/assets/${id}`, body);
+  return axiosInstance.put(`${assetApiBase(type)}/${id}`, body);
 }
 
-export function deleteAsset(id: string): Promise<AxiosResponse<{ message: string }>> {
-  return axiosInstance.delete(`/assets/${id}`);
+export function deleteAsset(type: AssetType, id: string): Promise<AxiosResponse<{ message: string }>> {
+  return axiosInstance.delete(`${assetApiBase(type)}/${id}`);
 }
 
-export function restoreAsset(id: string): Promise<AxiosResponse<{ message: string; data: Asset }>> {
-  return axiosInstance.patch(`/assets/${id}/restore`);
+export function restoreAsset(type: AssetType, id: string): Promise<AxiosResponse<{ message: string; data: Asset }>> {
+  return axiosInstance.patch(`${assetApiBase(type)}/${id}/restore`);
 }
 
 /** [MỚI 2026-09-16, DEV-060] Xoá mềm hàng loạt — chọn nhiều dòng ở danh sách. */
-export function bulkDeleteAssets(ids: string[]): Promise<AxiosResponse<{ message: string; data: BulkDeleteResult }>> {
-  return axiosInstance.post("/assets/bulk-delete", { ids });
+export function bulkDeleteAssets(type: AssetType, ids: string[]): Promise<AxiosResponse<{ message: string; data: BulkDeleteResult }>> {
+  return axiosInstance.post(`${assetApiBase(type)}/bulk-delete`, { ids });
 }
 
-/** [MỚI 2026-09-17, DEV-062] Khôi phục hàng loạt — cùng permission ASSET_UPDATE với `restoreAsset`. */
-export function bulkRestoreAssets(ids: string[]): Promise<AxiosResponse<{ message: string; data: BulkDeleteResult }>> {
-  return axiosInstance.post("/assets/bulk-restore", { ids });
+/** [MỚI 2026-09-17, DEV-062] Khôi phục hàng loạt — cùng quyền `*_ASSET_UPDATE` của module với `restoreAsset`. */
+export function bulkRestoreAssets(type: AssetType, ids: string[]): Promise<AxiosResponse<{ message: string; data: BulkDeleteResult }>> {
+  return axiosInstance.post(`${assetApiBase(type)}/bulk-restore`, { ids });
 }
 
 export function assignAsset(
+  type: AssetType,
   id: string,
   body: AssignAssetRequest,
 ): Promise<AxiosResponse<{ message: string; data: Asset }>> {
-  return axiosInstance.post(`/assets/${id}/assign`, body);
+  return axiosInstance.post(`${assetApiBase(type)}/${id}/assign`, body);
 }
 
 export function transferAsset(
+  type: AssetType,
   id: string,
   body: TransferAssetRequest,
 ): Promise<AxiosResponse<{ message: string; data: Asset }>> {
-  return axiosInstance.post(`/assets/${id}/transfer`, body);
+  return axiosInstance.post(`${assetApiBase(type)}/${id}/transfer`, body);
 }
 
 export function returnAsset(
+  type: AssetType,
   id: string,
   body: ReturnAssetRequest,
 ): Promise<AxiosResponse<{ message: string; data: Asset }>> {
-  return axiosInstance.post(`/assets/${id}/return`, body);
+  return axiosInstance.post(`${assetApiBase(type)}/${id}/return`, body);
 }
 
 export function getAssetAssignmentHistory(
+  type: AssetType,
   id: string,
   params: GetAssetAssignmentHistoryParams,
 ): Promise<AxiosResponse<{ message: string; data: AssetAssignmentHistoryItem[]; pagination: Pagination }>> {
-  return axiosInstance.get(`/assets/${id}/assignment-history`, { params });
+  return axiosInstance.get(`${assetApiBase(type)}/${id}/assignment-history`, { params });
 }
 
 /* =========================================================================
@@ -111,21 +113,21 @@ export function getAssetAssignmentHistory(
  * gốc `assetQRCode.service.ts`). Response ảnh thô (KHÔNG bọc JSON) — dùng
  * `responseType:"blob"`, cùng pattern `downloadFile`/`exportAssetsExcel`.
  */
-export function getAssetQRCode(id: string): Promise<AxiosResponse<Blob>> {
-  return axiosInstance.get(`/assets/${id}/qrcode`, { responseType: "blob" });
+export function getAssetQRCode(type: AssetType, id: string): Promise<AxiosResponse<Blob>> {
+  return axiosInstance.get(`${assetApiBase(type)}/${id}/qrcode`, { responseType: "blob" });
 }
 
 /**
  * Tra cứu asset theo `assetCode` (đọc từ QR/đầu đọc mã vạch/gõ tay) — bước 1
  * luồng kiểm kê, để FE hiển thị xác nhận trước khi gọi `checkInAsset`.
  */
-export function lookupAssetByCode(assetCode: string): Promise<AxiosResponse<{ message: string; data: Asset }>> {
-  return axiosInstance.get(`/assets/lookup/${encodeURIComponent(assetCode)}`);
+export function lookupAssetByCode(type: AssetType, assetCode: string): Promise<AxiosResponse<{ message: string; data: Asset }>> {
+  return axiosInstance.get(`${assetApiBase(type)}/lookup/${encodeURIComponent(assetCode)}`);
 }
 
 /** Ghi nhận kiểm kê — bước 2, sau khi nhân viên xác nhận đúng tài sản ở bước 1. */
-export function checkInAsset(id: string): Promise<AxiosResponse<{ message: string; data: Asset }>> {
-  return axiosInstance.post(`/assets/${id}/check-in`);
+export function checkInAsset(type: AssetType, id: string): Promise<AxiosResponse<{ message: string; data: Asset }>> {
+  return axiosInstance.post(`${assetApiBase(type)}/${id}/check-in`);
 }
 
 /* =========================================================================
@@ -135,24 +137,41 @@ export function checkInAsset(id: string): Promise<AxiosResponse<{ message: strin
    lại cho đủ ngữ cảnh.
 ========================================================================= */
 
-export function exportAssetsExcel(params: ExportAssetsExcelParams): Promise<AxiosResponse<Blob>> {
-  return axiosInstance.get("/assets/export", { params, responseType: "blob" });
+export function exportAssetsExcel(type: AssetType, params: ExportAssetsExcelParams): Promise<AxiosResponse<Blob>> {
+  return axiosInstance.get(`${assetApiBase(type)}/export`, { params, responseType: "blob" });
 }
 
-export function downloadAssetImportTemplate(): Promise<AxiosResponse<Blob>> {
-  return axiosInstance.get("/assets/import/template", { responseType: "blob" });
+export function downloadAssetImportTemplate(type: AssetType): Promise<AxiosResponse<Blob>> {
+  return axiosInstance.get(`${assetApiBase(type)}/import/template`, { responseType: "blob" });
 }
 
 /** `POST /assets/import?dryRun=...` — CÙNG route cho preview lẫn import thật, giống Document. */
 export function importAssetsExcel(
+  type: AssetType,
   file: File,
   dryRun: boolean,
 ): Promise<AxiosResponse<{ message: string; data: ExcelImportResult<AssetImportPreviewRow> }>> {
   const formData = new FormData();
   formData.append("file", file);
-  return axiosInstance.post("/assets/import", formData, {
+  return axiosInstance.post(`${assetApiBase(type)}/import`, formData, {
     params: { dryRun },
     headers: { "Content-Type": "multipart/form-data" },
     timeout: 60_000,
   });
+}
+
+/* =========================================================================
+   TRA CỨU CHUNG CHO HAI LOẠI (FE-44, backend DEV-118/DEV-119) — ô chọn tài sản ở Tài liệu/Hợp đồng, link từ
+   Thông báo. Không thuộc module nào: cần MỘT TRONG HAI quyền xem; backend chỉ trả loại người gọi xem được.
+========================================================================= */
+
+export function lookupAssetOptions(
+  params: AssetLookupParams,
+): Promise<AxiosResponse<{ message: string; data: AssetLookupItem[]; pagination: Pagination }>> {
+  return axiosInstance.get("/assets/lookup-options", { params });
+}
+
+/** 1 tài sản theo id kèm loại (kể cả đã xoá mềm, trả isActive=false); loại không xem được → 404. */
+export function lookupAssetOptionById(id: string): Promise<AxiosResponse<{ message: string; data: AssetLookupItem }>> {
+  return axiosInstance.get(`/assets/lookup-options/${id}`);
 }

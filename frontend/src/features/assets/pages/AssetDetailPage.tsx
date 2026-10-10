@@ -8,7 +8,6 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { usePermission } from "@/hooks/usePermission";
-import { PERMISSIONS } from "@/constants/permissions";
 import { useAssetDetail } from "@/features/assets/hooks/useAssetDetail";
 import { useDeleteAsset } from "@/features/assets/hooks/useDeleteAsset";
 import { AssetStatusBadge } from "@/features/assets/components/AssetStatusBadge";
@@ -18,14 +17,18 @@ import { AssetTransferModal } from "@/features/assets/components/AssetTransferMo
 import { AssetReturnModal } from "@/features/assets/components/AssetReturnModal";
 import { AssetAssignmentHistorySection } from "@/features/assets/components/AssetAssignmentHistorySection";
 import { MedicalDeviceSection } from "@/features/assets/components/MedicalDeviceSection";
+import { ItDeviceSection } from "@/features/assets/components/ItDeviceSection";
+import { AssetSoftwareLicensesSection } from "@/features/softwareLicenses/components/AssetSoftwareLicensesSection";
 import { AssetQRCodeSection } from "@/features/assets/components/AssetQRCodeSection";
 import { MaintenancePlanHistorySection } from "@/features/assets/components/MaintenancePlanHistorySection";
 import { ContractHistorySection } from "@/features/vendors/components/ContractHistorySection";
 import { parseApiError } from "@/utils/parseApiError";
+import { useAssetModule } from "@/features/assets/hooks/useAssetModule";
 
 const SECTION_CLASS = "space-y-3 rounded-lg border border-border bg-card p-4";
 
 export function AssetDetailPage() {
+  const assetModule = useAssetModule();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { hasPermission } = usePermission();
@@ -59,15 +62,15 @@ export function AssetDetailPage() {
       <PageHeader
         title={asset.name}
         description={asset.assetCode}
-        breadcrumb={[{ label: "Tài sản", to: "/app/assets" }, { label: asset.assetCode }]}
+        breadcrumb={[{ label: assetModule.label, to: assetModule.routeBase }, { label: asset.assetCode }]}
         actions={
           <div className="flex flex-wrap gap-2">
-            <PermissionGuard permission={PERMISSIONS.ASSET_UPDATE}>
+            <PermissionGuard permission={assetModule.permissions.update}>
               <Button variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
                 <Pencil /> Sửa
               </Button>
             </PermissionGuard>
-            <PermissionGuard permission={PERMISSIONS.ASSET_DELETE}>
+            <PermissionGuard permission={assetModule.permissions.delete}>
               <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
                 <Trash2 /> Xoá
               </Button>
@@ -146,7 +149,7 @@ export function AssetDetailPage() {
       </div>
 
       {/* Assignment actions */}
-      {(hasPermission(PERMISSIONS.ASSET_ASSIGN) && (canAssign || canTransfer || canReturn)) && (
+      {(hasPermission(assetModule.permissions.assign) && (canAssign || canTransfer || canReturn)) && (
         <div className={SECTION_CLASS}>
           <h2 className="text-sm font-semibold text-foreground">Cấp phát / Luân chuyển</h2>
           <div className="flex flex-wrap gap-2">
@@ -175,10 +178,18 @@ export function AssetDetailPage() {
         <AssetAssignmentHistorySection assetId={asset._id} />
       </div>
 
-      {/* FE-07 — Medical Device Profile/Calibration (tự ẩn nếu không có MEDICAL_DEVICE_VIEW) */}
-      <MedicalDeviceSection assetId={asset._id} />
+      {/* FE-42/43 — phần riêng theo loại: y tế = hồ sơ y tế/kiểm định/chứng chỉ (tự ẩn nếu không có MEDICAL_DEVICE_VIEW);
+          CNTT = hồ sơ CNTT + bản quyền phần mềm đang gán (tự ẩn nếu không có SOFTWARE_LICENSE_VIEW). */}
+      {assetModule.type === "MEDICAL" ? (
+        <MedicalDeviceSection assetId={asset._id} />
+      ) : (
+        <>
+          <ItDeviceSection assetId={asset._id} />
+          <AssetSoftwareLicensesSection assetId={asset._id} />
+        </>
+      )}
 
-      {/* Roadmap B2 — Lịch bảo trì chủ động (tự ẩn nếu không có ASSET_MAINTENANCE_PLAN_VIEW) */}
+      {/* Roadmap B2 — Lịch bảo trì chủ động (tự ẩn nếu thiếu quyền xem kế hoạch bảo trì của module) */}
       <MaintenancePlanHistorySection assetId={asset._id} />
 
       {/* Roadmap B4 — Hợp đồng bảo trì/bảo hành (tự ẩn nếu không có CONTRACT_VIEW) */}
@@ -192,7 +203,7 @@ export function AssetDetailPage() {
       <ConfirmDialog
         open={deleteOpen}
         onClose={() => setDeleteOpen(false)}
-        onConfirm={() => deleteMutation.mutate(asset._id, { onSuccess: () => navigate("/app/assets") })}
+        onConfirm={() => deleteMutation.mutate(asset._id, { onSuccess: () => navigate(assetModule.routeBase) })}
         title="Xoá tài sản"
         message={`Ẩn "${asset.name}"? Có thể khôi phục lại sau ở trang danh sách (bộ lọc "Hiển thị: Đã ẩn").`}
         danger

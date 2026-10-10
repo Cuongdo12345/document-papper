@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { Pagination } from "@/components/shared/Pagination";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { AssetNameLink } from "@/features/assets/components/AssetNameLink";
 import { useMedicalDeviceCalibrationDue } from "@/features/dashboard/hooks/useMedicalDeviceCalibrationDue";
 import { parseApiError } from "@/utils/parseApiError";
 import type { CalibrationDueItem } from "@/types/dashboard.types";
@@ -13,9 +13,9 @@ const columns: DataTableColumn<CalibrationDueItem>[] = [
     header: "Thiết bị",
     className: "max-w-56 truncate",
     render: (row) => (
-      <Link to={`/app/assets/${row.asset._id}`} className="font-medium text-foreground hover:underline" title={row.asset.name}>
+      <AssetNameLink assetType="MEDICAL" id={row.asset._id} className="font-medium text-foreground hover:underline" title={row.asset.name}>
         {row.asset.name}
-      </Link>
+      </AssetNameLink>
     ),
   },
   { key: "department", header: "Khoa/Phòng", className: "max-w-44 truncate", render: (row) => row.asset.department?.name ?? "—" },

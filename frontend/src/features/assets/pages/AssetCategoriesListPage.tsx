@@ -10,7 +10,6 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { usePermission } from "@/hooks/usePermission";
-import { PERMISSIONS } from "@/constants/permissions";
 import { useRowSelection } from "@/hooks/useRowSelection";
 import { AssetSectionTabs } from "@/features/assets/components/AssetSectionTabs";
 import { AssetCategoryFormModal } from "@/features/assets/components/AssetCategoryFormModal";
@@ -24,6 +23,7 @@ import { AssetCategoryOptions } from "@/features/assets/components/AssetCategory
 import { parseApiError } from "@/utils/parseApiError";
 import { splitSelectionByActive } from "@/utils/splitSelectionByActive";
 import type { AssetCategory } from "@/types/asset.types";
+import { useAssetModule } from "@/features/assets/hooks/useAssetModule";
 
 const LIMIT = 10;
 
@@ -49,19 +49,20 @@ type LevelFilter = "leaf" | "group" | "";
  * `true`), nếu không có sẽ không có cách nào reach danh mục đã xoá mềm để
  * gọi `PATCH /:id/restore` (endpoint có sẵn nhưng không ai gọi tới được).
  *
- * KHÔNG có action "Xoá vĩnh viễn" (`ASSET_CATEGORY_DELETE_PERMANENT`) — cùng
- * quyết định với `ASSET_DELETE_PERMANENT` ở FE-06 (0 UI, xem `assets.api.ts`
+ * KHÔNG có action "Xoá vĩnh viễn" (`*_ASSET_CATEGORY_DELETE_PERMANENT`) — cùng
+ * quyết định với `*_ASSET_DELETE_PERMANENT` ở FE-06 (0 UI, xem `assets.api.ts`
  * lịch sử): backend CỐ TÌNH không gán permission này cho bất kỳ role nào
  * (`rolePermission.map.ts` comment gốc "rủi ro cao"), `PermissionGuard` cũng
  * sẽ ẩn hoàn toàn nút này với mọi tài khoản hiện có — không xây UI cho hành
  * động không ai dùng được ở thời điểm này.
  */
 export function AssetCategoriesListPage() {
+  const assetModule = useAssetModule();
   const { hasPermission } = usePermission();
   // [MỞ RỘNG 2026-09-17, DEV-062] 2 permission khác nhau cho 2 nút hàng loạt,
   // khớp đúng guard nút từng dòng — cùng cách DocumentsListPage/AssetsListPage.
-  const canBulkDelete = hasPermission(PERMISSIONS.ASSET_CATEGORY_DELETE);
-  const canBulkRestore = hasPermission(PERMISSIONS.ASSET_CATEGORY_UPDATE);
+  const canBulkDelete = hasPermission(assetModule.permissions.categoryDelete);
+  const canBulkRestore = hasPermission(assetModule.permissions.categoryUpdate);
   const canBulkAct = canBulkDelete || canBulkRestore;
 
   const [page, setPage] = useState(1);
@@ -130,9 +131,9 @@ export function AssetCategoriesListPage() {
     <div className="space-y-4">
       <PageHeader
         title="Danh mục tài sản"
-        description="Danh mục con dùng để gán tài sản — lọc theo nhóm để thu hẹp danh sách."
+        description={`Nhánh ${assetModule.label}: danh mục con dùng để gán thiết bị — lọc theo nhóm để thu hẹp danh sách.`}
         actions={
-          <PermissionGuard permission={PERMISSIONS.ASSET_CATEGORY_CREATE}>
+          <PermissionGuard permission={assetModule.permissions.categoryCreate}>
             <Button size="sm" onClick={() => setFormState({ open: true })}>
               <Plus /> Thêm danh mục
             </Button>
@@ -247,7 +248,7 @@ export function AssetCategoriesListPage() {
         rowActions={(row) =>
           row.isActive === false ? (
             <div className="flex justify-end gap-1">
-              <PermissionGuard permission={PERMISSIONS.ASSET_CATEGORY_UPDATE}>
+              <PermissionGuard permission={assetModule.permissions.categoryUpdate}>
                 <Button variant="ghost" size="sm" aria-label="Khôi phục" onClick={() => setRestoreTarget(row)}>
                   <RotateCcw />
                 </Button>
@@ -255,12 +256,12 @@ export function AssetCategoriesListPage() {
             </div>
           ) : (
             <div className="flex justify-end gap-1">
-              <PermissionGuard permission={PERMISSIONS.ASSET_CATEGORY_UPDATE}>
+              <PermissionGuard permission={assetModule.permissions.categoryUpdate}>
                 <Button variant="ghost" size="sm" aria-label="Sửa" onClick={() => setFormState({ open: true, category: row })}>
                   <Pencil />
                 </Button>
               </PermissionGuard>
-              <PermissionGuard permission={PERMISSIONS.ASSET_CATEGORY_DELETE}>
+              <PermissionGuard permission={assetModule.permissions.categoryDelete}>
                 <Button variant="ghost" size="sm" aria-label="Xoá" onClick={() => setDeleteTarget(row)}>
                   <Trash2 className="text-destructive" />
                 </Button>

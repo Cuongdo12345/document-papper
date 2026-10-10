@@ -30,7 +30,7 @@ interface AssetAssignModalProps {
 /**
  * Chỉ dùng khi asset đang IN_STOCK/RESERVED (điều kiện hiển thị nút — xem
  * `AssetDetailPage`, backend tự validate lại `assignAssetService`).
- * `canBrowseUsers` (`USER_VIEW`) — role `PHONG_VAT_TU_TTB` có `ASSET_ASSIGN`
+ * `canBrowseUsers` (`USER_VIEW`) — role `PHONG_VAT_TU_TTB` có `MEDICAL_ASSET_ASSIGN`
  * NHƯNG KHÔNG có `USER_VIEW` (`rolePermission.map.ts`) — ẩn dropdown chọn
  * người dùng cụ thể, vẫn cấp phát được cho khoa/phòng (field `toUser` tuỳ
  * chọn, không bắt buộc phải có mới cấp phát được) — ghi nhận ở FE-06.md.

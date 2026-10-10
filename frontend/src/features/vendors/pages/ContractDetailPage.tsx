@@ -8,6 +8,8 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { PERMISSIONS } from "@/constants/permissions";
+import { usePermission } from "@/hooks/usePermission";
+import { assetDetailPath, ASSET_MODULES } from "@/features/assets/constants/assetModule.constants";
 import { useContractDetail } from "@/features/vendors/hooks/useContractDetail";
 import { useCancelContract } from "@/features/vendors/hooks/useContractActions";
 import { EditContractModal } from "@/features/vendors/components/EditContractModal";
@@ -16,6 +18,7 @@ import { parseApiError } from "@/utils/parseApiError";
 
 /** Roadmap B4 (2026-09-16) — `/app/contracts/:id`. Chi tiết hợp đồng + danh sách tài sản áp dụng. */
 export function ContractDetailPage() {
+  const { hasPermission } = usePermission();
   const { id } = useParams<{ id: string }>();
   const query = useContractDetail(id);
   const cancelMutation = useCancelContract();
@@ -104,9 +107,16 @@ export function ContractDetailPage() {
               </li>
             ) : (
               <li key={a._id} className="text-sm">
-                <Link to={`/app/assets/${a._id}`} className="font-medium text-primary hover:underline">
-                  {a.assetCode} — {a.name}
-                </Link>
+                {/* FE-44: chỉ liên kết khi biết loại VÀ người xem có quyền xem chi tiết loại đó; còn lại hiện chữ thường. */}
+                {a.assetType && hasPermission(ASSET_MODULES[a.assetType].permissions.viewDetail) ? (
+                  <Link to={assetDetailPath(a.assetType, a._id)} className="font-medium text-primary hover:underline">
+                    {a.assetCode} — {a.name}
+                  </Link>
+                ) : (
+                  <span className="font-medium text-foreground">
+                    {a.assetCode} — {a.name}
+                  </span>
+                )}
                 {a.department && <span className="text-muted-foreground"> ({a.department.name})</span>}
               </li>
             ),

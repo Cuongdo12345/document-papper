@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { AssetNameLink } from "@/features/assets/components/AssetNameLink";
 import { AppModal } from "@/components/shared/AppModal";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { Pagination } from "@/components/shared/Pagination";
@@ -23,9 +23,9 @@ const columns: DataTableColumn<MedicalDeviceByClassItem>[] = [
     key: "name",
     header: "Tên thiết bị",
     render: (row) => (
-      <Link to={`/app/assets/${row.asset._id}`} className="font-medium text-primary hover:underline">
+      <AssetNameLink assetType="MEDICAL" id={row.asset._id} className="font-medium text-primary hover:underline">
         {row.asset.name}
-      </Link>
+      </AssetNameLink>
     ),
   },
   { key: "department", header: "Khoa/Phòng", render: (row) => row.asset.department?.name ?? "—" },

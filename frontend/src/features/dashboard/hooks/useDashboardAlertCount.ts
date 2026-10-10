@@ -1,6 +1,7 @@
 import { useAssetWarrantyExpiring } from "@/features/dashboard/hooks/useAssetWarrantyExpiring";
 import { useAssetMaintenanceOverdue } from "@/features/dashboard/hooks/useAssetMaintenanceOverdue";
 import { useMedicalDeviceCalibrationDue } from "@/features/dashboard/hooks/useMedicalDeviceCalibrationDue";
+import { useDashboardAssetScope } from "@/features/dashboard/hooks/useDashboardAssetScope";
 import { useWorkflowOverdueApprovals } from "@/features/dashboard/hooks/useWorkflowOverdueApprovals";
 
 const FIRST_PAGE = { page: 1, limit: 10 };
@@ -13,10 +14,12 @@ const FIRST_PAGE = { page: 1, limit: 10 };
  * khi bấm tab. API nào lỗi thì bỏ qua phần đó (widget trong tab vẫn tự báo lỗi).
  */
 export function useDashboardAlertCount(): number | undefined {
+  // FE-44: cùng phạm vi loại tài sản với các widget trong tab (trùng query key); cảnh báo kiểm định chỉ tính khi xem được thiết bị y tế.
+  const { assetType, canViewAny, canViewMedical } = useDashboardAssetScope();
   const queries = [
-    useAssetWarrantyExpiring(30, FIRST_PAGE),
-    useAssetMaintenanceOverdue(7, FIRST_PAGE),
-    useMedicalDeviceCalibrationDue(30, FIRST_PAGE),
+    useAssetWarrantyExpiring(30, FIRST_PAGE, { assetType, enabled: canViewAny }),
+    useAssetMaintenanceOverdue(7, FIRST_PAGE, { assetType, enabled: canViewAny }),
+    useMedicalDeviceCalibrationDue(30, FIRST_PAGE, { enabled: canViewMedical }),
     useWorkflowOverdueApprovals(FIRST_PAGE),
   ];
 

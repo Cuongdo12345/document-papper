@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { useAssets } from "@/features/assets/hooks/useAssets";
+import { useAssetLookup } from "@/features/assets/hooks/useAssetLookup";
+import { ASSET_TYPE_LABELS } from "@/features/assets/constants/assetType.constants";
+import type { AssetType } from "@/types/asset.types";
 import { useDebounce } from "@/hooks/useDebounce";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,20 +11,22 @@ interface AssetPickerProps {
   selectedLabel?: string;
   onChange: (assetId: string | undefined, label: string | undefined) => void;
   error?: string;
+  /** Giới hạn theo loại (vd trang Lịch bảo trì của module CNTT). Không truyền = cả hai loại người dùng được xem. */
+  assetType?: AssetType;
 }
 
 /**
  * Combobox chọn `relatedAsset` (BẮT BUỘC cho PROPOSE_REPAIR) — tìm kiếm debounce
- * qua `GET /assets?keyword=...`. `QueryAssetDTO.status` CHỈ nhận 1 giá trị đơn
+ * qua `GET /assets/lookup-options?keyword=...` (FE-44: dùng chung hai loại, backend chỉ trả loại người dùng được xem). Lookup chưa lọc theo trạng thái
  * (không phải danh sách loại trừ), nên lọc DISPOSED/LOST ở CLIENT sau khi có
  * kết quả (DOCUMENT_DOMAIN_MAP.md Mục 2: không cho chọn asset 2 trạng thái này).
  */
-export function AssetPicker({ value, selectedLabel, onChange, error }: AssetPickerProps) {
+export function AssetPicker({ value, selectedLabel, onChange, error, assetType }: AssetPickerProps) {
   const [keyword, setKeyword] = useState("");
   const [open, setOpen] = useState(false);
   const debouncedKeyword = useDebounce(keyword);
 
-  const query = useAssets({ keyword: debouncedKeyword || undefined, limit: 20 }, open && debouncedKeyword.length > 0);
+  const query = useAssetLookup({ keyword: debouncedKeyword || undefined, assetType, limit: 20 }, open && debouncedKeyword.length > 0);
   const results = (query.data?.data ?? []).filter((a) => a.status !== "DISPOSED" && a.status !== "LOST");
 
   if (value) {
@@ -68,6 +72,7 @@ export function AssetPicker({ value, selectedLabel, onChange, error }: AssetPick
               }}
             >
               <span className="font-mono text-xs text-muted-foreground">{asset.assetCode}</span> — {asset.name}
+              {!assetType && <span className="ml-2 text-xs text-muted-foreground">({ASSET_TYPE_LABELS[asset.assetType]})</span>}
             </button>
           ))}
         </div>

@@ -14,6 +14,7 @@ import { usePermission } from "@/hooks/usePermission";
 import { PERMISSIONS } from "@/constants/permissions";
 import { parseApiError } from "@/utils/parseApiError";
 import { toast } from "@/stores/toastStore";
+import { useAssetModule } from "@/features/assets/hooks/useAssetModule";
 
 const createAssetSchema = z.object({
   category: z.string().min(1, "Vui lòng chọn danh mục"),
@@ -37,9 +38,9 @@ const createAssetSchema = z.object({
 type CreateAssetFormValues = z.infer<typeof createAssetSchema>;
 
 /**
- * `/app/assets/create` — trang riêng (khớp `DocumentCreatePage`, nhiều field
+ * `${assetModule.routeBase}/create` — trang riêng (khớp `DocumentCreatePage`, nhiều field
  * hơn 1 `AppDrawer` phù hợp). Áp dụng CÙNG pattern khoá "Khoa/Phòng" như
- * DEV-033 (`DocumentCreatePage`): role `PHONG_VAT_TU_TTB` có `ASSET_CREATE`
+ * DEV-033 (`DocumentCreatePage`): role `PHONG_VAT_TU_TTB` có `MEDICAL_ASSET_CREATE`
  * NHƯNG KHÔNG có `DEPARTMENT_VIEW` (`rolePermission.map.ts`) — khoá field về
  * đúng khoa của người tạo thay vì nới RBAC. Khác Document: đây là hạn chế
  * CHƯA lý tưởng cho role này (Phòng Vật tư-TTB thực tế trang bị tài sản cho
@@ -47,11 +48,12 @@ type CreateAssetFormValues = z.infer<typeof createAssetSchema>;
  * Issues thay vì tự ý mở rộng RBAC ngoài phạm vi 1 task UI.
  */
 export function AssetCreatePage() {
+  const assetModule = useAssetModule();
   const navigate = useNavigate();
   const createMutation = useCreateAsset();
   const { user, hasPermission } = usePermission();
   const canBrowseDepartments = hasPermission(PERMISSIONS.DEPARTMENT_VIEW);
-  const canBrowseCategories = hasPermission(PERMISSIONS.ASSET_CATEGORY_VIEW);
+  const canBrowseCategories = hasPermission(assetModule.permissions.categoryView);
   const departmentsQuery = useDepartments({ limit: 100 }, { enabled: canBrowseDepartments });
   // DEV-080: limit 300 — dựng cây cần ĐỦ mọi danh mục (thiếu cha thì con bị đẩy lên gốc).
   const categoriesQuery = useAssetCategories({ limit: 300 }, { enabled: canBrowseCategories });
@@ -98,7 +100,7 @@ export function AssetCreatePage() {
       {
         onSuccess: (response) => {
           toast.success("Đã thêm tài sản mới");
-          navigate(`/app/assets/${response.data.data._id}`);
+          navigate(`${assetModule.routeBase}/${response.data.data._id}`);
         },
       },
     );
@@ -288,7 +290,7 @@ export function AssetCreatePage() {
           )}
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="secondary" size="sm" onClick={() => navigate("/app/assets")} disabled={createMutation.isPending}>
+            <Button type="button" variant="secondary" size="sm" onClick={() => navigate(assetModule.routeBase)} disabled={createMutation.isPending}>
               Huỷ
             </Button>
             <Button

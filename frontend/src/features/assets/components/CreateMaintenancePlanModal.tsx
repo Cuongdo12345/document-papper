@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { AppModal } from "@/components/shared/AppModal";
 import { Button } from "@/components/ui/button";
+import { useAssetModule } from "@/features/assets/hooks/useAssetModule";
 import { AssetPicker } from "@/features/documents/components/AssetPicker";
 import { useCreateMaintenancePlan } from "@/features/assets/hooks/useMaintenancePlanActions";
 import { parseApiError } from "@/utils/parseApiError";
@@ -25,6 +26,7 @@ interface CreateMaintenancePlanModalProps {
 
 /** Roadmap B2 — lên lịch bảo trì mới. Tái dùng `AssetPicker` (đã có sẵn từ domain Document) khi chưa biết asset trước. */
 export function CreateMaintenancePlanModal({ open, onClose, assetId: fixedAssetId, assetLabel }: CreateMaintenancePlanModalProps) {
+  const assetModule = useAssetModule();
   const [pickedAsset, setPickedAsset] = useState<{ id?: string; label?: string }>({});
   const createMutation = useCreateMaintenancePlan();
 
@@ -55,6 +57,7 @@ export function CreateMaintenancePlanModal({ open, onClose, assetId: fixedAssetI
               value={pickedAsset.id}
               selectedLabel={pickedAsset.label}
               onChange={(id, label) => setPickedAsset({ id, label })}
+              assetType={assetModule.type}
             />
           </div>
         )}

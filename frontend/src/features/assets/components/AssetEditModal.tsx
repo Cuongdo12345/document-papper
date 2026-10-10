@@ -8,10 +8,10 @@ import { useAssetCategories } from "@/features/assets/hooks/useAssetCategories";
 import { AssetCategoryOptions } from "@/features/assets/components/AssetCategoryOptions";
 import { getCategoryAncestorNames } from "@/features/assets/utils/categoryTree";
 import { usePermission } from "@/hooks/usePermission";
-import { PERMISSIONS } from "@/constants/permissions";
 import { parseApiError } from "@/utils/parseApiError";
 import { toast } from "@/stores/toastStore";
 import type { Asset } from "@/types/asset.types";
+import { useAssetModule } from "@/features/assets/hooks/useAssetModule";
 
 /**
  * Khớp `UpdateAssetDTO` — CHỦ Ý KHÔNG có `status`/`assignedTo`/`department`
@@ -47,9 +47,10 @@ interface AssetEditModalProps {
 
 /** `key={asset._id}` ở nơi gọi đảm bảo remount khi đổi asset đang sửa (cùng pattern `DocumentEditModal`). */
 export function AssetEditModal({ open, onClose, asset }: AssetEditModalProps) {
+  const assetModule = useAssetModule();
   const updateMutation = useUpdateAsset();
   const { hasPermission } = usePermission();
-  const canBrowseCategories = hasPermission(PERMISSIONS.ASSET_CATEGORY_VIEW);
+  const canBrowseCategories = hasPermission(assetModule.permissions.categoryView);
   // DEV-080: limit 300 — dựng cây cần ĐỦ mọi danh mục (thiếu cha thì con bị đẩy lên gốc).
   const categoriesQuery = useAssetCategories({ limit: 300 }, { enabled: canBrowseCategories });
 

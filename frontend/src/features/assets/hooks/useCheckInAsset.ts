@@ -4,6 +4,7 @@ import { unwrapResponse } from "@/utils/unwrapResponse";
 import { parseApiError } from "@/utils/parseApiError";
 import { toast } from "@/stores/toastStore";
 import type { Asset } from "@/types/asset.types";
+import { useAssetModule } from "@/features/assets/hooks/useAssetModule";
 
 /**
  * Giai đoạn 5 (roadmap A1) — bước 2 luồng kiểm kê: ghi nhận đã thấy tài sản
@@ -15,11 +16,12 @@ import type { Asset } from "@/types/asset.types";
  * này biết gì về UI cụ thể của trang gọi nó.
  */
 export function useCheckInAsset() {
+  const { type } = useAssetModule();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await checkInAsset(id);
+      const response = await checkInAsset(type, id);
       return unwrapResponse<Asset>(response).data;
     },
     onSuccess: (asset) => {

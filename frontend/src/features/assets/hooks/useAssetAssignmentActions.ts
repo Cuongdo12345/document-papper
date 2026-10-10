@@ -3,6 +3,7 @@ import { assignAsset, transferAsset, returnAsset } from "@/api/assets.api";
 import { toast } from "@/stores/toastStore";
 import { parseApiError } from "@/utils/parseApiError";
 import type { AssignAssetRequest, TransferAssetRequest, ReturnAssetRequest } from "@/types/asset.types";
+import { useAssetModule } from "@/features/assets/hooks/useAssetModule";
 
 /**
  * FE-06 — 3 action Cấp phát/Luân chuyển/Thu hồi (roadmap Mục 12). Gộp chung
@@ -18,9 +19,10 @@ function invalidateAfterAssignment(queryClient: QueryClient, id: string) {
 }
 
 export function useAssignAsset() {
+  const { type } = useAssetModule();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: AssignAssetRequest }) => assignAsset(id, body),
+    mutationFn: ({ id, body }: { id: string; body: AssignAssetRequest }) => assignAsset(type, id, body),
     onSuccess: (_data, variables) => {
       toast.success("Đã cấp phát tài sản");
       invalidateAfterAssignment(queryClient, variables.id);
@@ -30,9 +32,10 @@ export function useAssignAsset() {
 }
 
 export function useTransferAsset() {
+  const { type } = useAssetModule();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: TransferAssetRequest }) => transferAsset(id, body),
+    mutationFn: ({ id, body }: { id: string; body: TransferAssetRequest }) => transferAsset(type, id, body),
     onSuccess: (_data, variables) => {
       toast.success("Đã luân chuyển tài sản");
       invalidateAfterAssignment(queryClient, variables.id);
@@ -42,9 +45,10 @@ export function useTransferAsset() {
 }
 
 export function useReturnAsset() {
+  const { type } = useAssetModule();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: ReturnAssetRequest }) => returnAsset(id, body),
+    mutationFn: ({ id, body }: { id: string; body: ReturnAssetRequest }) => returnAsset(type, id, body),
     onSuccess: (_data, variables) => {
       toast.success("Đã thu hồi tài sản về kho");
       invalidateAfterAssignment(queryClient, variables.id);

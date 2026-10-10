@@ -30,10 +30,12 @@ interface ContractVendorRef {
   email?: string;
 }
 
-interface ContractAssetRef {
+export interface ContractAssetRef {
   _id: string;
   assetCode: string;
   name: string;
+  /** FE-44: backend (DEV-119) populate thêm loại để dẫn tới đúng trang chi tiết CNTT / y tế. */
+  assetType?: "IT" | "MEDICAL";
   department?: { _id: string; code: string; name: string };
 }
 

@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { Pagination } from "@/components/shared/Pagination";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { AssetNameLink } from "@/features/assets/components/AssetNameLink";
+import { useDashboardAssetScope } from "@/features/dashboard/hooks/useDashboardAssetScope";
 import { useAssetWarrantyExpiring } from "@/features/dashboard/hooks/useAssetWarrantyExpiring";
 import { parseApiError } from "@/utils/parseApiError";
 import type { Asset } from "@/types/asset.types";
@@ -26,9 +27,9 @@ const columns: DataTableColumn<Asset>[] = [
     header: "Tài sản",
     className: "max-w-56 truncate",
     render: (row) => (
-      <Link to={`/app/assets/${row._id}`} className="font-medium text-foreground hover:underline" title={row.name}>
+      <AssetNameLink assetType={row.assetType} id={row._id} className="font-medium text-foreground hover:underline" title={row.name}>
         {row.name}
-      </Link>
+      </AssetNameLink>
     ),
   },
   { key: "category", header: "Danh mục", className: "max-w-36 truncate", render: (row) => row.category.name },
@@ -57,7 +58,9 @@ export function WarrantyExpiringWidget() {
 
   const daysAhead = Number(daysAheadInput);
   const isValid = Number.isInteger(daysAhead) && daysAhead >= 0;
-  const query = useAssetWarrantyExpiring(isValid ? daysAhead : 30, { page, limit: 10 });
+  // FE-44: chỉ gọi/hiện loại tài sản người dùng được xem (xem `useDashboardAssetScope`).
+  const { assetType, canViewAny } = useDashboardAssetScope();
+  const query = useAssetWarrantyExpiring(isValid ? daysAhead : 30, { page, limit: 10 }, { assetType, enabled: canViewAny });
 
   return (
     <div className="space-y-3">

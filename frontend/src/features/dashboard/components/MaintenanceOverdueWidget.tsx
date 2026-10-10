@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { Pagination } from "@/components/shared/Pagination";
+import { AssetNameLink } from "@/features/assets/components/AssetNameLink";
+import { useDashboardAssetScope } from "@/features/dashboard/hooks/useDashboardAssetScope";
 import { useAssetMaintenanceOverdue } from "@/features/dashboard/hooks/useAssetMaintenanceOverdue";
 import { parseApiError } from "@/utils/parseApiError";
 import type { MaintenanceOverdueItem } from "@/types/dashboard.types";
@@ -12,9 +13,9 @@ const columns: DataTableColumn<MaintenanceOverdueItem>[] = [
     header: "Tài sản",
     className: "max-w-56 truncate",
     render: (row) => (
-      <Link to={`/app/assets/${row._id}`} className="font-medium text-foreground hover:underline" title={row.name}>
+      <AssetNameLink assetType={row.assetType} id={row._id} className="font-medium text-foreground hover:underline" title={row.name}>
         {row.name}
-      </Link>
+      </AssetNameLink>
     ),
   },
   { key: "department", header: "Khoa/Phòng", className: "max-w-44 truncate", render: (row) => row.department.name },
@@ -29,7 +30,8 @@ export function MaintenanceOverdueWidget() {
 
   const daysThreshold = Number(daysThresholdInput);
   const isValid = Number.isInteger(daysThreshold) && daysThreshold >= 0;
-  const query = useAssetMaintenanceOverdue(isValid ? daysThreshold : 7, { page, limit: 10 });
+  const { assetType, canViewAny } = useDashboardAssetScope(); // FE-44 — xem `WarrantyExpiringWidget`
+  const query = useAssetMaintenanceOverdue(isValid ? daysThreshold : 7, { page, limit: 10 }, { assetType, enabled: canViewAny });
 
   return (
     <div className="space-y-3">

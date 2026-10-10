@@ -8,6 +8,7 @@ import {
 import { unwrapResponse } from "@/utils/unwrapResponse";
 import { toast } from "@/stores/toastStore";
 import { parseApiError } from "@/utils/parseApiError";
+import { useAssetModule } from "@/features/assets/hooks/useAssetModule";
 import type {
   CreateMaintenancePlanRequest,
   UpdateMaintenancePlanRequest,
@@ -32,10 +33,11 @@ function invalidateAfterAction(queryClient: QueryClient, assetId: string | undef
 }
 
 export function useCreateMaintenancePlan() {
+  const { type } = useAssetModule();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ assetId, body }: { assetId: string; body: CreateMaintenancePlanRequest }) =>
-      createMaintenancePlan(assetId, body),
+      createMaintenancePlan(type, assetId, body),
     onSuccess: (_data, variables) => {
       toast.success("Đã lên lịch bảo trì");
       invalidateAfterAction(queryClient, variables.assetId);
@@ -45,10 +47,11 @@ export function useCreateMaintenancePlan() {
 }
 
 export function useUpdateMaintenancePlan() {
+  const { type } = useAssetModule();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: UpdateMaintenancePlanRequest; assetId?: string }) =>
-      updateMaintenancePlan(id, body),
+      updateMaintenancePlan(type, id, body),
     onSuccess: (_data, variables) => {
       toast.success("Đã cập nhật kế hoạch bảo trì");
       invalidateAfterAction(queryClient, variables.assetId);
@@ -58,10 +61,11 @@ export function useUpdateMaintenancePlan() {
 }
 
 export function useCompleteMaintenancePlan() {
+  const { type } = useAssetModule();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: ResolveMaintenancePlanRequest; assetId?: string }) =>
-      completeMaintenancePlan(id, body),
+      completeMaintenancePlan(type, id, body),
     onSuccess: (data, variables) => {
       const plan = unwrapResponse(data).data;
       toast.success(`Đã hoàn tất bảo trì: ${plan.title}`);
@@ -72,10 +76,11 @@ export function useCompleteMaintenancePlan() {
 }
 
 export function useCancelMaintenancePlan() {
+  const { type } = useAssetModule();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: ResolveMaintenancePlanRequest; assetId?: string }) =>
-      cancelMaintenancePlan(id, body),
+      cancelMaintenancePlan(type, id, body),
     onSuccess: (data, variables) => {
       const plan = unwrapResponse(data).data;
       toast.success(`Đã huỷ kế hoạch: ${plan.title}`);

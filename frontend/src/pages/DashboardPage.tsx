@@ -17,6 +17,7 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { useDashboardAssetScope } from "@/features/dashboard/hooks/useDashboardAssetScope";
 import { useDashboardAlertCount } from "@/features/dashboard/hooks/useDashboardAlertCount";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePermission } from "@/hooks/usePermission";
@@ -98,8 +99,8 @@ function AlertCountBadge() {
  * đúng cách file `dashboard.types.ts` đã phân 3 nhóm response shape +
  * domain nghiệp vụ):
  *   - "Tổng quan": admin-summary / department/:id
- *   - "Tài sản": assets/summary
- *   - "Thiết bị y tế": medical-devices/summary
+ *   - "Thiết bị CNTT": assets/summary?assetType=IT (FE-44)
+ *   - "Thiết bị y tế": assets/summary?assetType=MEDICAL + medical-devices/summary
  *   - "Xu hướng & Thống kê": kpi/proposal-conversion, kpi/device-damage-trend,
  *     kpi/top-damaged-*, device-stats
  *   - "Cảnh báo": assets/warranty-expiring, assets/maintenance-overdue,
@@ -114,6 +115,7 @@ export function DashboardPage() {
   const { hasPermission } = usePermission();
   const isAdmin = useIsAdmin();
   const canViewDashboard = hasPermission(PERMISSIONS.DASHBOARD_READ);
+  const assetScope = useDashboardAssetScope(); // FE-44
   // MỚI (DEV-043, 2026-09-12 — user xác nhận sau khi báo lỗi Dashboard IT
   // toàn số 0): permission `DOCUMENT_VIEW_ALL_DEPARTMENTS` (DEV-040, IT đã
   // được gán) giờ CŨNG mở nút "Xem theo khoa/phòng khác" — trước đây CHỈ
@@ -130,7 +132,10 @@ export function DashboardPage() {
   // `replace`: đổi tab không tạo thêm mục lịch sử, Back vẫn rời Dashboard như cũ.
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const activeTab: DashboardTab = (TAB_VALUES as readonly string[]).includes(tabParam ?? "") ? (tabParam as DashboardTab) : "overview";
+  const requestedTab: DashboardTab = (TAB_VALUES as readonly string[]).includes(tabParam ?? "") ? (tabParam as DashboardTab) : "overview";
+  // FE-44: tab loại tài sản mà người dùng không xem được → về "Tổng quan" (link cũ ?tab=assets / ?tab=medical-devices).
+  const activeTab: DashboardTab =
+    (requestedTab === "assets" && !assetScope.canViewIt) || (requestedTab === "medical-devices" && !assetScope.canViewMedical) ? "overview" : requestedTab;
   const changeTab = (value: string) => setSearchParams(value === "overview" ? {} : { tab: value }, { replace: true });
 
   if (isLoading) return <LoadingState label="Đang tải thông tin tài khoản..." />;
@@ -173,14 +178,19 @@ export function DashboardPage() {
             <LayoutDashboard className="size-4" aria-hidden="true" />
             Tổng quan
           </TabsTrigger>
-          <TabsTrigger value="assets">
-            <Boxes className="size-4" aria-hidden="true" />
-            Tài sản
-          </TabsTrigger>
-          <TabsTrigger value="medical-devices">
-            <Stethoscope className="size-4" aria-hidden="true" />
-            Thiết bị y tế
-          </TabsTrigger>
+          {/* FE-44: mỗi loại một tab, chỉ hiện khi có quyền xem loại đó. value="assets" giữ nguyên để link cũ ?tab=assets vẫn dùng được. */}
+          {assetScope.canViewIt && (
+            <TabsTrigger value="assets">
+              <Boxes className="size-4" aria-hidden="true" />
+              Thiết bị CNTT
+            </TabsTrigger>
+          )}
+          {assetScope.canViewMedical && (
+            <TabsTrigger value="medical-devices">
+              <Stethoscope className="size-4" aria-hidden="true" />
+              Thiết bị y tế
+            </TabsTrigger>
+          )}
           <TabsTrigger value="trends">
             <TrendingUp className="size-4" aria-hidden="true" />
             Xu hướng & Thống kê
@@ -219,17 +229,24 @@ export function DashboardPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="assets">
-          <div className={SECTION_CLASS}>
-            <AssetSummaryWidget />
-          </div>
-        </TabsContent>
+        {assetScope.canViewIt && (
+          <TabsContent value="assets">
+            <div className={SECTION_CLASS}>
+              <AssetSummaryWidget assetType="IT" />
+            </div>
+          </TabsContent>
+        )}
 
-        <TabsContent value="medical-devices">
-          <div className={SECTION_CLASS}>
-            <MedicalDeviceSummaryWidget />
-          </div>
-        </TabsContent>
+        {assetScope.canViewMedical && (
+          <TabsContent value="medical-devices" className="space-y-4">
+            <div className={SECTION_CLASS}>
+              <AssetSummaryWidget assetType="MEDICAL" />
+            </div>
+            <div className={SECTION_CLASS}>
+              <MedicalDeviceSummaryWidget />
+            </div>
+          </TabsContent>
+        )}
 
         <TabsContent value="trends" className="space-y-4">
           <div className={SECTION_CLASS}>
@@ -291,13 +308,15 @@ export function DashboardPage() {
             <MaintenanceOverdueWidget />
           </div>
 
-          <div className={SECTION_CLASS}>
-            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-              <CalendarClock className="size-4 text-warning" aria-hidden="true" />
-              Thiết bị y tế sắp/quá hạn kiểm định
-            </h2>
-            <CalibrationDueWidget />
-          </div>
+          {assetScope.canViewMedical && (
+            <div className={SECTION_CLASS}>
+              <h2 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                <CalendarClock className="size-4 text-warning" aria-hidden="true" />
+                Thiết bị y tế sắp/quá hạn kiểm định
+              </h2>
+              <CalibrationDueWidget />
+            </div>
+          )}
 
           {/* Roadmap B1 (SLA & nhắc việc Workflow, 2026-09-15) */}
           <div className={SECTION_CLASS}>

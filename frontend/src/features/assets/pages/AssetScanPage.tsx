@@ -7,6 +7,7 @@ import { useLookupAssetByCode } from "@/features/assets/hooks/useLookupAssetByCo
 import { useCheckInAsset } from "@/features/assets/hooks/useCheckInAsset";
 import { parseApiError } from "@/utils/parseApiError";
 import type { Asset } from "@/types/asset.types";
+import { useAssetModule } from "@/features/assets/hooks/useAssetModule";
 
 interface CheckedInEntry {
   assetCode: string;
@@ -32,6 +33,7 @@ interface CheckedInEntry {
  * có đầu đọc vật lý), đó là 1 task riêng cần xác nhận thêm dependency.
  */
 export function AssetScanPage() {
+  const assetModule = useAssetModule();
   const [code, setCode] = useState("");
   const [foundAsset, setFoundAsset] = useState<Asset | null>(null);
   const [history, setHistory] = useState<CheckedInEntry[]>([]);
@@ -74,7 +76,7 @@ export function AssetScanPage() {
       <PageHeader
         title="Quét mã kiểm kê"
         description="Quét bằng đầu đọc QR/mã vạch, hoặc gõ tay mã tài sản, để xác nhận đã kiểm kê."
-        breadcrumb={[{ label: "Tài sản", to: "/app/assets" }, { label: "Quét mã kiểm kê" }]}
+        breadcrumb={[{ label: assetModule.label, to: assetModule.routeBase }, { label: "Quét mã kiểm kê" }]}
       />
 
       <form

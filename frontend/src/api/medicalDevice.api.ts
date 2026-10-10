@@ -1,5 +1,6 @@
 import type { AxiosResponse } from "axios";
 import { axiosInstance } from "@/api/axios";
+import { MEDICAL_ASSETS_API } from "@/api/assetPaths";
 import type { Pagination } from "@/types/shared.types";
 import type {
   MedicalDeviceProfile,
@@ -12,7 +13,7 @@ import type {
 } from "@/types/medicalDevice.types";
 
 /**
- * API layer domain Medical Device — mount tại `/api/assets/medical-devices`
+ * API layer domain Medical Device — mount tại `/api/medical-assets` (GĐ 8: route cũ `/api/assets/medical-devices` đã gỡ)
  * (`app.ts:118`), mọi route theo `:assetId` (KHÔNG có `profileId` riêng).
  * Response envelope: `{message, data}` hoặc `{message, data, pagination}` —
  * KHÔNG có `success` (đã xác nhận trực tiếp `medicalDevice.controller.ts`/
@@ -21,28 +22,28 @@ import type {
 export function getMedicalDeviceProfile(
   assetId: string,
 ): Promise<AxiosResponse<{ message: string; data: MedicalDeviceProfile }>> {
-  return axiosInstance.get(`/assets/medical-devices/${assetId}/profile`);
+  return axiosInstance.get(`${MEDICAL_ASSETS_API}/${assetId}/profile`);
 }
 
 export function createMedicalDeviceProfile(
   assetId: string,
   body: CreateMedicalDeviceProfileRequest,
 ): Promise<AxiosResponse<{ message: string; data: MedicalDeviceProfile }>> {
-  return axiosInstance.post(`/assets/medical-devices/${assetId}/profile`, body);
+  return axiosInstance.post(`${MEDICAL_ASSETS_API}/${assetId}/profile`, body);
 }
 
 export function updateMedicalDeviceProfile(
   assetId: string,
   body: UpdateMedicalDeviceProfileRequest,
 ): Promise<AxiosResponse<{ message: string; data: MedicalDeviceProfile }>> {
-  return axiosInstance.put(`/assets/medical-devices/${assetId}/profile`, body);
+  return axiosInstance.put(`${MEDICAL_ASSETS_API}/${assetId}/profile`, body);
 }
 
 export function getCalibrationHistory(
   assetId: string,
   params: GetCalibrationHistoryParams,
 ): Promise<AxiosResponse<{ message: string; data: CalibrationRecordItem[]; pagination: Pagination }>> {
-  return axiosInstance.get(`/assets/medical-devices/${assetId}/calibration-records`, { params });
+  return axiosInstance.get(`${MEDICAL_ASSETS_API}/${assetId}/calibration-records`, { params });
 }
 
 /**
@@ -64,12 +65,12 @@ export function createCalibrationRecord(
     formData.append("result", body.result);
     formData.append("nextDueDate", body.nextDueDate);
     formData.append("certificateFile", certificateFile);
-    return axiosInstance.post(`/assets/medical-devices/${assetId}/calibration-records`, formData, {
+    return axiosInstance.post(`${MEDICAL_ASSETS_API}/${assetId}/calibration-records`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
       timeout: 60_000,
     });
   }
-  return axiosInstance.post(`/assets/medical-devices/${assetId}/calibration-records`, body);
+  return axiosInstance.post(`${MEDICAL_ASSETS_API}/${assetId}/calibration-records`, body);
 }
 
 /**
@@ -82,7 +83,7 @@ export function downloadCalibrationCertificate(
   recordId: string,
 ): Promise<AxiosResponse<Blob>> {
   return axiosInstance.get(
-    `/assets/medical-devices/${assetId}/calibration-records/${recordId}/certificate/download`,
+    `${MEDICAL_ASSETS_API}/${assetId}/calibration-records/${recordId}/certificate/download`,
     { responseType: "blob" },
   );
 }
@@ -98,7 +99,7 @@ export function updateCalibrationCertificate(
   body: UpdateCalibrationCertificateRequest,
   certificateFile?: File,
 ): Promise<AxiosResponse<{ message: string; data: CalibrationRecordItem }>> {
-  const url = `/assets/medical-devices/${assetId}/calibration-records/${recordId}/certificate`;
+  const url = `${MEDICAL_ASSETS_API}/${assetId}/calibration-records/${recordId}/certificate`;
   if (certificateFile) {
     const formData = new FormData();
     formData.append("certificateFile", certificateFile);

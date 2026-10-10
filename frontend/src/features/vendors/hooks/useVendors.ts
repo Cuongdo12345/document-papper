@@ -4,7 +4,7 @@ import { unwrapResponse } from "@/utils/unwrapResponse";
 import type { Vendor, GetVendorsParams } from "@/types/vendor.types";
 
 /** Roadmap B4 — danh sách nhà cung cấp, phân trang (`VendorsListPage`). */
-export function useVendors(params: GetVendorsParams) {
+export function useVendors(params: GetVendorsParams, enabled = true) {
   return useQuery({
     queryKey: ["vendors", "list", params] as const,
     queryFn: async () => {
@@ -12,5 +12,6 @@ export function useVendors(params: GetVendorsParams) {
       return unwrapResponse<Vendor[]>(response);
     },
     placeholderData: (prev) => prev,
+    enabled,
   });
 }

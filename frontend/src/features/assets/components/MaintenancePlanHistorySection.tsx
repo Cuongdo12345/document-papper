@@ -6,7 +6,6 @@ import { ErrorState } from "@/components/shared/ErrorState";
 import { Pagination } from "@/components/shared/Pagination";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { usePermission } from "@/hooks/usePermission";
-import { PERMISSIONS } from "@/constants/permissions";
 import { useMaintenancePlansForAsset } from "@/features/assets/hooks/useMaintenancePlansForAsset";
 import { useCompleteMaintenancePlan, useCancelMaintenancePlan } from "@/features/assets/hooks/useMaintenancePlanActions";
 import { CreateMaintenancePlanModal } from "@/features/assets/components/CreateMaintenancePlanModal";
@@ -14,6 +13,7 @@ import { EditMaintenancePlanModal } from "@/features/assets/components/EditMaint
 import { WorkflowActionModal } from "@/features/documents/components/WorkflowActionModal";
 import { parseApiError } from "@/utils/parseApiError";
 import type { AssetMaintenancePlan } from "@/types/assetMaintenancePlan.types";
+import { useAssetModule } from "@/features/assets/hooks/useAssetModule";
 
 const SECTION_CLASS = "space-y-3 rounded-lg border border-border bg-card p-4";
 const LIMIT = 5;
@@ -31,8 +31,9 @@ function statusBadge(plan: AssetMaintenancePlan) {
  * (khác domain nghiệp vụ) nhưng CÙNG pattern hiển thị lịch sử theo asset.
  */
 export function MaintenancePlanHistorySection({ assetId }: { assetId: string }) {
+  const assetModule = useAssetModule();
   const { hasPermission } = usePermission();
-  const canView = hasPermission(PERMISSIONS.ASSET_MAINTENANCE_PLAN_VIEW);
+  const canView = hasPermission(assetModule.permissions.planView);
 
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
@@ -53,7 +54,7 @@ export function MaintenancePlanHistorySection({ assetId }: { assetId: string }) 
     <div className={SECTION_CLASS}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-foreground">Lịch bảo trì</h2>
-        <PermissionGuard permission={PERMISSIONS.ASSET_MAINTENANCE_PLAN_CREATE}>
+        <PermissionGuard permission={assetModule.permissions.planCreate}>
           <Button variant="secondary" size="sm" onClick={() => setCreateOpen(true)}>
             <CalendarPlus /> Lên lịch bảo trì
           </Button>
@@ -82,7 +83,7 @@ export function MaintenancePlanHistorySection({ assetId }: { assetId: string }) 
                 </p>
               )}
               {p.status === "planned" && (
-                <PermissionGuard permission={PERMISSIONS.ASSET_MAINTENANCE_PLAN_UPDATE}>
+                <PermissionGuard permission={assetModule.permissions.planUpdate}>
                   <div className="mt-2 flex flex-wrap gap-3 text-xs">
                     <button type="button" onClick={() => setEditingPlan(p)} className="flex items-center gap-1 text-primary hover:underline">
                       <Pencil className="size-3" /> Sửa

@@ -39,9 +39,36 @@ export interface GetAssetsParams {
  * GIỮ RIÊNG cho `AssetPicker` (chỉ cần 4 field, không kéo theo toàn bộ type
  * này vào 1 dropdown nhỏ).
  */
+/** DEV-112: loại tài sản, lấy từ danh mục gốc (backend `AssetType`). */
+export type AssetType = "IT" | "MEDICAL";
+
+/** FE-44 — 1 dòng của `GET /assets/lookup-options` (và `/:id`): trường tối thiểu để chọn/dẫn tới trang chi tiết. */
+export interface AssetLookupItem {
+  _id: string;
+  assetCode: string;
+  name: string;
+  assetType: AssetType;
+  status: AssetStatus;
+  /** Chỉ có ở `/lookup-options/:id` (tài sản đã xoá mềm vẫn trả về). */
+  isActive?: boolean;
+  department?: { _id: string; code: string; name: string } | null;
+  category?: { _id: string; code: string; name: string } | null;
+}
+
+/** Khớp `QueryAssetLookupDTO` (limit tối đa 100). */
+export interface AssetLookupParams {
+  page?: number;
+  limit?: number;
+  keyword?: string;
+  assetType?: AssetType;
+  department?: string;
+}
+
 export interface Asset {
   _id: string;
   assetCode: string;
+  /** DEV-112: backend tự gán theo danh mục gốc; client không gửi. */
+  assetType?: AssetType;
   name: string;
   category: { _id: string; code: string; name: string };
   department: { _id: string; code: string; name: string };
@@ -103,6 +130,8 @@ export interface AssetCategory {
   name: string;
   parentCategory?: { _id: string; code: string; name: string } | null;
   defaultWarrantyMonths?: number;
+  /** DEV-112: chỉ có trên danh mục gốc; danh mục con kế thừa. */
+  assetType?: AssetType;
   isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -126,6 +155,8 @@ export interface CreateAssetCategoryRequest {
   name: string;
   parentCategory?: string;
   defaultWarrantyMonths?: number;
+  /** DEV-112: bắt buộc khi không có `parentCategory` (danh mục gốc), cấm khi có. */
+  assetType?: AssetType;
 }
 
 /** Khớp `UpdateAssetCategoryDTO` — CHỦ Ý KHÔNG có `code` (`ASSET_CATEGORY_UPDATE_WHITELIST` không nhận field này, mã danh mục bất biến sau khi tạo) và KHÔNG có `isActive` (đổi qua action Xoá/Khôi phục riêng, không qua form sửa — tránh 2 đường đổi trạng thái cùng lúc, xem `AssetCategoryFormModal.tsx`). */
@@ -134,6 +165,8 @@ export interface UpdateAssetCategoryRequest {
   /** DEV-080: `null` = gỡ danh mục cha (đưa lên cấp gốc). */
   parentCategory?: string | null;
   defaultWarrantyMonths?: number;
+  /** DEV-112: chỉ gửi khi danh mục là/trở thành gốc. */
+  assetType?: AssetType;
 }
 
 /** Khớp `AssignAssetDTO`. */

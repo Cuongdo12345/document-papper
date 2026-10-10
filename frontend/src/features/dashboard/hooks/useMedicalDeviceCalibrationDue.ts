@@ -7,6 +7,7 @@ import type { CalibrationDueItem, GetAlertListParams } from "@/types/dashboard.t
 export function useMedicalDeviceCalibrationDue(
   daysAhead: number,
   params: GetAlertListParams & { sortBy?: "nextCalibrationDueDate" | "deviceClass"; sortOrder?: "asc" | "desc" },
+  options?: { enabled?: boolean },
 ) {
   return useQuery({
     queryKey: ["dashboard", "medical-devices", "calibration-due", daysAhead, params] as const,
@@ -16,5 +17,6 @@ export function useMedicalDeviceCalibrationDue(
     },
     placeholderData: (prev) => prev,
     staleTime: 20_000,
+    enabled: options?.enabled ?? true,
   });
 }
