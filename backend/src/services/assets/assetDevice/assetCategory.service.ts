@@ -8,6 +8,36 @@ import {
 } from "../assets.constants";
 import { escapeRegex } from "../../../shared/utils/regex.util";
 import { runBulkDelete } from "../../../shared/utils/bulkDelete.util";
+import { AssetType } from "../../../interfaces/assets/asset.interface";
+import {
+  ASSET_TYPE_LABELS,
+  assertCategoryOfType,
+  getAllDescendantCategoryIds,
+  getBranchCategoryIds,
+  getCategoryRootType,
+  requireCategoryRootType,
+  UNTYPED_BRANCH_MESSAGE,
+} from "../assetType.helper";
+
+/**
+ * DEV-112: đổi loại của 1 nhánh (CNTT <-> y tế) sẽ đổi loại mọi tài sản trong
+ * đó — chỉ cho phép khi nhánh (gồm danh mục con cháu, kể cả đã xoá mềm) không
+ * còn tài sản nào (kể cả tài sản đã xoá mềm). User chốt 2026-10-08.
+ */
+const assertBranchTypeChangeAllowed = async (
+  categoryId: any,
+  fromType: AssetType | undefined,
+  toType: AssetType,
+) => {
+  if (fromType === toType) return;
+  const ids = await getAllDescendantCategoryIds(categoryId);
+  if (await Asset.exists({ category: { $in: ids } })) {
+    const from = fromType ? `"${ASSET_TYPE_LABELS[fromType]}"` : "chưa thuộc nhánh nào";
+    throw ApiError.badRequest(
+      `Không thể chuyển danh mục từ nhánh ${from} sang "${ASSET_TYPE_LABELS[toType]}" vì nhánh này còn tài sản`,
+    );
+  }
+};
 
 /* =====================================================================
    CÂY DANH MỤC (DEV-080) — quy tắc đã chốt với user:
@@ -101,13 +131,32 @@ const assertValidParent = async (parentId: any, selfId?: any) => {
 /**
  * 📌 CREATE ASSET CATEGORY
  */
-export const createAssetCategoryService = async (payload: {
-  code: string;
-  name: string;
-  parentCategory?: string;
-  defaultWarrantyMonths?: number;
-}) => {
+export const createAssetCategoryService = async (
+  payload: {
+    code: string;
+    name: string;
+    parentCategory?: string;
+    defaultWarrantyMonths?: number;
+    assetType?: AssetType;
+  },
+  scopeType?: AssetType,
+) => {
   const { code, parentCategory } = payload;
+  // DEV-115: module theo loại — danh mục gốc mặc định thuộc loại của module (gửi loại khác -> 400),
+  // danh mục con phải có cha thuộc nhánh của module.
+  if (scopeType) {
+    if (parentCategory) {
+      const parentType = await getCategoryRootType(parentCategory);
+      if (parentType !== scopeType) {
+        throw ApiError.badRequest(`Danh mục cha không thuộc nhánh "${ASSET_TYPE_LABELS[scopeType]}" của module này`);
+      }
+    } else if (payload.assetType && payload.assetType !== scopeType) {
+      throw ApiError.badRequest(`Module này chỉ tạo danh mục gốc thuộc nhánh "${ASSET_TYPE_LABELS[scopeType]}"`);
+    } else {
+      payload = { ...payload, assetType: scopeType };
+    }
+  }
+  const { assetType } = payload;
 
   // Không check thêm isActive: giữ `code` unique TOÀN CỤC kể cả với danh
   // mục đã soft-delete — cùng cách Document đang làm với `documentCode`
@@ -119,6 +168,14 @@ export const createAssetCategoryService = async (payload: {
 
   if (parentCategory) {
     await assertValidParent(parentCategory);
+    // DEV-112: danh mục con kế thừa loại của gốc, không tự chọn loại; cha phải
+    // thuộc 1 nhánh.
+    if (assetType) {
+      throw ApiError.badRequest("Chỉ danh mục gốc mới chọn loại tài sản — danh mục con kế thừa loại của danh mục gốc");
+    }
+    await requireCategoryRootType(parentCategory);
+  } else if (!assetType) {
+    throw ApiError.badRequest("Danh mục gốc phải chọn loại tài sản (Thiết bị CNTT hoặc Thiết bị y tế)");
   }
 
   const category = await AssetCategory.create(payload);
@@ -128,7 +185,7 @@ export const createAssetCategoryService = async (payload: {
 /**
  * 📌 GET ALL ASSET CATEGORIES
  */
-export const getAllAssetCategoriesService = async (query: any) => {
+export const getAllAssetCategoriesService = async (query: any, scopeType?: AssetType) => {
   const { keyword, page = 1, limit = 10, isActive, group, level } = query;
 
   // ⚠️ SỬA (Asset Categories UI, 2026-09-09): trước đây `filter.isActive`
@@ -152,6 +209,8 @@ export const getAllAssetCategoriesService = async (query: any) => {
   // có bộ lọc theo nhóm). Gộp các điều kiện `_id` qua `$and` vì có thể cùng
   // lúc có `$in` (nhánh nhóm) và `$in/$nin` (lá/nhóm).
   const idConditions: any[] = [];
+  // DEV-115: module theo loại chỉ liệt kê danh mục thuộc các nhánh gốc của loại đó.
+  if (scopeType) idConditions.push({ _id: { $in: await getBranchCategoryIds(scopeType) } });
   if (group) {
     const branchIds = await getCategoryWithDescendantIds(group);
     idConditions.push({ _id: { $in: branchIds.filter((id) => String(id) !== String(group)) } });
@@ -213,7 +272,7 @@ export const getAssetCategoryByIdService = async (id: any) => {
 /**
  * 📌 UPDATE ASSET CATEGORY
  */
-export const updateAssetCategoryService = async (id: any, payload: any) => {
+export const updateAssetCategoryService = async (id: any, payload: any, scopeType?: AssetType) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw ApiError.badRequest("ID danh mục không hợp lệ");
   }
@@ -223,19 +282,67 @@ export const updateAssetCategoryService = async (id: any, payload: any) => {
     ASSET_CATEGORY_UPDATE_WHITELIST,
   );
 
+  // DEV-115: module theo loại không cho chuyển danh mục sang nhánh của loại khác.
+  if (scopeType) {
+    if (safePayload.assetType && safePayload.assetType !== scopeType) {
+      throw ApiError.badRequest(`Module này không đổi danh mục sang nhánh "${ASSET_TYPE_LABELS[safePayload.assetType as AssetType]}"`);
+    }
+    if (safePayload.parentCategory) {
+      const parentType = await getCategoryRootType(safePayload.parentCategory);
+      if (parentType !== scopeType) {
+        throw ApiError.badRequest(`Danh mục cha không thuộc nhánh "${ASSET_TYPE_LABELS[scopeType]}" của module này`);
+      }
+    } else if (safePayload.parentCategory === null && !safePayload.assetType) {
+      // Gỡ cha -> thành danh mục gốc: mặc định mang loại của module.
+      safePayload.assetType = scopeType;
+    }
+  }
+
   if (safePayload.parentCategory) {
     await assertValidParent(safePayload.parentCategory, id);
   }
+
+  // DEV-112: loại tài sản chỉ đặt trên danh mục gốc; đổi cha/đổi loại không
+  // được làm đổi loại của tài sản đang có trong nhánh.
+  const existing = await AssetCategory.findOne({ _id: id, isActive: true });
+  if (!existing) {
+    throw ApiError.notFound("Không tìm thấy danh mục tài sản");
+  }
+  const nextParent =
+    "parentCategory" in safePayload ? safePayload.parentCategory : existing.parentCategory;
+  let nextType: AssetType;
+  if (nextParent) {
+    if (safePayload.assetType) {
+      throw ApiError.badRequest("Chỉ danh mục gốc mới chọn loại tài sản — danh mục con kế thừa loại của danh mục gốc");
+    }
+    nextType = await requireCategoryRootType(nextParent);
+  } else {
+    const chosen = safePayload.assetType ?? existing.assetType;
+    if (!chosen) {
+      throw ApiError.badRequest("Danh mục gốc phải chọn loại tài sản (Thiết bị CNTT hoặc Thiết bị y tế)");
+    }
+    nextType = chosen;
+  }
+  await assertBranchTypeChangeAllowed(id, await getCategoryRootType(id), nextType);
 
   // DEV-080: `parentCategory: null` = gỡ khỏi danh mục cha (đưa lên cấp gốc).
   // Trước đây DTO không nhận `null` và FE gửi `undefined` khi chọn "Không có"
   // → một khi đã gán cha thì KHÔNG gỡ ra được qua UI. `$unset` thay vì ghi
   // `null` để document giữ đúng shape "không có field" như danh mục gốc tạo mới.
   const update: any = { ...safePayload };
+  delete update.assetType;
+  const unset: Record<string, ""> = {};
   if (safePayload.parentCategory === null) {
     delete update.parentCategory;
-    update.$unset = { parentCategory: "" };
+    unset.parentCategory = "";
   }
+  // DEV-112: gốc lưu loại; danh mục con không lưu (kế thừa).
+  if (nextParent) {
+    unset.assetType = "";
+  } else {
+    update.assetType = nextType;
+  }
+  if (Object.keys(unset).length) update.$unset = unset;
 
   const category = await AssetCategory.findOneAndUpdate(
     { _id: id, isActive: true },
@@ -301,8 +408,11 @@ export const deleteAssetCategoryService = async (id: any, userId?: any) => {
  * fail (còn con active) trong khi con xoá thành công — kết quả trả về nêu
  * rõ id nào fail kèm lý do, user tự xoá lại cha sau khi con đã bị xoá.
  */
-export const bulkDeleteAssetCategoryService = async (ids: string[], userId?: any) => {
-  return runBulkDelete(ids, (id) => deleteAssetCategoryService(id, userId));
+export const bulkDeleteAssetCategoryService = async (ids: string[], userId?: any, scopeType?: AssetType) => {
+  return runBulkDelete(ids, async (id) => {
+    if (scopeType) await assertCategoryOfType(id, scopeType);
+    return deleteAssetCategoryService(id, userId);
+  });
 };
 
 /**
@@ -347,6 +457,11 @@ export const restoreAssetCategoryService = async (id: any) => {
   if (category.isActive) {
     throw ApiError.badRequest("Danh mục này chưa bị xoá");
   }
+  // DEV-112: danh mục chưa thuộc nhánh nào (vd danh mục gốc cũ không có loại)
+  // không được kích hoạt lại.
+  if (!(await getCategoryRootType(id))) {
+    throw ApiError.badRequest(`Không thể khôi phục: ${UNTYPED_BRANCH_MESSAGE}`);
+  }
 
   category.isActive = true;
   category.deletedAt = undefined;
@@ -359,6 +474,13 @@ export const restoreAssetCategoryService = async (id: any) => {
 /**
  * 📌 BULK RESTORE ASSET CATEGORY (khôi phục hàng loạt — DEV-062, 2026-09-17)
  */
-export const bulkRestoreAssetCategoryService = async (ids: string[]) => {
-  return runBulkDelete(ids, (id) => restoreAssetCategoryService(id), "Khôi phục thất bại");
+export const bulkRestoreAssetCategoryService = async (ids: string[], scopeType?: AssetType) => {
+  return runBulkDelete(
+    ids,
+    async (id) => {
+      if (scopeType) await assertCategoryOfType(id, scopeType);
+      return restoreAssetCategoryService(id);
+    },
+    "Khôi phục thất bại",
+  );
 };

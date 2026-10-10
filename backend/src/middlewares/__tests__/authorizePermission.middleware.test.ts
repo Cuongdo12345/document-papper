@@ -77,7 +77,7 @@ describe("authorizePermission middleware", () => {
     it("Admin KHÔNG có quyền yêu cầu (vd permission mới chưa gán) → ghi ADMIN_BYPASS", async () => {
       mockedGetCachedPermissions.mockResolvedValue(["DOCUMENT_VIEW"]);
       const next = jest.fn();
-      await authorizePermission("ASSET_DELETE")(makeReq(admin), makeRes(), next);
+      await authorizePermission("IT_ASSET_DELETE")(makeReq(admin), makeRes(), next);
       await flushPromises();
       expect(next).toHaveBeenCalledWith();
       expect(UserAudit.create).toHaveBeenCalledTimes(1);
@@ -85,7 +85,7 @@ describe("authorizePermission middleware", () => {
         expect.objectContaining({
           user: "admin-9",
           action: "ADMIN_BYPASS",
-          note: "ADMIN bypass permission check: ASSET_DELETE",
+          note: "ADMIN bypass permission check: IT_ASSET_DELETE",
         }),
       );
     });
@@ -162,7 +162,7 @@ describe("authorizePermission middleware", () => {
   it("chặn 403 nếu user KHÔNG có permission yêu cầu và không bật ABAC", async () => {
     mockedGetCachedPermissions.mockResolvedValue(["DOCUMENT_VIEW"]);
     const next = jest.fn();
-    const middleware = authorizePermission("ASSET_DELETE");
+    const middleware = authorizePermission("IT_ASSET_DELETE");
     const req = makeReq({ _id: "u1", role: { name: "USER" } });
     await middleware(req, makeRes(), next);
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 403 }));

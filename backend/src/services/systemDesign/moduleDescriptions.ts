@@ -37,14 +37,16 @@ export const MODULE_DESCRIPTIONS: Record<string, ModuleDescription> = {
   },
   assets: {
     description:
-      "Quản lý vòng đời tài sản/thiết bị y tế: cấp phát, luân chuyển, thu hồi, bảo trì chủ động và kiểm định định kỳ.",
+      "Lõi dùng chung của tài sản (Thiết bị CNTT và Thiết bị y tế): cấp phát, luân chuyển, thu hồi và bảo trì chủ động. Phần riêng của thiết bị y tế nằm ở module medicalDevices.",
     features: [
       "CRUD Asset + Asset Category (kèm soft-delete/khôi phục)",
       "Cây danh mục nhiều cấp (gốc CNTT/TBYT → nhóm → loại thiết bị): tài sản chỉ gắn danh mục lá, lọc theo nhóm gồm cả con cháu",
+      "Loại tài sản (assetType: IT/MEDICAL) lấy từ danh mục gốc, được ép ở service (DEV-112)",
       "Cấp phát/luân chuyển/thu hồi tài sản, lưu lịch sử cấp phát",
-      "Hồ sơ thiết bị y tế (MedicalDeviceProfile) + lịch sử kiểm định (CalibrationRecord), upload file chứng nhận",
       "Lịch bảo trì chủ động (AssetMaintenancePlan) theo tháng, độc lập với luồng sửa chữa phản ứng",
       "Excel import/export cho Asset, QR code theo từng Asset",
+      "Cảnh báo bảo hành/bảo trì theo loại: thiết bị CNTT gửi IT; thiết bị y tế gửi Phòng Vật tư-TTB và IT",
+      "Dashboard tổng quan tài sản lọc theo loại (?assetType=IT|MEDICAL) và tra cứu tài sản dùng chung cho Tài liệu/Hợp đồng (/api/assets/lookup-options)",
     ],
   },
   auth: {
@@ -82,6 +84,26 @@ export const MODULE_DESCRIPTIONS: Record<string, ModuleDescription> = {
       "Lịch sử giao dịch nhập/xuất bất biến (ConsumableTransaction)",
       "Dự trù/đề xuất mua vật tư hàng tháng (ConsumableRequest) — KHÔNG qua luồng duyệt",
       "Cảnh báo tồn kho thấp tự động (cron hằng ngày)",
+    ],
+  },
+  itDevices: {
+    description:
+      "Phần mở rộng dành riêng cho thiết bị CNTT (tài sản thuộc nhánh Thiết bị CNTT): hồ sơ kỹ thuật và danh mục bản quyền phần mềm gán cho máy.",
+    features: [
+      "Hồ sơ thiết bị CNTT (ItDeviceProfile) 1-1 với Asset: cấu hình phần cứng, mạng (IP/MAC/hostname/VLAN), hệ điều hành & firmware; IP trùng chỉ cảnh báo",
+      "Danh mục bản quyền phần mềm (SoftwareLicense): vĩnh viễn/thuê bao, số máy tối đa, gán/gỡ máy an toàn khi đồng thời, KHÔNG lưu khoá bản quyền",
+      "Thanh lý/xoá thiết bị tự trả slot bản quyền; chứng từ bản quyền tải qua endpoint có quyền",
+      "Cron cảnh báo bản quyền thuê bao sắp/đã hết hạn gửi cho IT",
+    ],
+  },
+  medicalDevices: {
+    description:
+      "Phần mở rộng dành riêng cho thiết bị y tế (tài sản thuộc nhánh Thiết bị y tế): hồ sơ thiết bị, kiểm định/hiệu chuẩn và chứng chỉ người vận hành.",
+    features: [
+      "Hồ sơ thiết bị y tế (MedicalDeviceProfile) 1-1 với Asset: phân loại, giấy phép, thông tin kiểm định",
+      "Lịch sử kiểm định/hiệu chuẩn (CalibrationRecord), upload file chứng nhận",
+      "Chứng chỉ người vận hành (OperatorCertificate) theo danh mục thiết bị y tế",
+      "Cron cảnh báo kiểm định, giấy phép và chứng chỉ sắp hết hạn, gửi Phòng Vật tư-TTB và IT (mỗi người nhận một lần)",
     ],
   },
   notifications: {

@@ -12,6 +12,12 @@ import ExcelJS from "exceljs";
  * `assetAssignment.service.test.ts` (tránh lỗi Jest automock vào nội bộ
  * Mongoose Model).
  */
+// DEV-112: loại của nhánh danh mục. Mặc định "IT" (giữ qua clearAllMocks);
+// test cần loại khác dùng mockResolvedValueOnce.
+jest.mock("../../assetType.helper", () => ({
+  ...jest.requireActual("../../assetType.helper"),
+  getCategoryRootType: jest.fn().mockResolvedValue("IT"),
+}));
 jest.mock("../../../../models/assets/asset.model", () => ({
   ...jest.requireActual("../../../../models/assets/asset.model"),
   Asset: { create: jest.fn() },
@@ -36,6 +42,8 @@ import Department from "../../../../models/departments/department.model";
 import { ImportHistory } from "../../../../models/importAudit/importhistory.model";
 import { generateAssetCode } from "../../../../shared/helpers/generateAssetCode";
 import { importAssetsExcel } from "../assetExcel.service";
+import { getCategoryRootType } from "../../assetType.helper";
+const mockedRootType = getCategoryRootType as jest.Mock;
 
 const mockedAsset = Asset as any;
 const mockedCategory = AssetCategory as any;
@@ -154,6 +162,17 @@ describe("importAssetsExcel (bổ sung test sau A3)", () => {
 
     expect(result.errors).toEqual([expect.objectContaining({ row: 2, message: expect.stringContaining("KHONGTONTAI") })]);
     expect(mockedAsset.create).not.toHaveBeenCalled();
+  });
+
+  it("DEV-112 — danh mục không thuộc nhánh CNTT/y tế → lỗi theo dòng, KHÔNG tạo tài sản; hợp lệ thì gán đúng loại", async () => {
+    mockedRootType.mockResolvedValueOnce(undefined);
+    const bad = await importAssetsExcel(await buildWorkbook([VALID_ROW]), "user-1");
+    expect(bad.errors).toEqual([expect.objectContaining({ row: 2, message: expect.stringContaining("không thuộc nhánh") })]);
+    expect(mockedAsset.create).not.toHaveBeenCalled();
+
+    mockedRootType.mockResolvedValueOnce("MEDICAL");
+    await importAssetsExcel(await buildWorkbook([VALID_ROW]), "user-1");
+    expect(mockedAsset.create).toHaveBeenCalledWith(expect.objectContaining({ assetType: "MEDICAL" }));
   });
 
   it("DEV-080 — mã Danh mục là danh mục NHÓM (có con active) → lỗi theo dòng, không tạo tài sản", async () => {

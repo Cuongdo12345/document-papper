@@ -36,6 +36,26 @@ describe("systemDesign.service — getSystemDesignService (DEV-073)", () => {
     expect(vendorsModule?.models.slice().sort()).toEqual(["Contract", "Vendor"]);
   });
 
+  it("DEV-113: 3 model y tế thuộc module medicalDevices (có mô tả), lõi assets không còn chứa chúng", () => {
+    const result = getSystemDesignService();
+    const medicalModule = result.modules.find((m) => m.name === "medicalDevices");
+    const assetsModule = result.modules.find((m) => m.name === "assets");
+
+    expect(medicalModule?.models.slice().sort()).toEqual(["CalibrationRecord", "MedicalDeviceProfile", "OperatorCertificate"]);
+    expect(medicalModule?.description).toBeTruthy();
+    expect(assetsModule?.models.slice().sort()).toEqual(["Asset", "AssetAssignmentHistory", "AssetCategory", "AssetMaintenancePlan"]);
+  });
+
+  it("DEV-116: 2 model CNTT thuộc module itDevices (có mô tả)", () => {
+    const result = getSystemDesignService();
+    const itModule = result.modules.find((m) => m.name === "itDevices");
+
+    expect(itModule?.models.slice().sort()).toEqual(["ItDeviceProfile", "SoftwareLicense"]);
+    expect(itModule?.description).toBeTruthy();
+    expect(result.relationships).toContainEqual({ model: "SoftwareLicense", field: "assets[]", ref: "Asset" });
+    expect(result.relationships).toContainEqual({ model: "ItDeviceProfile", field: "asset", ref: "Asset" });
+  });
+
   it("phát hiện đúng quan hệ ref trực tiếp từ schema — 4 dạng khai báo khác nhau đã xác nhận có thật trong source", () => {
     const result = getSystemDesignService();
     const relationsOf = (modelName: string) => result.relationships.filter((r) => r.model === modelName);

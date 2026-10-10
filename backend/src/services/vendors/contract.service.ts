@@ -13,7 +13,7 @@ import { runBulkDelete } from "../../shared/utils/bulkDelete.util";
 
 const CONTRACT_POPULATE = [
   { path: "vendor", select: "name contactPerson phone email" },
-  { path: "assets", select: "assetCode name department", populate: { path: "department", select: "code name" } },
+  { path: "assets", select: "assetCode name assetType department", populate: { path: "department", select: "code name" } },
   { path: "createdBy", select: "username fullName" },
   { path: "cancelledBy", select: "username fullName" },
 ];

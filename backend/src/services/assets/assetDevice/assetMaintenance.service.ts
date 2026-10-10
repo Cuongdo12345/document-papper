@@ -15,6 +15,7 @@
 import mongoose from "mongoose";
 import { Asset, AssetStatus } from "../../../models/assets/asset.model";
 import ApiError from "../../../shared/errors/ApiError";
+import { releaseAssetFromSoftwareLicenses } from "../../itDevices/assetLifecycle.hooks";
 
 export type RepairOutcome = "REPAIRED" | "UNREPAIRABLE";
 
@@ -88,6 +89,11 @@ export const resolveAssetMaintenanceService = async (
     throw ApiError.badRequest(
       `Tài sản không ở trạng thái đang bảo trì (hiện tại: ${asset.status}) — không thể xác nhận kết quả sửa chữa`,
     );
+  }
+
+  // DEV-116: máy không sửa được -> thanh lý -> trả slot bản quyền phần mềm (user chốt), gỡ trước khi lưu trạng thái.
+  if (outcome !== "REPAIRED") {
+    await releaseAssetFromSoftwareLicenses(asset._id as any);
   }
 
   asset.status =

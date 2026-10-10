@@ -14,6 +14,7 @@ import QRCode from "qrcode";
 import mongoose from "mongoose";
 import { Asset } from "../../../models/assets/asset.model";
 import ApiError from "../../../shared/errors/ApiError";
+import type { AssetType } from "../../../interfaces/assets/asset.interface";
 
 /**
  * 📌 Sinh ảnh QR code (PNG buffer) cho 1 asset — encode `assetCode`.
@@ -68,10 +69,11 @@ export const checkInAssetService = async (assetId: any, actorUserId: any) => {
  * thông tin asset cho nhân viên xác nhận trước khi thực sự ghi nhận kiểm
  * kê — tránh quét nhầm mã rồi check-in oan cho asset khác.
  */
-export const findAssetByCodeService = async (assetCode: string) => {
+export const findAssetByCodeService = async (assetCode: string, assetType?: AssetType) => {
   const asset = await Asset.findOne({
     assetCode: assetCode.trim(),
     isActive: true,
+    ...(assetType ? { assetType } : {}), // DEV-115: mã của loại khác -> 404
   })
     .populate("category", "code name")
     .populate("department", "code name");

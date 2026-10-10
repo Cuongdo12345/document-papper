@@ -8,8 +8,8 @@
 import mongoose from "mongoose";
 import fs from "fs";
 import { Asset } from "../../../models/assets/asset.model";
-import { MedicalDeviceProfile } from "../../../models/assets/medicalDeviceProfile.model";
-import { CalibrationRecord } from "../../../models/assets/calibrationRecord.model";
+import { MedicalDeviceProfile } from "../../../models/medicalDevices/medicalDeviceProfile.model";
+import { CalibrationRecord } from "../../../models/medicalDevices/calibrationRecord.model";
 import ApiError from "../../../shared/errors/ApiError";
 import { Upload } from "../../../models/uploadFiles/upload.model";
 import { withTransaction } from "../../../shared/utils/withTransaction";

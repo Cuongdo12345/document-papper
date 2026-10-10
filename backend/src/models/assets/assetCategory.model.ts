@@ -1,6 +1,7 @@
 // models/assets/assetCategory.model.ts
 import { Schema, model, Types } from "mongoose";
 import type { IAssetCategory } from "../../interfaces/assets/assetCategory.interface";
+import { AssetType } from "../../interfaces/assets/asset.interface";
 
 /**
  * Schema
@@ -24,6 +25,12 @@ const AssetCategorySchema = new Schema<IAssetCategory>(
     defaultWarrantyMonths: {
       type: Number,
       min: 0,
+    },
+
+    // DEV-112: chỉ có trên danh mục gốc (nguồn sự thật cho loại tài sản).
+    assetType: {
+      type: String,
+      enum: Object.values(AssetType),
     },
 
     isActive: { type: Boolean, default: true },

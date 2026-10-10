@@ -1,10 +1,16 @@
 // [MỚI, DEV-077] Test cho domain mới OperatorCertificate — theo dõi chứng
 // chỉ vận hành thiết bị y tế. Mock model — cùng cách các test khác trong
 // domain Medical Device đã làm (không dùng DB thật).
-jest.mock("../../../../models/assets/operatorCertificate.model", () => ({
+// DEV-112: loại của nhánh danh mục. Mặc định "MEDICAL" (giữ qua clearAllMocks);
+// test cần loại khác dùng mockResolvedValueOnce.
+jest.mock("../../assetType.helper", () => ({
+  ...jest.requireActual("../../assetType.helper"),
+  getCategoryRootType: jest.fn().mockResolvedValue("MEDICAL"),
+}));
+jest.mock("../../../../models/medicalDevices/operatorCertificate.model", () => ({
   OperatorCertificate: { create: jest.fn(), find: jest.fn(), exists: jest.fn(), findById: jest.fn() },
 }));
-jest.mock("../../../../models/assets/medicalDeviceProfile.model", () => ({
+jest.mock("../../../../models/medicalDevices/medicalDeviceProfile.model", () => ({
   MedicalDeviceProfile: { findOne: jest.fn() },
 }));
 jest.mock("../../../../models/assets/assetCategory.model", () => ({
@@ -14,8 +20,8 @@ jest.mock("../../../../models/users/user.model", () => ({
   User: { findOne: jest.fn() },
 }));
 
-import { OperatorCertificate } from "../../../../models/assets/operatorCertificate.model";
-import { MedicalDeviceProfile } from "../../../../models/assets/medicalDeviceProfile.model";
+import { OperatorCertificate } from "../../../../models/medicalDevices/operatorCertificate.model";
+import { MedicalDeviceProfile } from "../../../../models/medicalDevices/medicalDeviceProfile.model";
 import { AssetCategory } from "../../../../models/assets/assetCategory.model";
 import { User } from "../../../../models/users/user.model";
 import {
@@ -27,6 +33,8 @@ import {
   revokeOperatorCertificateService,
   deleteOperatorCertificateService,
 } from "../operatorCertificate.service";
+import { getCategoryRootType } from "../../assetType.helper";
+const mockedRootType = getCategoryRootType as jest.Mock;
 
 const mockedCertificate = OperatorCertificate as any;
 const mockedProfile = MedicalDeviceProfile as any;
@@ -66,6 +74,22 @@ describe("createOperatorCertificateService", () => {
         expiresAt: new Date("2027-01-01"),
       }),
     ).rejects.toMatchObject({ status: 400 });
+    expect(mockedCertificate.create).not.toHaveBeenCalled();
+  });
+
+  it("DEV-112 — danh mục thuộc nhánh CNTT (không phải thiết bị y tế) → 400, không tạo bản ghi", async () => {
+    mockedUser.findOne.mockResolvedValue({ _id: USER_ID });
+    mockedCategory.findOne.mockResolvedValue({ _id: CATEGORY_ID });
+    mockedRootType.mockResolvedValueOnce("IT");
+
+    await expect(
+      createOperatorCertificateService({
+        user: USER_ID,
+        deviceCategory: CATEGORY_ID,
+        issuedAt: new Date("2026-01-01"),
+        expiresAt: new Date("2027-01-01"),
+      }),
+    ).rejects.toMatchObject({ status: 400, message: expect.stringContaining("Thiết bị y tế") });
     expect(mockedCertificate.create).not.toHaveBeenCalled();
   });
 

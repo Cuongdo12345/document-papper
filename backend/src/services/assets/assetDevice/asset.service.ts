@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import { Asset, AssetStatus } from "../../../models/assets/asset.model";
 import { AssetCategory } from "../../../models/assets/assetCategory.model";
 import Department from "../../../models/departments/department.model";
-import { MedicalDeviceProfile } from "../../../models/assets/medicalDeviceProfile.model";
+import { MedicalDeviceProfile } from "../../../models/medicalDevices/medicalDeviceProfile.model";
 import ApiError from "../../../shared/errors/ApiError";
 import { generateAssetCode } from "../../../shared/helpers/generateAssetCode";
 import { ASSET_UPDATE_WHITELIST, pickWhitelisted } from "../assets.constants";
@@ -13,6 +13,14 @@ import {
   assertLeafCategory,
   getCategoryWithDescendantIds,
 } from "./assetCategory.service";
+import {
+  ASSET_TYPE_LABELS,
+  assertAssetOfType,
+  requireCategoryRootType,
+  resolveAssetType,
+} from "../assetType.helper";
+import type { AssetType } from "../../../interfaces/assets/asset.interface";
+import { deleteItDeviceProfileOfAsset, releaseAssetFromSoftwareLicenses } from "../../itDevices/assetLifecycle.hooks";
 
 const ASSET_POPULATE = [
   { path: "category", select: "code name" },
@@ -25,8 +33,11 @@ const ASSET_POPULATE = [
  * Tài sản mới luôn khởi tạo ở trạng thái IN_STOCK (trong kho) — việc cấp
  * phát (chuyển sang IN_USE, gắn assignedTo) là nghiệp vụ riêng của Giai
  * đoạn 2 (AssetAssignmentHistory), không set trực tiếp lúc tạo.
+ *
+ * DEV-115: `expectedType` (chỉ route `/api/it-assets`, `/api/medical-assets` truyền) —
+ * danh mục phải thuộc nhánh của module đó, nếu không → 400.
  */
-export const createAssetService = async (payload: any, userId?: any) => {
+export const createAssetService = async (payload: any, userId?: any, expectedType?: AssetType) => {
   const { category, department } = payload;
  
   const [categoryExists, departmentExists] = await Promise.all([
@@ -43,11 +54,18 @@ export const createAssetService = async (payload: any, userId?: any) => {
   // BR-06 (DEV-100): khoa đã xoá mềm không nhận dữ liệu mới.
   assertDepartmentNotDeleted(departmentExists);
   await assertLeafCategory(category);
+  // DEV-112: loại tài sản lấy từ gốc danh mục (danh mục ngoài 2 nhánh -> 400).
+  // Đặt SAU `...payload` để client không tự gửi được loại.
+  const assetType = await requireCategoryRootType(category);
+  if (expectedType && assetType !== expectedType) {
+    throw ApiError.badRequest(`Danh mục không thuộc nhánh "${ASSET_TYPE_LABELS[expectedType]}" của module này`);
+  }
 
   const assetCode = await generateAssetCode(department);
  
   const asset = await Asset.create({
     ...payload,
+    assetType,
     assetCode,
     status: AssetStatus.IN_STOCK,
     createdBy: userId,
@@ -60,7 +78,7 @@ export const createAssetService = async (payload: any, userId?: any) => {
 /**
  * 📌 GET ALL ASSETS — filter + search + pagination
  */
-export const getAllAssetsService = async (query: any) => {
+export const getAllAssetsService = async (query: any, assetType?: AssetType) => {
   const {
     keyword,
     department,
@@ -79,6 +97,8 @@ export const getAllAssetsService = async (query: any) => {
   // `QueryAssetDTO`, boolean hoặc `undefined`), mặc định `true` CHỈ khi client
   // không truyền field này — cùng pattern đã sửa ở `getAllDocumentsService`.
   const filter: any = { isActive: isActive === undefined ? true : isActive };
+  // DEV-115: module theo loại chỉ thấy tài sản của loại mình.
+  if (assetType) filter.assetType = assetType;
 
   // DEV-010/IMP-015 (SEC-36/RV06-02): escape trước khi đưa vào $regex.
   if (keyword) {
@@ -165,6 +185,21 @@ export const updateAssetService = async (
       throw ApiError.badRequest("Danh mục tài sản không tồn tại");
     }
     await assertLeafCategory(safePayload.category);
+
+    // DEV-112: đổi danh mục KHÔNG được đổi loại tài sản (CNTT <-> y tế); hồ sơ
+    // y tế, hiệu chuẩn, chứng chỉ gắn theo loại. Muốn đổi loại phải xử lý riêng.
+    const current = await Asset.findOne({ _id: id, isActive: true }).select("assetType category");
+    if (!current) {
+      throw ApiError.notFound("Không tìm thấy tài sản");
+    }
+    const currentType = await resolveAssetType(current);
+    const nextType = await requireCategoryRootType(safePayload.category);
+    if (currentType && nextType !== currentType) {
+      throw ApiError.badRequest(
+        `Không thể chuyển tài sản loại "${ASSET_TYPE_LABELS[currentType]}" sang danh mục thuộc nhánh "${ASSET_TYPE_LABELS[nextType]}"`,
+      );
+    }
+    safePayload.assetType = nextType;
   }
 
    // 🔗 Giai đoạn 4 — đổi hạn bảo hành thì phải cho phép cron cảnh báo lại
@@ -214,6 +249,10 @@ export const deleteAssetService = async (id: any, userId?: any) => {
     );
   }
  
+  // DEV-116: xoá mềm trả slot bản quyền phần mềm (user chốt). Gỡ TRƯỚC khi lưu để nếu lưu lỗi thì chỉ mất gán
+  // (gán lại được), không để máy đã xoá chiếm slot; hàm gỡ idempotent nên thử xoá lại vẫn đúng.
+  await releaseAssetFromSoftwareLicenses(asset._id as any);
+
   asset.isActive = false;
   asset.deletedAt = new Date();
   asset.deletedBy = userId;
@@ -228,8 +267,12 @@ export const deleteAssetService = async (id: any, userId?: any) => {
  * validate hiện có (không cho xoá tài sản IN_USE/UNDER_MAINTENANCE), 1 item
  * lỗi không chặn các item còn lại.
  */
-export const bulkDeleteAssetService = async (ids: string[], userId?: any) => {
-  return runBulkDelete(ids, (id) => deleteAssetService(id, userId));
+export const bulkDeleteAssetService = async (ids: string[], userId?: any, assetType?: AssetType) => {
+  return runBulkDelete(ids, async (id) => {
+    // DEV-115: id thuộc loại khác báo "Không tìm thấy tài sản", như id không tồn tại.
+    if (assetType) await assertAssetOfType(id, assetType);
+    return deleteAssetService(id, userId);
+  });
 };
 
 /**
@@ -239,10 +282,10 @@ export const bulkDeleteAssetService = async (ids: string[], userId?: any) => {
  *   1. Asset phải đã được soft-delete trước (`isActive: false`, gọi qua
  *      `deleteAssetService`/API DELETE thường) — không cho hard-delete
  *      thẳng 1 tài sản đang active, tránh xoá nhầm do gọi sai endpoint.
- *   2. Endpoint hard-delete dùng permission RIÊNG (`ASSET_DELETE_PERMANENT`,
+ *   2. Endpoint hard-delete dùng permission RIÊNG (`IT_ASSET_DELETE_PERMANENT` / `MEDICAL_ASSET_DELETE_PERMANENT`,
  *      không gán cho role USER) — theo đúng tinh thần tách permission
  *      thanh lý/xoá vĩnh viễn ra khỏi permission xoá thường đã đề cập ở
- *      phần phân tích thiết kế ban đầu (ASSET_DISPOSE).
+ *      phần phân tích thiết kế ban đầu (IT_ASSET_DISPOSE / MEDICAL_ASSET_DISPOSE).
  *
  * Ghi chú cho Giai đoạn 3: khi đã có field liên kết Document↔Asset
  * (`relatedAsset`), cần bổ sung thêm điều kiện chặn hard-delete nếu vẫn
@@ -278,6 +321,11 @@ export const hardDeleteAssetService = async (id: any) => {
       "Không thể xoá vĩnh viễn tài sản vì vẫn còn hồ sơ thiết bị y tế (kiểm định/hiệu chuẩn) gắn với tài sản này",
     );
   }
+
+  // DEV-116: xoá vĩnh viễn -> trả slot bản quyền (thường đã trả từ lúc xoá mềm; gọi lại cho chắc, idempotent)
+  // và xoá hồ sơ CNTT đi kèm để không còn hồ sơ mồ côi.
+  await releaseAssetFromSoftwareLicenses(id);
+  await deleteItDeviceProfileOfAsset(id);
 
   await Asset.deleteOne({ _id: id });
 
@@ -316,6 +364,13 @@ export const restoreAssetService = async (id: any, userId?: any) => {
  * Gọi lại NGUYÊN VẸN `restoreAssetService` cho từng id, cùng pattern
  * `bulkDeleteAssetService` ở trên.
  */
-export const bulkRestoreAssetService = async (ids: string[], userId?: any) => {
-  return runBulkDelete(ids, (id) => restoreAssetService(id, userId), "Khôi phục thất bại");
+export const bulkRestoreAssetService = async (ids: string[], userId?: any, assetType?: AssetType) => {
+  return runBulkDelete(
+    ids,
+    async (id) => {
+      if (assetType) await assertAssetOfType(id, assetType);
+      return restoreAssetService(id, userId);
+    },
+    "Khôi phục thất bại",
+  );
 };

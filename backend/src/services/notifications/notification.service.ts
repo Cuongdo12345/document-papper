@@ -144,6 +144,39 @@ export const notifyUsersByRoleName = async (
 };
 
 /**
+ * Broadcast tới NHIỀU role, mỗi user chỉ nhận ĐÚNG 1 thông báo dù thuộc nhiều
+ * role trong danh sách (lọc theo user, không theo role). Dùng cho cảnh báo
+ * thiết bị y tế gửi cả Phòng Vật tư-TTB và IT (tách module Tài sản, GĐ 6).
+ * Cùng nguyên tắc `notifyUsersByRoleName`: nuốt lỗi, role không tồn tại bị bỏ qua.
+ * Trả về số user đã được gọi gửi (để test/ghi log; KHÔNG phải số gửi thành công).
+ */
+export const notifyUsersByRoleNames = async (
+  roleNames: string[],
+  payload: Omit<CreateNotificationParams, "recipient">,
+): Promise<number> => {
+  try {
+    const roles = await Role.find({ name: { $in: roleNames } }).select("_id");
+    if (roles.length === 0) return 0;
+
+    const users = await User.find({
+      role: { $in: roles.map((r) => r._id) },
+      isActive: true,
+    }).select("_id");
+
+    // `User.role` là 1 giá trị nên mỗi user chỉ xuất hiện 1 lần trong kết quả
+    // `$in` ở trên; vẫn khử trùng theo id để an toàn nếu sau này đổi sang nhiều role/user.
+    const uniqueIds = [...new Set(users.map((u) => String(u._id)))];
+    await Promise.allSettled(
+      uniqueIds.map((id) => createNotification({ ...payload, recipient: id })),
+    );
+    return uniqueIds.length;
+  } catch (err) {
+    console.error("[notification.service] notifyUsersByRoleNames thất bại:", err);
+    return 0;
+  }
+};
+
+/**
  * Broadcast theo phòng ban — dùng cho `DOCUMENT_SUBMITTED` (báo các thành
  * viên cùng khoa/phòng biết có tài liệu mới, KHÔNG đi qua workflow).
  * `excludeUserId` dùng để loại người vừa tạo document ra khỏi danh sách

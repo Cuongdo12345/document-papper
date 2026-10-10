@@ -5,28 +5,28 @@
 // từng có test riêng trước đây) + shape kết hợp của `runMedicalDeviceAlertsService`.
 // Mock model — cùng cách `calibrationRecord.service.test.ts` đã làm (không
 // dùng DB thật, jest thường của repo không có mongodb-memory-server).
-jest.mock("../../../../models/assets/medicalDeviceProfile.model", () => ({
+jest.mock("../../../../models/medicalDevices/medicalDeviceProfile.model", () => ({
   MedicalDeviceProfile: { find: jest.fn() },
 }));
-jest.mock("../../../../models/assets/operatorCertificate.model", () => ({
+jest.mock("../../../../models/medicalDevices/operatorCertificate.model", () => ({
   OperatorCertificate: { find: jest.fn() },
 }));
 jest.mock("../../../../models/rbac/role.model", () => ({
-  Role: { findOne: jest.fn() },
+  Role: { find: jest.fn() },
 }));
 jest.mock("../../../../models/users/user.model", () => ({
   User: { countDocuments: jest.fn() },
 }));
 jest.mock("../../../notifications/notification.service", () => ({
-  notifyUsersByRoleName: jest.fn(),
+  notifyUsersByRoleNames: jest.fn(),
   createNotification: jest.fn(),
 }));
 
-import { MedicalDeviceProfile } from "../../../../models/assets/medicalDeviceProfile.model";
-import { OperatorCertificate } from "../../../../models/assets/operatorCertificate.model";
+import { MedicalDeviceProfile } from "../../../../models/medicalDevices/medicalDeviceProfile.model";
+import { OperatorCertificate } from "../../../../models/medicalDevices/operatorCertificate.model";
 import { Role } from "../../../../models/rbac/role.model";
 import { User } from "../../../../models/users/user.model";
-import { notifyUsersByRoleName, createNotification } from "../../../notifications/notification.service";
+import { notifyUsersByRoleNames, createNotification } from "../../../notifications/notification.service";
 import {
   checkLicenseExpiringService,
   checkOperatorCertificateExpiringService,
@@ -37,7 +37,7 @@ const mockedProfile = MedicalDeviceProfile as any;
 const mockedCertificate = OperatorCertificate as any;
 const mockedRole = Role as any;
 const mockedUser = User as any;
-const mockedNotify = notifyUsersByRoleName as jest.Mock;
+const mockedNotify = notifyUsersByRoleNames as jest.Mock;
 const mockedCreateNotification = createNotification as jest.Mock;
 
 const makeProfile = (overrides: Record<string, any> = {}) => ({
@@ -55,8 +55,8 @@ const makeProfile = (overrides: Record<string, any> = {}) => ({
 });
 
 function mockRecipients(exists: boolean) {
-  mockedRole.findOne.mockReturnValue({
-    select: jest.fn().mockResolvedValue(exists ? { _id: "role-it" } : null),
+  mockedRole.find.mockReturnValue({
+    select: jest.fn().mockResolvedValue(exists ? [{ _id: "role-it", name: "IT" }] : []),
   });
   mockedUser.countDocuments.mockResolvedValue(exists ? 1 : 0);
 }
@@ -67,7 +67,7 @@ describe("checkLicenseExpiringService (đóng gap cảnh báo hết hạn giấy
   });
 
   it("role IT không tồn tại trong DB → {checked:0, notified:0}, không query profile", async () => {
-    mockedRole.findOne.mockReturnValue({ select: jest.fn().mockResolvedValue(null) });
+    mockedRole.find.mockReturnValue({ select: jest.fn().mockResolvedValue([]) });
 
     const result = await checkLicenseExpiringService();
 
@@ -76,7 +76,7 @@ describe("checkLicenseExpiringService (đóng gap cảnh báo hết hạn giấy
   });
 
   it("role IT tồn tại nhưng chưa có user active nào → {checked:0, notified:0}", async () => {
-    mockedRole.findOne.mockReturnValue({ select: jest.fn().mockResolvedValue({ _id: "role-it" }) });
+    mockedRole.find.mockReturnValue({ select: jest.fn().mockResolvedValue([{ _id: "role-it", name: "IT" }]) });
     mockedUser.countDocuments.mockResolvedValue(0);
 
     const result = await checkLicenseExpiringService();
@@ -108,7 +108,7 @@ describe("checkLicenseExpiringService (đóng gap cảnh báo hết hạn giấy
 
     expect(result).toEqual({ checked: 1, notified: 1 });
     expect(mockedNotify).toHaveBeenCalledWith(
-      "IT",
+      ["PHONG_VAT_TU_TTB", "IT"], // GĐ 6: thiết bị y tế gửi Vật tư-TTB và IT
       expect.objectContaining({
         type: "MEDICAL_DEVICE_LICENSE_EXPIRING",
         title: "Thiết bị y tế sắp hết hạn giấy phép lưu hành",
@@ -132,7 +132,7 @@ describe("checkLicenseExpiringService (đóng gap cảnh báo hết hạn giấy
     await checkLicenseExpiringService();
 
     expect(mockedNotify).toHaveBeenCalledWith(
-      "IT",
+      ["PHONG_VAT_TU_TTB", "IT"], // GĐ 6: thiết bị y tế gửi Vật tư-TTB và IT
       expect.objectContaining({
         title: "Thiết bị y tế đã hết hạn giấy phép lưu hành",
         message: expect.stringContaining("đã hết hạn giấy phép lưu hành từ"),
@@ -192,7 +192,7 @@ describe("checkOperatorCertificateExpiringService (DEV-077, đóng gap theo dõi
   });
 
   it("role IT không tồn tại → {checked:0, notified:0}, không query certificate", async () => {
-    mockedRole.findOne.mockReturnValue({ select: jest.fn().mockResolvedValue(null) });
+    mockedRole.find.mockReturnValue({ select: jest.fn().mockResolvedValue([]) });
 
     const result = await checkOperatorCertificateExpiringService();
 
@@ -222,7 +222,7 @@ describe("checkOperatorCertificateExpiringService (DEV-077, đóng gap theo dõi
 
     expect(result).toEqual({ checked: 1, notified: 1 });
     expect(mockedNotify).toHaveBeenCalledWith(
-      "IT",
+      ["PHONG_VAT_TU_TTB", "IT"], // GĐ 6: thiết bị y tế gửi Vật tư-TTB và IT
       expect.objectContaining({
         type: "OPERATOR_CERTIFICATE_EXPIRING",
         message: expect.stringContaining("Nguyễn Văn A"),
@@ -259,7 +259,7 @@ describe("runMedicalDeviceAlertsService — kết hợp cả 3 loại cảnh bá
   });
 
   it("[CẬP NHẬT DEV-077] trả về shape { calibration, license, operatorCertificate } — cả 3 chạy song song, không loại nào bị bỏ sót", async () => {
-    mockedRole.findOne.mockReturnValue({ select: jest.fn().mockResolvedValue(null) });
+    mockedRole.find.mockReturnValue({ select: jest.fn().mockResolvedValue([]) });
 
     const result = await runMedicalDeviceAlertsService();
 

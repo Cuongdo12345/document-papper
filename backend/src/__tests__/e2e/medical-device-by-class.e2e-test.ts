@@ -16,7 +16,7 @@ const PASSWORD = "Password123";
 describe("E2E — Danh sách thiết bị y tế theo phân loại (DEV-084)", () => {
   let app: import("express").Express;
   let adminToken: string;
-  let userToken: string; // role USER — có ASSET_VIEW nhưng KHÔNG có DASHBOARD_READ (xem rolePermission.map.ts)
+  let userToken: string; // role USER — có MEDICAL_ASSET_VIEW nhưng KHÔNG có DASHBOARD_READ (xem rolePermission.map.ts)
   let deptId: string;
   const ids: Record<string, string> = {};
 
@@ -38,7 +38,7 @@ describe("E2E — Danh sách thiết bị y tế theo phân loại (DEV-084)", (
     userToken = (await request(app).post("/api/auths/login").send({ username: "class_user", password: PASSWORD })).body.data.accessToken;
 
     const admin = api(adminToken);
-    const cat = await admin.post("/api/assets/asset-categories", { code: "MED_TEST", name: "Danh mục thiết bị test" });
+    const cat = await admin.post("/api/medical-assets/categories", { code: "MED_TEST", name: "Danh mục thiết bị test", assetType: "MEDICAL" });
     ids.category = cat.body.data._id;
 
     // 2 thiết bị Loại B, 1 thiết bị Loại C — đủ để phân biệt lọc đúng class + test phân trang.
@@ -47,12 +47,12 @@ describe("E2E — Danh sách thiết bị y tế theo phân loại (DEV-084)", (
       ["assetB2", "Máy thở ICU 2"],
       ["assetC1", "Monitor bệnh nhân 1"],
     ] as const) {
-      const asset = await admin.post("/api/assets", { category: ids.category, department: deptId, name });
+      const asset = await admin.post("/api/medical-assets", { category: ids.category, department: deptId, name });
       ids[key] = asset.body.data._id;
     }
-    await admin.post(`/api/assets/medical-devices/${ids.assetB1}/profile`, { deviceClass: "B", registrationNumber: "REG-B1" });
-    await admin.post(`/api/assets/medical-devices/${ids.assetB2}/profile`, { deviceClass: "B", registrationNumber: "REG-B2" });
-    await admin.post(`/api/assets/medical-devices/${ids.assetC1}/profile`, { deviceClass: "C", registrationNumber: "REG-C1" });
+    await admin.post(`/api/medical-assets/${ids.assetB1}/profile`, { deviceClass: "B", registrationNumber: "REG-B1" });
+    await admin.post(`/api/medical-assets/${ids.assetB2}/profile`, { deviceClass: "B", registrationNumber: "REG-B2" });
+    await admin.post(`/api/medical-assets/${ids.assetC1}/profile`, { deviceClass: "C", registrationNumber: "REG-C1" });
   }, 60_000);
 
   afterAll(async () => {

@@ -1,6 +1,17 @@
 import type { Types } from "mongoose";
 import type { AssetStatus } from "../../models/assets/asset.model";
 
+/**
+ * Loại tài sản — tách module CNTT / Thiết bị y tế (docs/development/ASSET_MODULE_SPLIT_PLAN.md,
+ * Giai đoạn 1, DEV-112). Nguồn sự thật là `AssetCategory.assetType` của DANH MỤC GỐC;
+ * `Asset.assetType` là bản sao phi chuẩn hoá, luôn bằng loại của gốc danh mục
+ * (ép ở service, xem `assetType.helper.ts`).
+ */
+export enum AssetType {
+  IT = "IT",
+  MEDICAL = "MEDICAL",
+}
+
 /* ===== INTERFACE ===== */
 
 export interface IAsset {
@@ -47,6 +58,8 @@ export interface IAsset {
   lastInventoryCheckBy?: Types.ObjectId;
 
   status: AssetStatus;
+  /** Loại tài sản, lấy từ gốc danh mục khi tạo — client không gửi được (DEV-112). */
+  assetType: AssetType;
   isActive: boolean;
 
   /** Cấu hình động theo category (CPU/RAM/IP...), giống pattern `meta` của Document */

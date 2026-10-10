@@ -16,7 +16,8 @@
 // Y tế), nhưng code MỚI nên theo pattern tốt hơn thay vì copy pattern cũ.
 
 import { PipelineStage } from "mongoose";
-import { MedicalDeviceProfile } from "../../models/assets/medicalDeviceProfile.model";
+import { MedicalDeviceProfile } from "../../models/medicalDevices/medicalDeviceProfile.model";
+import { AssetType } from "../../interfaces/assets/asset.interface";
 import { MedicalDeviceClass } from "../../interfaces/assets/medicalDevice.interface";
 import {
   runPaginatedAggregate,
@@ -48,7 +49,7 @@ export const getMedicalDeviceDashboardSummaryService = async () => {
       },
     },
     { $unwind: "$assetDoc" },
-    { $match: { "assetDoc.isActive": true } },
+    { $match: { "assetDoc.isActive": true, "assetDoc.assetType": AssetType.MEDICAL } }, // GĐ 6: chỉ thiết bị y tế (phòng hồ sơ y tế gắn nhầm tài sản CNTT)
     {
       $facet: {
         byClass: [
@@ -169,7 +170,7 @@ export const getCalibrationDueListService = async (
       },
     },
     { $unwind: "$assetDoc" },
-    { $match: { "assetDoc.isActive": true } },
+    { $match: { "assetDoc.isActive": true, "assetDoc.assetType": AssetType.MEDICAL } }, // GĐ 6: chỉ thiết bị y tế (phòng hồ sơ y tế gắn nhầm tài sản CNTT)
     {
       $lookup: {
         from: "departments",
@@ -254,7 +255,7 @@ export const getMedicalDevicesByClassListService = async (
       },
     },
     { $unwind: "$assetDoc" },
-    { $match: { "assetDoc.isActive": true } },
+    { $match: { "assetDoc.isActive": true, "assetDoc.assetType": AssetType.MEDICAL } }, // GĐ 6: chỉ thiết bị y tế (phòng hồ sơ y tế gắn nhầm tài sản CNTT)
     {
       $lookup: {
         from: "departments",

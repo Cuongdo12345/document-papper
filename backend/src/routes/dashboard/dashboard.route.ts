@@ -18,6 +18,7 @@ import {
 } from "../../controllers/dashboard/dashboard.controller";
 import { authenticate } from "../../middlewares/auth.middleware";
 import { authorizePermission } from "../../middlewares/authorizePermission.middleware";
+import { authorizeAssetTypeQuery } from "../../middlewares/assetScope.middleware";
 const router = Router();
 
 // 🏥 ADMIN DASHBOARD SUMMARY
@@ -30,9 +31,11 @@ router.get("/kpi/top-damaged-inks", authenticate, authorizePermission("DASHBOARD
 router.get("/device-stats", authenticate, authorizePermission("DASHBOARD_READ"), getDashboardDeviceStatsData) 
 
 // 🔗 GIAI ĐOẠN 4 (module Asset)
-router.get("/assets/summary", authenticate, authorizePermission("DASHBOARD_READ"), getAssetDashboardSummary);
-router.get("/assets/warranty-expiring", authenticate, authorizePermission("DASHBOARD_READ"), getAssetWarrantyExpiring);
-router.get("/assets/maintenance-overdue", authenticate, authorizePermission("DASHBOARD_READ"), getAssetMaintenanceOverdue);
+// Tách module Tài sản, GĐ 6: nhận thêm `?assetType=IT|MEDICAL` (không truyền = cả hai loại như trước); khi có thì
+// `authorizeAssetTypeQuery` yêu cầu thêm quyền xem đúng loại (IT_ASSET_VIEW / MEDICAL_ASSET_VIEW).
+router.get("/assets/summary", authenticate, authorizePermission("DASHBOARD_READ"), authorizeAssetTypeQuery(), getAssetDashboardSummary);
+router.get("/assets/warranty-expiring", authenticate, authorizePermission("DASHBOARD_READ"), authorizeAssetTypeQuery(), getAssetWarrantyExpiring);
+router.get("/assets/maintenance-overdue", authenticate, authorizePermission("DASHBOARD_READ"), authorizeAssetTypeQuery(), getAssetMaintenanceOverdue);
 
 // 🔗 GIAI ĐOẠN 4 (module Quản lý Thiết bị Y tế) — dùng CHUNG permission
 // DASHBOARD_READ với mọi route dashboard khác (kể cả của module Asset ở

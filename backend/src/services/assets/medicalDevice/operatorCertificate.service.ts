@@ -3,11 +3,13 @@
 // MODULE MỚI (DEV-077) — xem `interfaces/assets/operatorCertificate.interface.ts`.
 
 import mongoose from "mongoose";
-import { OperatorCertificate } from "../../../models/assets/operatorCertificate.model";
-import { MedicalDeviceProfile } from "../../../models/assets/medicalDeviceProfile.model";
+import { OperatorCertificate } from "../../../models/medicalDevices/operatorCertificate.model";
+import { MedicalDeviceProfile } from "../../../models/medicalDevices/medicalDeviceProfile.model";
 import { AssetCategory } from "../../../models/assets/assetCategory.model";
 import { User } from "../../../models/users/user.model";
 import ApiError from "../../../shared/errors/ApiError";
+import { AssetType } from "../../../interfaces/assets/asset.interface";
+import { getCategoryRootType } from "../assetType.helper";
 
 const CERTIFICATE_POPULATE = [
   { path: "user", select: "username fullName email" },
@@ -40,6 +42,10 @@ export const createOperatorCertificateService = async (
   });
   if (!category) {
     throw ApiError.badRequest("Danh mục thiết bị không tồn tại");
+  }
+  // DEV-112: chứng chỉ người vận hành chỉ dành cho thiết bị y tế.
+  if ((await getCategoryRootType(category._id)) !== AssetType.MEDICAL) {
+    throw ApiError.badRequest("Chứng chỉ người vận hành chỉ áp dụng cho danh mục thuộc nhánh Thiết bị y tế");
   }
 
   const certificate = await OperatorCertificate.create({

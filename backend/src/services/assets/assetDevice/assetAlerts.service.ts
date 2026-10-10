@@ -4,21 +4,21 @@
 //
 // 2 hàm ở đây được gọi từ cron job hằng ngày (`shared/cron/assetAlerts.cron.ts`)
 // và cũng expose qua 1 API trigger tay để test/chạy thủ công (xem
-// `asset.routes.ts` — POST /api/assets/alerts/run).
+// `assetModule.routes.ts` — POST /api/it-assets|medical-assets/alerts/run).
 //
 // CHỦ Ý tách 2 hàm riêng biệt (không gộp 1 hàm "checkAll") — vì 2 loại cảnh
 // báo có ngữ nghĩa gửi lặp lại KHÁC NHAU (xem giải thích ở từng hàm), gộp
 // chung dễ nhầm lẫn khi đọc lại sau này.
 
 import { Asset, AssetStatus } from "../../../models/assets/asset.model";
+import { AssetType } from "../../../interfaces/assets/asset.interface";
 import {
   NotificationType,
   NotificationResourceType,
   NotificationPriority,
 } from "../../../models/notifications/notification.model";
-import { Role } from "../../../models/rbac/role.model";
-import { User } from "../../../models/users/user.model";
-import { notifyUsersByRoleName } from "../../notifications/notification.service";
+import { notifyUsersByRoleNames } from "../../notifications/notification.service";
+import { ALERT_RECIPIENT_ROLES, hasValidAlertRecipients } from "../assetAlertRecipients";
 
 /** Số ngày trước hạn bảo hành để bắt đầu cảnh báo — chỉnh ở đây nếu cần đổi. */
 const WARRANTY_ALERT_DAYS_BEFORE = 30;
@@ -26,45 +26,21 @@ const WARRANTY_ALERT_DAYS_BEFORE = 30;
 /** Số ngày bảo trì tối đa trước khi coi là "quá hạn" — chỉnh ở đây nếu cần đổi. */
 const MAINTENANCE_OVERDUE_DAYS = 7;
 
-/** Role nhận cảnh báo — nhân viên IT là người trực tiếp xử lý tài sản. */
-const ALERT_RECIPIENT_ROLE = "IT";
-
 /**
- * ⚠️ Kiểm tra có ÍT NHẤT 1 user hợp lệ để nhận cảnh báo hay không, TRƯỚC
- * KHI xử lý bất kỳ asset nào.
+ * Người nhận cảnh báo theo LOẠI tài sản (tách module Tài sản, GĐ 6 — xem `assetAlertRecipients.ts`):
+ * thiết bị CNTT gửi IT; thiết bị y tế gửi Phòng Vật tư-TTB và IT (mỗi user nhận 1 lần).
  *
- * Lý do bắt buộc phải có bước này: `notifyUsersByRoleName` CHỦ Ý nuốt mọi
- * lỗi bên trong (try/catch, chỉ log, không throw, không trả về số lượng
- * đã gửi thành công) — nếu role "IT" không tồn tại hoặc chưa có user nào
- * thuộc role đó, hàm sẽ âm thầm không gửi cho ai NHƯNG KHÔNG BÁO LỖI GÌ.
- * Nếu không check trước, `checkWarrantyExpiringService` vẫn sẽ set
- * `warrantyAlertSentAt = now` cho MỌI asset dù chưa từng có ai nhận được
- * cảnh báo — coi như "đã xử lý xong" trong khi thực chất chưa gửi được
- * cho ai, và cron sẽ KHÔNG BAO GIỜ thử lại (silent failure nguy hiểm
- * nhất: trông như thành công).
+ * ⚠️ Kiểm tra có người nhận hợp lệ TRƯỚC khi xử lý bất kỳ tài sản nào (lý do ở `hasValidAlertRecipients`: service
+ * gửi nuốt lỗi, thiếu người nhận mà vẫn đánh dấu "đã gửi" thì cron không bao giờ gửi lại). Kiểm theo TỪNG loại:
+ * loại không có người nhận bị bỏ qua, loại còn lại vẫn chạy bình thường.
  */
-const hasValidRecipients = async (roleName: string): Promise<boolean> => {
-  const role = await Role.findOne({ name: roleName }).select("_id");
-  if (!role) {
-    console.warn(
-      `[assetAlerts] Không tìm thấy role "${roleName}" trong DB — bỏ qua kiểm tra cảnh báo Asset để tránh đánh dấu "đã gửi" nhầm.`,
-    );
-    return false;
+const getDeliverableAssetTypes = async (assetType?: AssetType): Promise<AssetType[]> => {
+  const candidates = assetType ? [assetType] : [AssetType.IT, AssetType.MEDICAL];
+  const deliverable: AssetType[] = [];
+  for (const type of candidates) {
+    if (await hasValidAlertRecipients(ALERT_RECIPIENT_ROLES[type], "assetAlerts")) deliverable.push(type);
   }
-
-  const recipientCount = await User.countDocuments({
-    role: role._id,
-    isActive: true,
-  });
-
-  if (recipientCount === 0) {
-    console.warn(
-      `[assetAlerts] Role "${roleName}" chưa có user nào đang active — bỏ qua kiểm tra cảnh báo Asset để tránh đánh dấu "đã gửi" nhầm.`,
-    );
-    return false;
-  }
-
-  return true;
+  return deliverable;
 };
 
 /**
@@ -80,8 +56,9 @@ const hasValidRecipients = async (roleName: string): Promise<boolean> => {
  * Đây là "cảnh báo 1 lần cho biết trước" — khác hẳn cảnh báo bảo trì quá
  * hạn bên dưới (nhắc LẶP LẠI mỗi ngày cho tới khi xử lý xong).
  */
-export const checkWarrantyExpiringService = async () => {
-  if (!(await hasValidRecipients(ALERT_RECIPIENT_ROLE))) {
+export const checkWarrantyExpiringService = async (assetType?: AssetType) => {
+  const types = await getDeliverableAssetTypes(assetType);
+  if (types.length === 0) {
     return { checked: 0, notified: 0 };
   }
 
@@ -94,6 +71,7 @@ export const checkWarrantyExpiringService = async () => {
     warrantyExpiredAt: { $lte: threshold },
     warrantyAlertSentAt: null,
     status: { $nin: [AssetStatus.DISPOSED, AssetStatus.LOST] }, // đã thanh lý/mất thì không cần lo bảo hành nữa
+    assetType: { $in: types }, // DEV-115: chạy tay theo module chỉ quét loại đó; GĐ 6: chỉ loại có người nhận
   }).populate("department", "code name");
 
   let notified = 0;
@@ -102,7 +80,7 @@ export const checkWarrantyExpiringService = async () => {
     const isAlreadyExpired = asset.warrantyExpiredAt! < now;
     const departmentName = (asset.department as any)?.name ?? "";
 
-    await notifyUsersByRoleName(ALERT_RECIPIENT_ROLE, {
+    await notifyUsersByRoleNames(ALERT_RECIPIENT_ROLES[asset.assetType], {
       type: NotificationType.ASSET_WARRANTY_EXPIRING,
       title: isAlreadyExpired
         ? "Tài sản đã hết hạn bảo hành"
@@ -134,8 +112,9 @@ export const checkWarrantyExpiringService = async () => {
  * asset không còn khớp filter `status: UNDER_MAINTENANCE` nữa, cảnh báo
  * tự động dừng — không cần thêm field cờ nào để "tắt" cảnh báo này).
  */
-export const checkMaintenanceOverdueService = async () => {
-  if (!(await hasValidRecipients(ALERT_RECIPIENT_ROLE))) {
+export const checkMaintenanceOverdueService = async (assetType?: AssetType) => {
+  const types = await getDeliverableAssetTypes(assetType);
+  if (types.length === 0) {
     return { checked: 0, notified: 0 };
   }
 
@@ -147,6 +126,7 @@ export const checkMaintenanceOverdueService = async () => {
     isActive: true,
     status: AssetStatus.UNDER_MAINTENANCE,
     maintenanceStartedAt: { $lte: threshold },
+    assetType: { $in: types },
   }).populate("department", "code name");
 
   for (const asset of assets) {
@@ -156,7 +136,7 @@ export const checkMaintenanceOverdueService = async () => {
     );
     const departmentName = (asset.department as any)?.name ?? "";
 
-    await notifyUsersByRoleName(ALERT_RECIPIENT_ROLE, {
+    await notifyUsersByRoleNames(ALERT_RECIPIENT_ROLES[asset.assetType], {
       type: NotificationType.ASSET_MAINTENANCE_OVERDUE,
       title: "Tài sản bảo trì quá hạn",
       message: `Tài sản "${asset.name}" (${asset.assetCode}, ${departmentName}) đã bảo trì ${daysInMaintenance} ngày, vượt quá ${MAINTENANCE_OVERDUE_DAYS} ngày cho phép — cần kiểm tra tiến độ sửa chữa.`,
@@ -173,10 +153,10 @@ export const checkMaintenanceOverdueService = async () => {
 /**
  * 📌 CHẠY CẢ 2 CẢNH BÁO — dùng cho cron job và cho API trigger tay.
  */
-export const runAssetAlertsService = async () => {
+export const runAssetAlertsService = async (assetType?: AssetType) => {
   const [warranty, maintenance] = await Promise.all([
-    checkWarrantyExpiringService(),
-    checkMaintenanceOverdueService(),
+    checkWarrantyExpiringService(assetType),
+    checkMaintenanceOverdueService(assetType),
   ]);
 
   return { warranty, maintenance };

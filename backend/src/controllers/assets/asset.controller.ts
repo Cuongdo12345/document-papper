@@ -24,12 +24,13 @@ import { catchAsync } from "../../shared/utils/catchAsync";
 import { runAssetAlertsService } from "../../services/assets/assetDevice/assetAlerts.service";
 import { getAllDocumentsService } from "../../services/documents/document.service";
 import ApiError from "../../shared/errors/ApiError";
+import { getAssetScope } from "../../middlewares/assetScope.middleware";
 
 /**
  * CREATE
  */
 export const createAsset = catchAsync(async (req: Request, res: Response) => {
-  const asset = await createAssetService(req.body, req.user?._id);
+  const asset = await createAssetService(req.body, req.user?._id, getAssetScope(res));
 
   res.status(201).json({
     message: "Tạo tài sản thành công",
@@ -41,7 +42,7 @@ export const createAsset = catchAsync(async (req: Request, res: Response) => {
  * GET ALL
  */
 export const getAllAssets = catchAsync(async (req: Request, res: Response) => {
-  const result = await getAllAssetsService(req.query);
+  const result = await getAllAssetsService(req.query, getAssetScope(res));
 
   res.json({
     message: "Lấy danh sách tài sản thành công",
@@ -92,7 +93,7 @@ export const deleteAsset = catchAsync(async (req: Request, res: Response) => {
  * BULK DELETE (xoá mềm hàng loạt — DEV-060, 2026-09-16)
  */
 export const bulkDeleteAssets = catchAsync(async (req: Request, res: Response) => {
-  const result = await bulkDeleteAssetService(req.body.ids, req.user?._id);
+  const result = await bulkDeleteAssetService(req.body.ids, req.user?._id, getAssetScope(res));
 
   res.json({
     message: `Đã xoá ${result.deletedIds.length}/${req.body.ids.length} tài sản`,
@@ -129,7 +130,7 @@ export const restoreAsset = catchAsync(async (req: Request, res: Response) => {
  * BULK RESTORE (khôi phục hàng loạt — DEV-062, 2026-09-17)
  */
 export const bulkRestoreAssets = catchAsync(async (req: Request, res: Response) => {
-  const result = await bulkRestoreAssetService(req.body.ids, req.user?._id);
+  const result = await bulkRestoreAssetService(req.body.ids, req.user?._id, getAssetScope(res));
 
   res.json({
     message: `Đã khôi phục ${result.deletedIds.length}/${req.body.ids.length} tài sản`,
@@ -143,7 +144,7 @@ export const bulkRestoreAssets = catchAsync(async (req: Request, res: Response) 
  */
 export const runAssetAlerts = catchAsync(
   async (req: Request, res: Response) => {
-    const result = await runAssetAlertsService();
+    const result = await runAssetAlertsService(getAssetScope(res));
 
     res.json({
       message: "Chạy kiểm tra cảnh báo Asset thành công",
@@ -162,7 +163,7 @@ export const runAssetAlerts = catchAsync(
  * sau khi hàm chạy xong (giống hệt quy ước của `exportDocumentsExcel`).
  */
 export const exportAssets = catchAsync(async (req: Request, res: Response) => {
-  await exportAssetsExcelPRO(req.query, res);
+  await exportAssetsExcelPRO(req.query, res, getAssetScope(res));
 });
 
 /**
@@ -188,6 +189,7 @@ export const importAssets = catchAsync(async (req: Request, res: Response) => {
   const result = await importAssetsExcel(req.file.buffer, req.user?._id, {
     dryRun,
     fileName: req.file.originalname,
+    assetType: getAssetScope(res),
   });
 
   res.json({
@@ -224,7 +226,7 @@ export const getAssetQRCode = catchAsync(
  */
 export const lookupAssetByCode = catchAsync(
   async (req: Request, res: Response) => {
-    const asset = await findAssetByCodeService(String(req.params.assetCode));
+    const asset = await findAssetByCodeService(String(req.params.assetCode), getAssetScope(res));
 
     res.json({
       message: "Tìm thấy tài sản",
@@ -253,13 +255,13 @@ export const checkInAsset = catchAsync(async (req: Request, res: Response) => {
  * cứng `relatedAsset = :id` từ URL param.
  *
  * FE cho phép lọc thêm qua query string như bình thường, vd:
- *   GET /api/assets/:id/documents?subType=MANUAL   (chỉ xem manual)
- *   GET /api/assets/:id/documents                  (toàn bộ tài liệu liên quan)
+ *   GET /api/it-assets|medical-assets/:id/documents?subType=MANUAL   (chỉ xem manual)
+ *   GET /api/it-assets|medical-assets/:id/documents               (toàn bộ tài liệu liên quan)
  *
  * Đây chính là bước "nối QR tới thông tin thiết bị" đã đề cập ở roadmap:
  * QR code (xem `assetQRCode.service.ts`) CHỦ Ý chỉ encode `assetCode`
  * (không encode URL — lý do đã giải thích tại đó). Luồng đúng: FE quét QR
- * → gọi `GET /api/assets/lookup/:assetCode` (đã có) lấy `assetId` → gọi
+ * → gọi `GET /api/it-assets|medical-assets/lookup/:assetCode` (đã có) lấy `assetId` → gọi
  * endpoint này để lấy danh sách manual/tài liệu của đúng thiết bị đó.
  */
 export const getAssetDocuments = catchAsync(

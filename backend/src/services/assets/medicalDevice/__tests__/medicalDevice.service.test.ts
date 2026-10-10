@@ -7,12 +7,12 @@
 jest.mock("../../../../models/assets/asset.model", () => ({
   Asset: { findOne: jest.fn() },
 }));
-jest.mock("../../../../models/assets/medicalDeviceProfile.model", () => ({
+jest.mock("../../../../models/medicalDevices/medicalDeviceProfile.model", () => ({
   MedicalDeviceProfile: { findOne: jest.fn() },
 }));
 
 import { Asset } from "../../../../models/assets/asset.model";
-import { MedicalDeviceProfile } from "../../../../models/assets/medicalDeviceProfile.model";
+import { MedicalDeviceProfile } from "../../../../models/medicalDevices/medicalDeviceProfile.model";
 import { updateMedicalDeviceProfileService } from "../medicalDevice.service";
 
 const mockedAsset = Asset as any;

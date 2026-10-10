@@ -42,6 +42,21 @@ tags:
       Asset (quan hệ 1-1, KHÔNG phải collection/API tách biệt). Mọi thao
       tác vòng đời khác của thiết bị (CRUD, cấp phát, Excel, QR code...)
       vẫn dùng API Assets sẵn có.
+  - name: IT Assets
+    description: >
+      [DEV-115] Module Thiết bị CNTT (`/api/it-assets`): CRUD tài sản loại IT, cấp phát, QR/kiểm kê, Excel,
+      cảnh báo, lịch bảo trì và danh mục nhánh CNTT (`/categories`). Quyền `IT_ASSET_*`, `IT_ASSET_CATEGORY_*`.
+      Id thuộc Thiết bị y tế trả 404. Thay thế `/api/assets*` (đã gỡ ở Giai đoạn 8, DEV-120; chỉ còn `/api/assets/lookup-options`).
+  - name: Medical Assets
+    description: >
+      [DEV-115] Module Thiết bị y tế (`/api/medical-assets`): như module CNTT, cộng hồ sơ thiết bị y tế
+      (`/{assetId}/profile`), hiệu chuẩn (`/{assetId}/calibration-records`), cảnh báo hiệu chuẩn
+      (`/calibration-alerts/run`) và chứng chỉ vận hành (`/operator-certificates`). Quyền `MEDICAL_ASSET_*`,
+      `MEDICAL_ASSET_CATEGORY_*` cùng `MEDICAL_DEVICE_*`, `OPERATOR_CERTIFICATE_*` (giữ nguyên). Id thuộc Thiết bị CNTT trả 404.
+  - name: Software Licenses
+    description: >
+      [DEV-116] Danh mục bản quyền phần mềm (`/api/software-licenses`), gán/gỡ cho máy CNTT theo số slot, chứng từ,
+      cảnh báo hết hạn. KHÔNG lưu khoá bản quyền. Quyền `SOFTWARE_LICENSE_*`.
   - name: Dashboard
     description: Thống kê tổng hợp và KPI
   - name: Notifications
@@ -2274,10 +2289,14 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
 
   # ================= ASSETS =================
-  /api/assets:
+  # ===== DEV-115 (tách module Tài sản, Giai đoạn 4): /api/it-assets và /api/medical-assets =====
+  # Sinh từ các path /api/assets* cũ (đã gỡ ở GĐ 8): cùng body/response, khác prefix + quyền (IT_ASSET_* / MEDICAL_ASSET_*).
+  # Cô lập theo loại: id (tài sản, danh mục, kế hoạch bảo trì, chứng chỉ) thuộc loại khác trả 404.
+
+  /api/it-assets:
     post:
-      tags: [Assets]
-      summary: Tạo tài sản mới (permission ASSET_CREATE)
+      tags: [IT Assets]
+      summary: Tạo tài sản mới (permission IT_ASSET_CREATE)
       description: >
         [DEV-080] `category` PHẢI là danh mục cấp cuối (không có danh mục con
         active) — danh mục nhóm → 400. Cùng quy tắc ở `PUT/PATCH /:id` và import Excel.
@@ -2300,8 +2319,8 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
     get:
-      tags: [Assets]
-      summary: Danh sách tài sản (permission ASSET_VIEW)
+      tags: [IT Assets]
+      summary: Danh sách tài sản (permission IT_ASSET_VIEW)
       parameters:
         - $ref: "#/components/parameters/PageParam"
         - name: limit
@@ -2338,10 +2357,10 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
-  /api/assets/export:
+  /api/it-assets/export:
     get:
-      tags: [Assets]
-      summary: Export danh sách tài sản ra file Excel (streaming) (permission ASSET_EXCEL_EXPORT)
+      tags: [IT Assets]
+      summary: Export danh sách tài sản ra file Excel (streaming) (permission IT_ASSET_EXCEL_EXPORT)
       description: >
         ⚠️ GHI CHÚ TỪ REVIEW: route này BẮT BUỘC phải đăng ký TRƯỚC
         `GET /:id` trong Express — nếu đặt sau, `GET /assets/export` sẽ bị
@@ -2349,7 +2368,7 @@ paths:
         bao giờ được gọi tới mà không báo lỗi gì. Đã xác nhận thứ tự đăng
         ký trong route file là đúng (source tự ghi chú lại lỗi này đã từng
         xảy ra ở bản đầu tiên). ĐÃ XÁC NHẬN LẠI: permission
-        `ASSET_EXCEL_EXPORT` có trong `permission.constant.ts` (verify từ
+        `IT_ASSET_EXCEL_EXPORT` có trong `permission.constant.ts` (verify từ
         source cập nhật) — không còn nghi vấn mismatch như ghi chú review
         trước đây.
       parameters:
@@ -2374,11 +2393,12 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
-  # [MỚI 2026-09-16, DEV-060] Xoá mềm hàng loạt — permission ASSET_DELETE y hệt DELETE /:id.
-  /api/assets/bulk-delete:
+  # [MỚI 2026-09-16, DEV-060] Xoá mềm hàng loạt — permission IT_ASSET_DELETE y hệt DELETE /:id.
+
+  /api/it-assets/bulk-delete:
     post:
-      tags: [Assets]
-      summary: Xoá mềm hàng loạt tài sản (permission ASSET_DELETE)
+      tags: [IT Assets]
+      summary: Xoá mềm hàng loạt tài sản (permission IT_ASSET_DELETE)
       requestBody:
         required: true
         content:
@@ -2394,10 +2414,10 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
-  /api/assets/bulk-restore:
+  /api/it-assets/bulk-restore:
     post:
-      tags: [Assets]
-      summary: Khôi phục hàng loạt tài sản (permission ASSET_UPDATE — dùng lại đúng permission của khôi phục từng dòng)
+      tags: [IT Assets]
+      summary: Khôi phục hàng loạt tài sản (permission IT_ASSET_UPDATE — dùng lại đúng permission của khôi phục từng dòng)
       description: "[MỚI 2026-09-17, DEV-062]"
       requestBody:
         required: true
@@ -2414,10 +2434,10 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
-  /api/assets/{id}:
+  /api/it-assets/{id}:
     get:
-      tags: [Assets]
-      summary: Chi tiết tài sản (permission ASSET_VIEW_DETAIL)
+      tags: [IT Assets]
+      summary: Chi tiết tài sản (permission IT_ASSET_VIEW_DETAIL)
       parameters: [{ $ref: "#/components/parameters/IdParam" }]
       responses:
         "200":
@@ -2433,8 +2453,8 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
     put:
-      tags: [Assets]
-      summary: Cập nhật tài sản (permission ASSET_UPDATE)
+      tags: [IT Assets]
+      summary: Cập nhật tài sản (permission IT_ASSET_UPDATE)
       parameters: [{ $ref: "#/components/parameters/IdParam" }]
       requestBody:
         required: true
@@ -2456,8 +2476,8 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
     delete:
-      tags: [Assets]
-      summary: Xoá mềm tài sản (permission ASSET_DELETE)
+      tags: [IT Assets]
+      summary: Xoá mềm tài sản (permission IT_ASSET_DELETE)
       parameters: [{ $ref: "#/components/parameters/IdParam" }]
       responses:
         "200":
@@ -2471,10 +2491,10 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /api/assets/{id}/permanent:
+  /api/it-assets/{id}/permanent:
     delete:
-      tags: [Assets]
-      summary: Xoá vĩnh viễn tài sản — chỉ áp dụng cho asset đã soft-delete (permission ASSET_DELETE_PERMANENT)
+      tags: [IT Assets]
+      summary: Xoá vĩnh viễn tài sản — chỉ áp dụng cho asset đã soft-delete (permission IT_ASSET_DELETE_PERMANENT)
       description: >-
         Chặn xoá nếu asset đang active (chưa soft-delete), hoặc còn
         MedicalDeviceProfile gắn với asset này (DEV-012/IMP-018) — trả về 400.
@@ -2492,10 +2512,10 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /api/assets/{id}/restore:
+  /api/it-assets/{id}/restore:
     patch:
-      tags: [Assets]
-      summary: Khôi phục tài sản đã soft-delete (permission ASSET_UPDATE)
+      tags: [IT Assets]
+      summary: Khôi phục tài sản đã soft-delete (permission IT_ASSET_UPDATE)
       parameters: [{ $ref: "#/components/parameters/IdParam" }]
       responses:
         "200":
@@ -2511,10 +2531,10 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /api/assets/alerts/run:
+  /api/it-assets/alerts/run:
     post:
-      tags: [Assets]
-      summary: Chạy tay kiểm tra cảnh báo bảo hành/bảo trì sắp hết hạn (permission ASSET_ALERTS_TRIGGER)
+      tags: [IT Assets]
+      summary: Chạy tay kiểm tra cảnh báo bảo hành/bảo trì sắp hết hạn (permission IT_ASSET_ALERTS_TRIGGER)
       description: Bình thường chạy tự động qua cron lúc 8h sáng hàng ngày — endpoint này để test/demo.
       responses:
         "200":
@@ -2529,10 +2549,10 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
-  /api/assets/import/template:
+  /api/it-assets/import/template:
     get:
-      tags: [Assets]
-      summary: Tải file Excel mẫu để import tài sản hàng loạt (permission ASSET_EXCEL_IMPORT)
+      tags: [IT Assets]
+      summary: Tải file Excel mẫu để import tài sản hàng loạt (permission IT_ASSET_EXCEL_IMPORT)
       responses:
         "200":
           description: File Excel mẫu (.xlsx)
@@ -2542,10 +2562,10 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
-  /api/assets/import:
+  /api/it-assets/import:
     post:
-      tags: [Assets]
-      summary: Import tài sản hàng loạt từ Excel (permission ASSET_EXCEL_IMPORT)
+      tags: [IT Assets]
+      summary: Import tài sản hàng loạt từ Excel (permission IT_ASSET_EXCEL_IMPORT)
       description: >
         CHỈ TẠO MỚI (không update tài sản đã tồn tại) — cố tình không cho đổi
         department/status/assignedTo qua import để không bỏ qua audit trail
@@ -2585,10 +2605,10 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
-  /api/assets/lookup/{assetCode}:
+  /api/it-assets/lookup/{assetCode}:
     get:
-      tags: [Assets]
-      summary: Tra cứu tài sản theo assetCode (permission ASSET_INVENTORY_CHECK)
+      tags: [IT Assets]
+      summary: Tra cứu tài sản theo assetCode (permission IT_ASSET_INVENTORY_CHECK)
       description: >
         Dùng ngay sau khi quét QR (đầu đọc mã vạch/QR hoạt động như bàn
         phím). Trả về đầy đủ thông tin để FE hiển thị cho nhân viên XÁC NHẬN
@@ -2612,10 +2632,10 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /api/assets/{id}/qrcode:
+  /api/it-assets/{id}/qrcode:
     get:
-      tags: [Assets]
-      summary: Sinh ảnh QR code (PNG) cho 1 tài sản (permission ASSET_VIEW_DETAIL)
+      tags: [IT Assets]
+      summary: Sinh ảnh QR code (PNG) cho 1 tài sản (permission IT_ASSET_VIEW_DETAIL)
       description: >
         QR code encode NGUYÊN VĂN `assetCode` (mã người đọc được, in trên
         tem dán vật lý) — không phải `assetId`/URL, để không phụ thuộc domain
@@ -2631,10 +2651,10 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /api/assets/{id}/check-in:
+  /api/it-assets/{id}/check-in:
     post:
-      tags: [Assets]
-      summary: Ghi nhận kiểm kê — xác nhận vẫn thấy tài sản (permission ASSET_INVENTORY_CHECK)
+      tags: [IT Assets]
+      summary: Ghi nhận kiểm kê — xác nhận vẫn thấy tài sản (permission IT_ASSET_INVENTORY_CHECK)
       description: >
         Chỉ cập nhật `lastInventoryCheckAt`/`lastInventoryCheckBy` — KHÔNG
         đổi status/department/assignedTo (kiểm kê là xác nhận sự tồn tại,
@@ -2655,10 +2675,11 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
 
   # ================= ASSET ASSIGNMENT =================
-  /api/assets/{id}/assign:
+
+  /api/it-assets/{id}/assign:
     post:
-      tags: [Asset Assignment]
-      summary: Cấp phát tài sản từ kho cho khoa/phòng (permission ASSET_ASSIGN)
+      tags: [IT Assets]
+      summary: Cấp phát tài sản từ kho cho khoa/phòng (permission IT_ASSET_ASSIGN)
       description: >
         [CẬP NHẬT, DEV-077] Nếu `toUser` được truyền VÀ thiết bị có
         `MedicalDeviceProfile.operatorCertificateRequired = true`, server
@@ -2686,10 +2707,10 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /api/assets/{id}/transfer:
+  /api/it-assets/{id}/transfer:
     post:
-      tags: [Asset Assignment]
-      summary: Luân chuyển tài sản đang sử dụng (permission ASSET_ASSIGN)
+      tags: [IT Assets]
+      summary: Luân chuyển tài sản đang sử dụng (permission IT_ASSET_ASSIGN)
       description: >
         [CẬP NHẬT, DEV-077] Cùng guard chứng chỉ vận hành đã mô tả ở
         `POST /{id}/assign` — chỉ áp dụng khi `toUser` được truyền (đổi
@@ -2715,10 +2736,10 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /api/assets/{id}/return:
+  /api/it-assets/{id}/return:
     post:
-      tags: [Asset Assignment]
-      summary: Thu hồi tài sản về kho (permission ASSET_ASSIGN)
+      tags: [IT Assets]
+      summary: Thu hồi tài sản về kho (permission IT_ASSET_ASSIGN)
       parameters: [{ $ref: "#/components/parameters/IdParam" }]
       requestBody:
         required: true
@@ -2740,10 +2761,10 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /api/assets/{id}/assignment-history:
+  /api/it-assets/{id}/assignment-history:
     get:
-      tags: [Asset Assignment]
-      summary: Lịch sử cấp phát/luân chuyển/thu hồi của 1 tài sản (permission ASSET_VIEW_DETAIL)
+      tags: [IT Assets]
+      summary: Lịch sử cấp phát/luân chuyển/thu hồi của 1 tài sản (permission IT_ASSET_VIEW_DETAIL)
       parameters:
         - { $ref: "#/components/parameters/IdParam" }
         - $ref: "#/components/parameters/PageParam"
@@ -2768,9 +2789,9 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /api/assets/{id}/documents:
+  /api/it-assets/{id}/documents:
     get:
-      tags: [Assets]
+      tags: [IT Assets]
       summary: Danh sách tài liệu liên quan tới 1 tài sản (permission DOCUMENT_READ)
       description: >
         Dùng chung permission DOCUMENT_READ (không phải ASSET_*) vì dữ liệu
@@ -2789,7 +2810,7 @@ paths:
 
 
         Đây là bước "nối QR tới thông tin thiết bị": FE quét QR (chỉ encode
-        assetCode) → gọi GET /api/assets/lookup/{assetCode} lấy assetId →
+        assetCode) → gọi GET /api/it-assets|medical-assets/lookup/{assetCode} lấy assetId →
         gọi endpoint này lấy danh sách manual/tài liệu.
       parameters:
         - { $ref: "#/components/parameters/IdParam" }
@@ -2880,14 +2901,1423 @@ paths:
   # (số nhiều, kebab-case — như `/api/asset-categories`). Vui lòng xác nhận
   # lại đúng prefix thật trong `app.ts` (dòng `app.use("/api/...", ...)`)
   # và báo lại nếu khác, để cập nhật chính xác.
-  /api/assets/medical-devices/{assetId}/profile:
+
+  /api/it-assets/maintenance-plans/calendar:
+    get:
+      tags: [IT Assets]
+      summary: >-
+        Lịch bảo trì theo tháng, xuyên suốt mọi asset (permission
+        IT_ASSET_MAINTENANCE_PLAN_VIEW) — Roadmap B2, 2026-09-15
+      description: >
+        Trả về TOÀN BỘ kế hoạch (mọi trạng thái — FE tự phân biệt qua
+        `status`/`isOverdue`) có `scheduledDate` rơi trong tháng/năm chỉ
+        định. KHÔNG department-scope theo ABAC (cùng nguyên tắc RBAC đơn
+        giản của toàn domain Asset) — `department` là filter TUỲ CHỌN.
+      parameters:
+        - name: month
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1, maximum: 12 }
+        - name: year
+          in: query
+          required: true
+          schema: { type: integer, minimum: 2000, maximum: 2100 }
+        - name: department
+          in: query
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/AssetMaintenancePlan" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/it-assets/maintenance-plans/asset/{assetId}:
     post:
-      tags: [Medical Device]
+      tags: [IT Assets]
+      summary: Lên lịch bảo trì mới cho 1 tài sản (permission IT_ASSET_MAINTENANCE_PLAN_CREATE)
+      parameters:
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, scheduledDate]
+              properties:
+                title: { type: string, minLength: 1 }
+                description: { type: string }
+                scheduledDate: { type: string, format: date-time }
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/AssetMaintenancePlan" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: Không tìm thấy tài sản/không active
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    get:
+      tags: [IT Assets]
+      summary: Lịch sử kế hoạch bảo trì theo 1 tài sản (permission IT_ASSET_MAINTENANCE_PLAN_VIEW)
+      description: Có phân trang, sắp xếp mới nhất trước theo `scheduledDate`.
+      parameters:
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/AssetMaintenancePlan" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: Không tìm thấy tài sản
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /api/it-assets/maintenance-plans/{id}:
+    put:
+      tags: [IT Assets]
+      summary: >-
+        Sửa kế hoạch bảo trì CÒN "planned" (permission
+        IT_ASSET_MAINTENANCE_PLAN_UPDATE)
+      description: >
+        Không cho sửa kế hoạch đã "completed"/"cancelled" — giữ nguyên làm
+        lịch sử. KHÔNG có field `status` trong request — đổi trạng thái
+        CHỈ qua `/complete` hoặc `/cancel`.
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string, minLength: 1 }
+                description: { type: string }
+                scheduledDate: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/AssetMaintenancePlan" }
+        "400":
+          description: ID không hợp lệ, hoặc kế hoạch đã completed/cancelled
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/it-assets/maintenance-plans/{id}/complete:
+    patch:
+      tags: [IT Assets]
+      summary: Đánh dấu hoàn tất kế hoạch bảo trì (permission IT_ASSET_MAINTENANCE_PLAN_UPDATE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                resolutionNote: { type: string, description: "Ghi chú kết quả bảo trì (tuỳ chọn)." }
+      responses:
+        "200":
+          description: Đánh dấu hoàn tất thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/AssetMaintenancePlan" }
+        "400":
+          description: ID không hợp lệ, hoặc kế hoạch không còn "planned"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/it-assets/maintenance-plans/{id}/cancel:
+    patch:
+      tags: [IT Assets]
+      summary: Huỷ kế hoạch bảo trì (permission IT_ASSET_MAINTENANCE_PLAN_UPDATE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                resolutionNote: { type: string, description: "Lý do huỷ (tuỳ chọn)." }
+      responses:
+        "200":
+          description: Huỷ thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/AssetMaintenancePlan" }
+        "400":
+          description: ID không hợp lệ, hoặc kế hoạch không còn "planned"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ================= INVENTORY (Roadmap B3, 2026-09-15) =================
+
+  /api/it-assets/categories:
+    post:
+      tags: [IT Assets]
+      summary: Tạo danh mục tài sản (permission IT_ASSET_CATEGORY_CREATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateAssetCategoryRequest" }
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/AssetCategory" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    get:
+      tags: [IT Assets]
+      summary: Danh sách danh mục tài sản (permission IT_ASSET_CATEGORY_VIEW)
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, default: 10 }
+        - $ref: "#/components/parameters/KeywordParam"
+        - name: isActive
+          in: query
+          description: >
+            Mặc định `true` nếu không truyền (Asset Categories UI, mới thêm —
+            cùng pattern `isActive` của `GET /assets`). Truyền `false` để xem
+            danh mục đã xoá mềm (phục vụ khôi phục qua PATCH .../restore).
+          schema: { type: boolean }
+        - name: group
+          in: query
+          description: >
+            [DEV-081] Chỉ danh mục thuộc nhánh của nhóm này (mọi cấp con cháu,
+            KHÔNG gồm chính nó).
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: level
+          in: query
+          description: >
+            [DEV-081] `leaf` = chỉ danh mục cấp cuối (không có con active —
+            nơi gắn tài sản), `group` = chỉ danh mục nhóm. Không truyền = tất cả.
+          schema: { type: string, enum: [leaf, group] }
+      responses:
+        "200":
+          description: Danh sách danh mục
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/AssetCategory" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  # [MỚI 2026-09-16, DEV-060] Xoá mềm hàng loạt — permission IT_ASSET_CATEGORY_DELETE y hệt DELETE /:id.
+
+  /api/it-assets/categories/bulk-delete:
+    post:
+      tags: [IT Assets]
+      summary: Xoá mềm hàng loạt danh mục tài sản (permission IT_ASSET_CATEGORY_DELETE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
+      responses:
+        "200":
+          description: OK (có thể có phần tử `failed` nếu 1 vài danh mục còn tài sản/danh mục con tham chiếu)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/it-assets/categories/bulk-restore:
+    post:
+      tags: [IT Assets]
+      summary: Khôi phục hàng loạt danh mục tài sản (permission IT_ASSET_CATEGORY_UPDATE — dùng lại đúng permission của khôi phục từng dòng)
+      description: "[MỚI 2026-09-17, DEV-062]"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/it-assets/categories/{id}:
+    get:
+      tags: [IT Assets]
+      summary: Chi tiết danh mục tài sản (permission IT_ASSET_CATEGORY_VIEW)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/AssetCategory" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [IT Assets]
+      summary: Cập nhật danh mục tài sản (permission IT_ASSET_CATEGORY_UPDATE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateAssetCategoryRequest" }
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/AssetCategory" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [IT Assets]
+      summary: Xoá mềm danh mục tài sản (permission IT_ASSET_CATEGORY_DELETE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Xoá thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/it-assets/categories/{id}/permanent:
+    delete:
+      tags: [IT Assets]
+      summary: Xoá vĩnh viễn danh mục tài sản (permission IT_ASSET_CATEGORY_DELETE_PERMANENT)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Xoá vĩnh viễn thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/it-assets/categories/{id}/restore:
+    patch:
+      tags: [IT Assets]
+      summary: Khôi phục danh mục đã soft-delete (permission IT_ASSET_CATEGORY_UPDATE)
+      description: >
+        [DEV-112] Danh mục không thuộc nhánh nào (gốc chưa có `assetType`, vd
+        danh mục gốc cũ) → 400, không khôi phục.
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Khôi phục thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/AssetCategory" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ================= DASHBOARD =================
+
+  # ===== DEV-116 (tách module Tài sản, Giai đoạn 5): hồ sơ thiết bị CNTT + bản quyền phần mềm =====
+  /api/it-assets/{assetId}/profile:
+    get:
+      tags: [IT Assets]
+      summary: Xem hồ sơ thiết bị CNTT (permission IT_ASSET_VIEW_DETAIL)
+      description: >
+        `data` là `null` (200) nếu thiết bị chưa có hồ sơ — không phải lỗi. `warnings` có phần tử `DUPLICATE_IP` khi
+        IP trùng thiết bị CNTT khác còn hoạt động (chỉ cảnh báo, Q-A3). Tài sản thuộc Thiết bị y tế → 404.
+      parameters:
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    nullable: true
+                    allOf:
+                      - { $ref: "#/components/schemas/ItDeviceProfile" }
+                  warnings:
+                    type: array
+                    items: { $ref: "#/components/schemas/ItDeviceProfileWarning" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [IT Assets]
+      summary: Tạo hoặc cập nhật hồ sơ thiết bị CNTT — upsert (permission IT_ASSET_UPDATE)
+      description: >
+        Tạo nếu chưa có, sửa nếu đã có (nguyên tử qua chỉ mục duy nhất theo tài sản). Chỉ trường được gửi mới đổi;
+        `null` hoặc chuỗi rỗng xoá trường. IP trùng thiết bị khác KHÔNG bị chặn, trả `warnings`. Phải gửi ít nhất một trường.
+      parameters:
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertItDeviceProfileRequest" }
+      responses:
+        "200":
+          description: Đã lưu
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/ItDeviceProfile" }
+                  warnings:
+                    type: array
+                    items: { $ref: "#/components/schemas/ItDeviceProfileWarning" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/software-licenses:
+    post:
+      tags: [Software Licenses]
+      summary: Tạo bản quyền phần mềm (permission SOFTWARE_LICENSE_CREATE)
+      description: >
+        KHÔNG lưu khoá bản quyền (Q-A2). Thuê bao (`SUBSCRIPTION`) bắt buộc `expiresAt`; vĩnh viễn (`PERPETUAL`) không có `expiresAt`.
+        Danh sách máy (`assets`) chỉ đổi qua `/assign` và `/unassign`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateSoftwareLicenseRequest" }
+      responses:
+        "201":
+          description: Đã tạo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/SoftwareLicense" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    get:
+      tags: [Software Licenses]
+      summary: Danh sách bản quyền phần mềm (permission SOFTWARE_LICENSE_VIEW)
+      description: >
+        Mỗi dòng có `usedSeats`, `freeSeats`, `isExpired` (tính khi đọc) nhưng KHÔNG có mảng `assets` — xem chi tiết để lấy danh sách máy.
+        `asset` lọc bản quyền đang gán cho máy đó (trang chi tiết thiết bị CNTT).
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+        - $ref: "#/components/parameters/KeywordParam"
+        - name: licenseType
+          in: query
+          schema: { $ref: "#/components/schemas/SoftwareLicenseType" }
+        - name: isActive
+          in: query
+          schema: { type: string, enum: ["true", "false"] }
+        - name: asset
+          in: query
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: expiringWithinDays
+          in: query
+          description: Thuê bao đã hết hạn hoặc hết hạn trong N ngày tới.
+          schema: { type: integer, minimum: 1, maximum: 3650 }
+        - name: sortBy
+          in: query
+          schema: { type: string, enum: [softwareName, expiresAt, createdAt], default: softwareName }
+        - $ref: "#/components/parameters/OrderParam"
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/SoftwareLicense" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/software-licenses/alerts/run:
+    post:
+      tags: [Software Licenses]
+      summary: Chạy tay cảnh báo bản quyền sắp/đã hết hạn (permission SOFTWARE_LICENSE_ALERTS_TRIGGER)
+      description: Cron tự chạy 08:25 hằng ngày. Gửi cho role IT, mỗi bản quyền 1 lần (reset khi sửa `expiresAt`).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      expiring:
+                        type: object
+                        properties:
+                          checked: { type: integer }
+                          notified: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/software-licenses/{id}:
+    get:
+      tags: [Software Licenses]
+      summary: Chi tiết bản quyền, kèm danh sách máy đang dùng (permission SOFTWARE_LICENSE_VIEW)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/SoftwareLicense" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Software Licenses]
+      summary: Cập nhật bản quyền (permission SOFTWARE_LICENSE_UPDATE)
+      description: >
+        Hạ `totalSeats` thấp hơn số máy đang dùng → 400 (kiểm nguyên tử). Đổi `expiresAt` thì cho phép cảnh báo lại.
+        `null` xoá trường tuỳ chọn. Quy tắc loại ↔ hạn kiểm trên trạng thái sau khi gộp.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateSoftwareLicenseRequest" }
+      responses:
+        "200":
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/SoftwareLicense" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Software Licenses]
+      summary: Xoá mềm bản quyền (permission SOFTWARE_LICENSE_DELETE)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+      responses:
+        "200":
+          description: Đã xoá mềm
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/software-licenses/{id}/restore:
+    patch:
+      tags: [Software Licenses]
+      summary: Khôi phục bản quyền đã xoá mềm (permission SOFTWARE_LICENSE_UPDATE)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+      responses:
+        "200":
+          description: Đã khôi phục
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/SoftwareLicense" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/software-licenses/{id}/assign:
+    post:
+      tags: [Software Licenses]
+      summary: Gán bản quyền cho 1 máy CNTT (permission SOFTWARE_LICENSE_ASSIGN)
+      description: >
+        Một lệnh cập nhật có điều kiện (còn slot và máy chưa được gán), an toàn khi nhiều request đồng thời vào slot cuối.
+        400 khi: máy không phải thiết bị CNTT, máy đã thanh lý/mất, máy đã được gán, hết slot. Máy thanh lý / xoá mềm / xoá vĩnh viễn tự được gỡ khỏi mọi bản quyền (trả slot).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssignSoftwareLicenseRequest" }
+      responses:
+        "200":
+          description: Đã gán
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/SoftwareLicense" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/software-licenses/{id}/unassign:
+    post:
+      tags: [Software Licenses]
+      summary: Gỡ bản quyền khỏi 1 máy (permission SOFTWARE_LICENSE_ASSIGN)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssignSoftwareLicenseRequest" }
+      responses:
+        "200":
+          description: Đã gỡ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/SoftwareLicense" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/software-licenses/{id}/proof-file:
+    put:
+      tags: [Software Licenses]
+      summary: Tải lên chứng từ bản quyền, thay file cũ (permission SOFTWARE_LICENSE_UPDATE)
+      description: multipart/form-data, trường `proofFile`, PDF/JPEG/PNG tối đa 10MB. File cũ được đánh dấu xoá mềm.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [proofFile]
+              properties:
+                proofFile: { type: string, format: binary }
+      responses:
+        "200":
+          description: Đã cập nhật chứng từ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/SoftwareLicense" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/software-licenses/{id}/proof-file/download:
+    get:
+      tags: [Software Licenses]
+      summary: Tải chứng từ bản quyền (permission SOFTWARE_LICENSE_VIEW)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+      responses:
+        "200":
+          description: Nội dung file
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/medical-assets:
+    post:
+      tags: [Medical Assets]
+      summary: Tạo tài sản mới (permission MEDICAL_ASSET_CREATE)
+      description: >
+        [DEV-080] `category` PHẢI là danh mục cấp cuối (không có danh mục con
+        active) — danh mục nhóm → 400. Cùng quy tắc ở `PUT/PATCH /:id` và import Excel.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateAssetRequest" }
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Asset" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    get:
+      tags: [Medical Assets]
+      summary: Danh sách tài sản (permission MEDICAL_ASSET_VIEW)
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, default: 10 }
+        - $ref: "#/components/parameters/KeywordParam"
+        - name: department
+          in: query
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: category
+          in: query
+          description: "[DEV-080] Gồm cả tài sản thuộc mọi danh mục con cháu của danh mục này."
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/AssetStatus" }
+        - name: sortBy
+          in: query
+          schema: { type: string, default: createdAt }
+        - $ref: "#/components/parameters/OrderParam"
+      responses:
+        "200":
+          description: Danh sách tài sản
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Asset" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/medical-assets/export:
+    get:
+      tags: [Medical Assets]
+      summary: Export danh sách tài sản ra file Excel (streaming) (permission MEDICAL_ASSET_EXCEL_EXPORT)
+      description: >
+        ⚠️ GHI CHÚ TỪ REVIEW: route này BẮT BUỘC phải đăng ký TRƯỚC
+        `GET /:id` trong Express — nếu đặt sau, `GET /assets/export` sẽ bị
+        `GET /:id` "nuốt" mất (hiểu `id="export"`), route export sẽ không
+        bao giờ được gọi tới mà không báo lỗi gì. Đã xác nhận thứ tự đăng
+        ký trong route file là đúng (source tự ghi chú lại lỗi này đã từng
+        xảy ra ở bản đầu tiên). ĐÃ XÁC NHẬN LẠI: permission
+        `MEDICAL_ASSET_EXCEL_EXPORT` có trong `permission.constant.ts` (verify từ
+        source cập nhật) — không còn nghi vấn mismatch như ghi chú review
+        trước đây.
+      parameters:
+        - name: department
+          in: query
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: category
+          in: query
+          description: "[DEV-080] Gồm cả tài sản thuộc mọi danh mục con cháu của danh mục này."
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/AssetStatus" }
+        - $ref: "#/components/parameters/KeywordParam"
+      responses:
+        "200":
+          description: File Excel (.xlsx) — streamed
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  # [MỚI 2026-09-16, DEV-060] Xoá mềm hàng loạt — permission MEDICAL_ASSET_DELETE y hệt DELETE /:id.
+
+  /api/medical-assets/bulk-delete:
+    post:
+      tags: [Medical Assets]
+      summary: Xoá mềm hàng loạt tài sản (permission MEDICAL_ASSET_DELETE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
+      responses:
+        "200":
+          description: OK (có thể có phần tử `failed` nếu 1 vài tài sản không xoá được, VD đang IN_USE)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/medical-assets/bulk-restore:
+    post:
+      tags: [Medical Assets]
+      summary: Khôi phục hàng loạt tài sản (permission MEDICAL_ASSET_UPDATE — dùng lại đúng permission của khôi phục từng dòng)
+      description: "[MỚI 2026-09-17, DEV-062]"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/medical-assets/{id}:
+    get:
+      tags: [Medical Assets]
+      summary: Chi tiết tài sản (permission MEDICAL_ASSET_VIEW_DETAIL)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Asset" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Medical Assets]
+      summary: Cập nhật tài sản (permission MEDICAL_ASSET_UPDATE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateAssetRequest" }
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Asset" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Medical Assets]
+      summary: Xoá mềm tài sản (permission MEDICAL_ASSET_DELETE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Xoá thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/medical-assets/{id}/permanent:
+    delete:
+      tags: [Medical Assets]
+      summary: Xoá vĩnh viễn tài sản — chỉ áp dụng cho asset đã soft-delete (permission MEDICAL_ASSET_DELETE_PERMANENT)
+      description: >-
+        Chặn xoá nếu asset đang active (chưa soft-delete), hoặc còn
+        MedicalDeviceProfile gắn với asset này (DEV-012/IMP-018) — trả về 400.
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Xoá vĩnh viễn thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/medical-assets/{id}/restore:
+    patch:
+      tags: [Medical Assets]
+      summary: Khôi phục tài sản đã soft-delete (permission MEDICAL_ASSET_UPDATE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Khôi phục thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Asset" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/medical-assets/alerts/run:
+    post:
+      tags: [Medical Assets]
+      summary: Chạy tay kiểm tra cảnh báo bảo hành/bảo trì sắp hết hạn (permission MEDICAL_ASSET_ALERTS_TRIGGER)
+      description: Bình thường chạy tự động qua cron lúc 8h sáng hàng ngày — endpoint này để test/demo.
+      responses:
+        "200":
+          description: Chạy thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { type: object, additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/medical-assets/import/template:
+    get:
+      tags: [Medical Assets]
+      summary: Tải file Excel mẫu để import tài sản hàng loạt (permission MEDICAL_ASSET_EXCEL_IMPORT)
+      responses:
+        "200":
+          description: File Excel mẫu (.xlsx)
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/medical-assets/import:
+    post:
+      tags: [Medical Assets]
+      summary: Import tài sản hàng loạt từ Excel (permission MEDICAL_ASSET_EXCEL_IMPORT)
+      description: >
+        CHỈ TẠO MỚI (không update tài sản đã tồn tại) — cố tình không cho đổi
+        department/status/assignedTo qua import để không bỏ qua audit trail
+        của assign/transfer/return. Dùng `?dryRun=true` để xem trước, không
+        ghi DB. File mẫu: cột Danh mục (mã)/Tên tài sản/Khoa-phòng (mã)/Số
+        serial/Model/Hãng SX/Vị trí/Ngày mua/Giá mua/Hạn bảo hành/Nhà cung
+        cấp — 3 cột đầu bắt buộc.
+      parameters:
+        - name: dryRun
+          in: query
+          schema: { type: boolean, default: false }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  {
+                    type: string,
+                    format: binary,
+                    description: "File .xlsx/.xls, tối đa 5MB",
+                  }
+      responses:
+        "200":
+          description: Kết quả import (hoặc preview nếu dryRun)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/ImportAssetsResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/medical-assets/lookup/{assetCode}:
+    get:
+      tags: [Medical Assets]
+      summary: Tra cứu tài sản theo assetCode (permission MEDICAL_ASSET_INVENTORY_CHECK)
+      description: >
+        Dùng ngay sau khi quét QR (đầu đọc mã vạch/QR hoạt động như bàn
+        phím). Trả về đầy đủ thông tin để FE hiển thị cho nhân viên XÁC NHẬN
+        trước khi gọi tiếp `POST /:id/check-in` — tránh quét nhầm mã.
+      parameters:
+        - name: assetCode
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Tìm thấy tài sản
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Asset" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/medical-assets/{id}/qrcode:
+    get:
+      tags: [Medical Assets]
+      summary: Sinh ảnh QR code (PNG) cho 1 tài sản (permission MEDICAL_ASSET_VIEW_DETAIL)
+      description: >
+        QR code encode NGUYÊN VĂN `assetCode` (mã người đọc được, in trên
+        tem dán vật lý) — không phải `assetId`/URL, để không phụ thuộc domain
+        môi trường và có thể đối chiếu bằng mắt khi máy quét lỗi.
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Ảnh QR code PNG
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/medical-assets/{id}/check-in:
+    post:
+      tags: [Medical Assets]
+      summary: Ghi nhận kiểm kê — xác nhận vẫn thấy tài sản (permission MEDICAL_ASSET_INVENTORY_CHECK)
+      description: >
+        Chỉ cập nhật `lastInventoryCheckAt`/`lastInventoryCheckBy` — KHÔNG
+        đổi status/department/assignedTo (kiểm kê là xác nhận sự tồn tại,
+        không phải thay đổi vòng đời; dùng assign/transfer/return cho việc đó).
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Ghi nhận kiểm kê thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Asset" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ================= ASSET ASSIGNMENT =================
+
+  /api/medical-assets/{id}/assign:
+    post:
+      tags: [Medical Assets]
+      summary: Cấp phát tài sản từ kho cho khoa/phòng (permission MEDICAL_ASSET_ASSIGN)
+      description: >
+        [CẬP NHẬT, DEV-077] Nếu `toUser` được truyền VÀ thiết bị có
+        `MedicalDeviceProfile.operatorCertificateRequired = true`, server
+        chặn 400 nếu user đó chưa có `OperatorCertificate` còn hạn cho đúng
+        danh mục thiết bị (xem `assertOperatorCertifiedIfRequired`). Không
+        truyền `toUser` (chỉ giao cho khoa/phòng) → không kiểm tra.
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssignAssetRequest" }
+      responses:
+        "200":
+          description: Cấp phát thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Asset" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/medical-assets/{id}/transfer:
+    post:
+      tags: [Medical Assets]
+      summary: Luân chuyển tài sản đang sử dụng (permission MEDICAL_ASSET_ASSIGN)
+      description: >
+        [CẬP NHẬT, DEV-077] Cùng guard chứng chỉ vận hành đã mô tả ở
+        `POST /{id}/assign` — chỉ áp dụng khi `toUser` được truyền (đổi
+        sang user mới), KHÔNG áp dụng khi giữ nguyên/gỡ `toUser`.
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TransferAssetRequest" }
+      responses:
+        "200":
+          description: Luân chuyển thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Asset" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/medical-assets/{id}/return:
+    post:
+      tags: [Medical Assets]
+      summary: Thu hồi tài sản về kho (permission MEDICAL_ASSET_ASSIGN)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReturnAssetRequest" }
+      responses:
+        "200":
+          description: Thu hồi thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/Asset" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/medical-assets/{id}/assignment-history:
+    get:
+      tags: [Medical Assets]
+      summary: Lịch sử cấp phát/luân chuyển/thu hồi của 1 tài sản (permission MEDICAL_ASSET_VIEW_DETAIL)
+      parameters:
+        - { $ref: "#/components/parameters/IdParam" }
+        - $ref: "#/components/parameters/PageParam"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items:
+                      { $ref: "#/components/schemas/AssetAssignmentHistory" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/medical-assets/{id}/documents:
+    get:
+      tags: [Medical Assets]
+      summary: Danh sách tài liệu liên quan tới 1 tài sản (permission DOCUMENT_READ)
+      description: >
+        Dùng chung permission DOCUMENT_READ (không phải ASSET_*) vì dữ liệu
+        trả về là Document — đúng permission bảo vệ resource thật sự được
+        đọc. Gọi lại y hệt GET /api/documents (cùng service, cùng bộ
+        filter/sort/pagination) nhưng ép cứng `relatedAsset = :id` từ URL.
+        Có thể lọc thêm qua query string như bình thường, ví dụ chỉ lấy
+        manual: `?subType=MANUAL`.
+
+
+        ⚠️ Khác với GET /api/documents (dùng QueryDocumentDTO validate/coerce
+        query), route này KHÔNG có validateQuery — `page`/`limit` không được
+        ép kiểu number, filter không được whitelist qua DTO. Coi giá trị trả
+        về là "best effort", không đảm bảo validate chặt như endpoint
+        documents gốc.
+
+
+        Đây là bước "nối QR tới thông tin thiết bị": FE quét QR (chỉ encode
+        assetCode) → gọi GET /api/it-assets|medical-assets/lookup/{assetCode} lấy assetId →
+        gọi endpoint này lấy danh sách manual/tài liệu.
+      parameters:
+        - { $ref: "#/components/parameters/IdParam" }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 10 }
+        - name: category
+          in: query
+          schema: { type: string, enum: [PROPOSAL, REPORT, REFERENCE] }
+        - name: subType
+          in: query
+          schema:
+            type: string
+            enum:
+              [
+                PROPOSE_REPAIR,
+                PROPOSE_INK,
+                PROPOSE_PROCUREMENT,
+                CHECK_DAMAGE,
+                CONFIRM_STATUS,
+                MANUAL,
+              ]
+        - name: isActive
+          in: query
+          schema: { type: boolean }
+        - name: keyword
+          in: query
+          schema: { type: string, maxLength: 100 }
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum:
+              [
+                createdAt,
+                updatedAt,
+                title,
+                documentCode,
+                serviceDate,
+                actualCost,
+              ]
+            default: createdAt
+        - name: order
+          in: query
+          schema: { type: string, enum: [asc, desc], default: desc }
+        - name: workflowStatus
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected, cancelled, completed]
+        - name: createdBy
+          in: query
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+        - name: department
+          in: query
+          schema: { type: string, pattern: "^[0-9a-fA-F]{24}$" }
+        - name: fromDate
+          in: query
+          schema: { type: string, format: date }
+        - name: toDate
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Document" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ================= MEDICAL DEVICE =================
+  # ⚠️ GHI CHÚ: route file gốc (`medicalDevice.routes.ts`) chỉ định nghĩa
+  # path tương đối "/:assetId/profile" — file `app.ts` (nơi mount prefix)
+  # KHÔNG có trong lần cung cấp source này. Prefix `/api/medical-devices`
+  # dưới đây là GIẢ ĐỊNH theo đúng quy ước đặt tên đang dùng trong dự án
+  # (số nhiều, kebab-case — như `/api/asset-categories`). Vui lòng xác nhận
+  # lại đúng prefix thật trong `app.ts` (dòng `app.use("/api/...", ...)`)
+  # và báo lại nếu khác, để cập nhật chính xác.
+
+  /api/medical-assets/{assetId}/profile:
+    post:
+      tags: [Medical Assets]
       summary: Gắn profile thiết bị y tế cho 1 Asset đã tồn tại (permission MEDICAL_DEVICE_CREATE)
       description: >
         Yêu cầu Asset phải tồn tại và đang active, và CHƯA có profile nào
         khác gắn vào (unique 1-1) — nếu đã có, dùng PUT để cập nhật thay vì
         gọi lại POST.
+        [DEV-112] Asset phải có `assetType = MEDICAL` (thuộc nhánh Thiết bị y tế) — không → 400.
       parameters:
         - name: assetId
           in: path
@@ -2914,7 +4344,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
     get:
-      tags: [Medical Device]
+      tags: [Medical Assets]
       summary: Xem profile thiết bị y tế theo Asset (permission MEDICAL_DEVICE_VIEW)
       parameters:
         - name: assetId
@@ -2939,7 +4369,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
     put:
-      tags: [Medical Device]
+      tags: [Medical Assets]
       summary: Cập nhật profile thiết bị y tế (permission MEDICAL_DEVICE_UPDATE)
       description: >
         Whitelist field ở tầng service — chỉ deviceClass/registrationNumber/
@@ -2972,9 +4402,10 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
 
   # ---- GIAI ĐOẠN 2 — Ghi nhận kiểm định (Calibration Record) ----
-  /api/assets/medical-devices/{assetId}/calibration-records:
+
+  /api/medical-assets/{assetId}/calibration-records:
     post:
-      tags: [Medical Device]
+      tags: [Medical Assets]
       summary: >-
         Ghi nhận 1 lần kiểm định mới (permission MEDICAL_DEVICE_CALIBRATE)
       description: >
@@ -3063,7 +4494,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
     get:
-      tags: [Medical Device]
+      tags: [Medical Assets]
       summary: Lịch sử kiểm định theo thiết bị (permission MEDICAL_DEVICE_VIEW)
       description: Có phân trang, sắp xếp mới nhất trước theo `calibratedAt`.
       parameters:
@@ -3097,9 +4528,10 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
-  /api/assets/medical-devices/{assetId}/calibration-records/{recordId}/certificate/download:
+
+  /api/medical-assets/{assetId}/calibration-records/{recordId}/certificate/download:
     get:
-      tags: [Medical Device]
+      tags: [Medical Assets]
       summary: >-
         Tải file giấy chứng nhận kiểm định thật (permission
         MEDICAL_DEVICE_VIEW) — A2, 2026-09-15
@@ -3140,9 +4572,10 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
-  /api/assets/medical-devices/{assetId}/calibration-records/{recordId}/certificate:
+
+  /api/medical-assets/{assetId}/calibration-records/{recordId}/certificate:
     put:
-      tags: [Medical Device]
+      tags: [Medical Assets]
       summary: >-
         Thay thế chứng nhận đã lưu — sửa lỗi upload nhầm file (permission
         MEDICAL_DEVICE_CALIBRATE), bổ sung sau A2 theo yêu cầu user
@@ -3207,9 +4640,10 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
-  /api/assets/medical-devices/alerts/run:
+
+  /api/medical-assets/calibration-alerts/run:
     post:
-      tags: [Medical Device]
+      tags: [Medical Assets]
       summary: Chạy tay kiểm tra cảnh báo kiểm định + giấy phép lưu hành + chứng chỉ vận hành sắp/đã quá hạn (permission MEDICAL_DEVICE_ALERTS_TRIGGER)
       description: >
         Bình thường chạy tự động qua cron — endpoint này để test/demo thủ
@@ -3226,7 +4660,7 @@ paths:
         liên kết phải active), đúng 1 lần cho mỗi bản ghi (dùng
         `alertSentAt` chống gửi trùng — KHÔNG có endpoint sửa `expiresAt`
         của bản ghi cũ, gia hạn = tạo bản ghi mới qua
-        `POST /api/operator-certificates`).
+        `POST /api/medical-assets/operator-certificates`).
       responses:
         "200":
           description: Chạy thành công
@@ -3257,9 +4691,9 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
-  /api/operator-certificates:
+  /api/medical-assets/operator-certificates:
     post:
-      tags: [Medical Device]
+      tags: [Medical Assets]
       summary: Cấp chứng chỉ vận hành mới cho 1 user + 1 danh mục thiết bị (permission OPERATOR_CERTIFICATE_CREATE)
       description: >
         [MỚI, DEV-077] Gia hạn/cấp lại chứng chỉ = gọi lại endpoint này, tạo
@@ -3268,6 +4702,7 @@ paths:
         NHẤT 1 bản ghi có `expiresAt` trong tương lai VÀ `isActive=true`.
         [CẬP NHẬT DEV-078] Bản ghi đã tạo giờ có thể sửa/thu hồi/xoá mềm —
         xem `PATCH /:id`, `PATCH /:id/revoke`, `DELETE /:id` bên dưới.
+        [DEV-112] `deviceCategory` phải thuộc nhánh Thiết bị y tế — không → 400.
       requestBody:
         required: true
         content:
@@ -3291,7 +4726,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
     get:
-      tags: [Medical Device]
+      tags: [Medical Assets]
       summary: Danh sách chứng chỉ vận hành, phân trang (permission OPERATOR_CERTIFICATE_VIEW)
       parameters:
         - name: page
@@ -3326,9 +4761,9 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
-  /api/operator-certificates/certified-users:
+  /api/medical-assets/operator-certificates/certified-users:
     get:
-      tags: [Medical Device]
+      tags: [Medical Assets]
       summary: Danh sách user hiện có chứng chỉ hợp lệ cho 1 danh mục thiết bị (permission OPERATOR_CERTIFICATE_VIEW)
       description: >
         [MỚI, DEV-077] Dùng cho FE picker khi cấp phát/chuyển giao thiết bị
@@ -3360,9 +4795,9 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
-  /api/operator-certificates/{id}:
+  /api/medical-assets/operator-certificates/{id}:
     patch:
-      tags: [Medical Device]
+      tags: [Medical Assets]
       summary: Sửa chứng chỉ vận hành — CHỈ certificateNumber (permission OPERATOR_CERTIFICATE_UPDATE)
       description: >
         [MỚI, DEV-078] KHÔNG cho sửa issuedAt/expiresAt/user/deviceCategory —
@@ -3401,7 +4836,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
     delete:
-      tags: [Medical Device]
+      tags: [Medical Assets]
       summary: Xoá mềm chứng chỉ vận hành — lỗi nhập liệu (permission OPERATOR_CERTIFICATE_REVOKE)
       description: >
         [MỚI, DEV-078] KHÔNG bắt buộc lý do (khác `PATCH /:id/revoke`) —
@@ -3435,9 +4870,9 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
 
-  /api/operator-certificates/{id}/revoke:
+  /api/medical-assets/operator-certificates/{id}/revoke:
     patch:
-      tags: [Medical Device]
+      tags: [Medical Assets]
       summary: Thu hồi chứng chỉ vận hành — bắt buộc lý do (permission OPERATOR_CERTIFICATE_REVOKE)
       description: >
         [MỚI, DEV-078] Dùng cho chứng chỉ TỪNG hợp lệ nhưng bị rút giữa
@@ -3478,12 +4913,13 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
 
   # ================= ASSET MAINTENANCE PLAN (Roadmap B2) =================
-  /api/assets/maintenance-plans/calendar:
+
+  /api/medical-assets/maintenance-plans/calendar:
     get:
-      tags: [Asset Maintenance Plan]
+      tags: [Medical Assets]
       summary: >-
         Lịch bảo trì theo tháng, xuyên suốt mọi asset (permission
-        ASSET_MAINTENANCE_PLAN_VIEW) — Roadmap B2, 2026-09-15
+        MEDICAL_ASSET_MAINTENANCE_PLAN_VIEW) — Roadmap B2, 2026-09-15
       description: >
         Trả về TOÀN BỘ kế hoạch (mọi trạng thái — FE tự phân biệt qua
         `status`/`isOverdue`) có `scheduledDate` rơi trong tháng/năm chỉ
@@ -3517,10 +4953,10 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
-  /api/assets/maintenance-plans/asset/{assetId}:
+  /api/medical-assets/maintenance-plans/asset/{assetId}:
     post:
-      tags: [Asset Maintenance Plan]
-      summary: Lên lịch bảo trì mới cho 1 tài sản (permission ASSET_MAINTENANCE_PLAN_CREATE)
+      tags: [Medical Assets]
+      summary: Lên lịch bảo trì mới cho 1 tài sản (permission MEDICAL_ASSET_MAINTENANCE_PLAN_CREATE)
       parameters:
         - name: assetId
           in: path
@@ -3556,8 +4992,8 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
     get:
-      tags: [Asset Maintenance Plan]
-      summary: Lịch sử kế hoạch bảo trì theo 1 tài sản (permission ASSET_MAINTENANCE_PLAN_VIEW)
+      tags: [Medical Assets]
+      summary: Lịch sử kế hoạch bảo trì theo 1 tài sản (permission MEDICAL_ASSET_MAINTENANCE_PLAN_VIEW)
       description: Có phân trang, sắp xếp mới nhất trước theo `scheduledDate`.
       parameters:
         - name: assetId
@@ -3591,12 +5027,12 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
 
-  /api/assets/maintenance-plans/{id}:
+  /api/medical-assets/maintenance-plans/{id}:
     put:
-      tags: [Asset Maintenance Plan]
+      tags: [Medical Assets]
       summary: >-
         Sửa kế hoạch bảo trì CÒN "planned" (permission
-        ASSET_MAINTENANCE_PLAN_UPDATE)
+        MEDICAL_ASSET_MAINTENANCE_PLAN_UPDATE)
       description: >
         Không cho sửa kế hoạch đã "completed"/"cancelled" — giữ nguyên làm
         lịch sử. KHÔNG có field `status` trong request — đổi trạng thái
@@ -3630,10 +5066,10 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /api/assets/maintenance-plans/{id}/complete:
+  /api/medical-assets/maintenance-plans/{id}/complete:
     patch:
-      tags: [Asset Maintenance Plan]
-      summary: Đánh dấu hoàn tất kế hoạch bảo trì (permission ASSET_MAINTENANCE_PLAN_UPDATE)
+      tags: [Medical Assets]
+      summary: Đánh dấu hoàn tất kế hoạch bảo trì (permission MEDICAL_ASSET_MAINTENANCE_PLAN_UPDATE)
       parameters: [{ $ref: "#/components/parameters/IdParam" }]
       requestBody:
         content:
@@ -3661,10 +5097,10 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /api/assets/maintenance-plans/{id}/cancel:
+  /api/medical-assets/maintenance-plans/{id}/cancel:
     patch:
-      tags: [Asset Maintenance Plan]
-      summary: Huỷ kế hoạch bảo trì (permission ASSET_MAINTENANCE_PLAN_UPDATE)
+      tags: [Medical Assets]
+      summary: Huỷ kế hoạch bảo trì (permission MEDICAL_ASSET_MAINTENANCE_PLAN_UPDATE)
       parameters: [{ $ref: "#/components/parameters/IdParam" }]
       requestBody:
         content:
@@ -3693,11 +5129,316 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
 
   # ================= INVENTORY (Roadmap B3, 2026-09-15) =================
+
+  /api/medical-assets/categories:
+    post:
+      tags: [Medical Assets]
+      summary: Tạo danh mục tài sản (permission MEDICAL_ASSET_CATEGORY_CREATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateAssetCategoryRequest" }
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/AssetCategory" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    get:
+      tags: [Medical Assets]
+      summary: Danh sách danh mục tài sản (permission MEDICAL_ASSET_CATEGORY_VIEW)
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, default: 10 }
+        - $ref: "#/components/parameters/KeywordParam"
+        - name: isActive
+          in: query
+          description: >
+            Mặc định `true` nếu không truyền (Asset Categories UI, mới thêm —
+            cùng pattern `isActive` của `GET /assets`). Truyền `false` để xem
+            danh mục đã xoá mềm (phục vụ khôi phục qua PATCH .../restore).
+          schema: { type: boolean }
+        - name: group
+          in: query
+          description: >
+            [DEV-081] Chỉ danh mục thuộc nhánh của nhóm này (mọi cấp con cháu,
+            KHÔNG gồm chính nó).
+          schema: { $ref: "#/components/schemas/ObjectIdRef" }
+        - name: level
+          in: query
+          description: >
+            [DEV-081] `leaf` = chỉ danh mục cấp cuối (không có con active —
+            nơi gắn tài sản), `group` = chỉ danh mục nhóm. Không truyền = tất cả.
+          schema: { type: string, enum: [leaf, group] }
+      responses:
+        "200":
+          description: Danh sách danh mục
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/AssetCategory" }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  # [MỚI 2026-09-16, DEV-060] Xoá mềm hàng loạt — permission MEDICAL_ASSET_CATEGORY_DELETE y hệt DELETE /:id.
+
+  /api/medical-assets/categories/bulk-delete:
+    post:
+      tags: [Medical Assets]
+      summary: Xoá mềm hàng loạt danh mục tài sản (permission MEDICAL_ASSET_CATEGORY_DELETE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
+      responses:
+        "200":
+          description: OK (có thể có phần tử `failed` nếu 1 vài danh mục còn tài sản/danh mục con tham chiếu)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/medical-assets/categories/bulk-restore:
+    post:
+      tags: [Medical Assets]
+      summary: Khôi phục hàng loạt danh mục tài sản (permission MEDICAL_ASSET_CATEGORY_UPDATE — dùng lại đúng permission của khôi phục từng dòng)
+      description: "[MỚI 2026-09-17, DEV-062]"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/medical-assets/categories/{id}:
+    get:
+      tags: [Medical Assets]
+      summary: Chi tiết danh mục tài sản (permission MEDICAL_ASSET_CATEGORY_VIEW)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/AssetCategory" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Medical Assets]
+      summary: Cập nhật danh mục tài sản (permission MEDICAL_ASSET_CATEGORY_UPDATE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateAssetCategoryRequest" }
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/AssetCategory" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Medical Assets]
+      summary: Xoá mềm danh mục tài sản (permission MEDICAL_ASSET_CATEGORY_DELETE)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Xoá thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/medical-assets/categories/{id}/permanent:
+    delete:
+      tags: [Medical Assets]
+      summary: Xoá vĩnh viễn danh mục tài sản (permission MEDICAL_ASSET_CATEGORY_DELETE_PERMANENT)
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Xoá vĩnh viễn thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { message: { type: string } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/medical-assets/categories/{id}/restore:
+    patch:
+      tags: [Medical Assets]
+      summary: Khôi phục danh mục đã soft-delete (permission MEDICAL_ASSET_CATEGORY_UPDATE)
+      description: >
+        [DEV-112] Danh mục không thuộc nhánh nào (gốc chưa có `assetType`, vd
+        danh mục gốc cũ) → 400, không khôi phục.
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: Khôi phục thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/AssetCategory" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ================= DASHBOARD =================
+
+  # [MỚI 2026-09-16, DEV-060] Xoá mềm hàng loạt — permission ASSET_DELETE y hệt DELETE /:id.
+  /api/assets/lookup-options:
+    get:
+      tags: [Assets]
+      summary: Tra cứu tài sản để chọn — dùng chung cho Tài liệu / Hợp đồng (permission IT_ASSET_VIEW hoặc MEDICAL_ASSET_VIEW)
+      description: >
+        [MỚI GĐ 6, DEV-118] Thay cho `GET /api/assets` (đã gỡ ở Giai đoạn 8, DEV-120) ở các ô chọn tài sản (đề xuất sửa chữa, hợp đồng). Cần MỘT TRONG HAI quyền xem; kết quả CHỈ gồm loại mà người gọi có quyền xem (có
+        `IT_ASSET_VIEW` -> thiết bị CNTT, có `MEDICAL_ASSET_VIEW` -> thiết bị y tế). Yêu cầu `assetType` mà người
+        gọi không được xem -> 403. Chỉ tài sản đang hoạt động; chỉ trả trường tối thiểu để chọn (không giá, serial,
+        người dùng, thông số). Sắp xếp theo `assetCode`.
+      parameters:
+        - name: keyword
+          in: query
+          description: Tìm theo tên hoặc mã tài sản (không phân biệt hoa thường, ký tự đặc biệt được escape)
+          schema: { type: string, maxLength: 100 }
+        - name: assetType
+          in: query
+          schema: { type: string, enum: [IT, MEDICAL] }
+        - name: department
+          in: query
+          schema: { type: string }
+        - $ref: "#/components/parameters/PageParam"
+        - name: limit
+          in: query
+          description: Tối đa 100 (vượt -> 400)
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        _id: { type: string }
+                        assetCode: { type: string }
+                        name: { type: string }
+                        assetType: { type: string, enum: [IT, MEDICAL] }
+                        status: { type: string }
+                        department: { type: object, properties: { _id: { type: string }, code: { type: string }, name: { type: string } } }
+                        category: { type: object, properties: { _id: { type: string }, code: { type: string }, name: { type: string } } }
+                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/assets/lookup-options/{id}:
+    get:
+      tags: [Assets]
+      summary: Thông tin 1 tài sản kèm loại — để dẫn tới đúng trang chi tiết (permission IT_ASSET_VIEW hoặc MEDICAL_ASSET_VIEW)
+      description: >
+        [MỚI GĐ 7, DEV-119] Dùng cho link từ Thông báo / Tài liệu / Hợp đồng khi chỉ biết id tài sản. Cùng quyền với
+        danh sách. Tài sản thuộc loại người gọi KHÔNG xem được -> 404 (không lộ sự tồn tại). Khác danh sách: trả cả tài
+        sản đã xoá mềm (`isActive: false`) vì tài liệu/hợp đồng có thể còn tham chiếu.
+      parameters: [{ $ref: "#/components/parameters/IdParam" }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      _id: { type: string }
+                      assetCode: { type: string }
+                      name: { type: string }
+                      assetType: { type: string, enum: [IT, MEDICAL] }
+                      status: { type: string }
+                      isActive: { type: boolean }
+                      department: { type: object, properties: { _id: { type: string }, code: { type: string }, name: { type: string } } }
+                      category: { type: object, properties: { _id: { type: string }, code: { type: string }, name: { type: string } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ================= ASSET ASSIGNMENT =================
+  # ================= MEDICAL DEVICE =================
+  # ⚠️ GHI CHÚ: route file gốc (`medicalDevice.routes.ts`) chỉ định nghĩa
+  # path tương đối "/:assetId/profile" — file `app.ts` (nơi mount prefix)
+  # KHÔNG có trong lần cung cấp source này. Prefix `/api/medical-devices`
+  # dưới đây là GIẢ ĐỊNH theo đúng quy ước đặt tên đang dùng trong dự án
+  # (số nhiều, kebab-case — như `/api/asset-categories`). Vui lòng xác nhận
+  # lại đúng prefix thật trong `app.ts` (dòng `app.use("/api/...", ...)`)
+  # và báo lại nếu khác, để cập nhật chính xác.
+  # ---- GIAI ĐOẠN 2 — Ghi nhận kiểm định (Calibration Record) ----
+  # ================= ASSET MAINTENANCE PLAN (Roadmap B2) =================
+  # ================= INVENTORY (Roadmap B3, 2026-09-15) =================
   /api/inventory/alerts/run:
     post:
       tags: [Inventory]
       summary: Chạy tay kiểm tra cảnh báo tồn kho thấp (permission CONSUMABLE_ALERTS_TRIGGER)
-      description: Dùng để test/chạy thủ công ngoài lịch cron (08:15 hằng ngày) — mirror POST /api/assets/alerts/run.
+      description: Dùng để test/chạy thủ công ngoài lịch cron (08:15 hằng ngày) — mirror POST /api/it-assets|medical-assets/alerts/run.
       responses:
         "200":
           description: OK
@@ -3975,7 +5716,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  # ============ NHÓM VẬT TƯ (ConsumableCategory, 2026-09-16) — mirror /api/assets/asset-categories ============
+  # ============ NHÓM VẬT TƯ (ConsumableCategory, 2026-09-16) — mirror /api/it-assets/categories ============
   /api/inventory/categories:
     post:
       tags: [Inventory]
@@ -4632,7 +6373,7 @@ paths:
     post:
       tags: [Contracts]
       summary: Chạy tay kiểm tra cảnh báo hợp đồng sắp hết hạn (permission CONTRACT_ALERTS_TRIGGER)
-      description: Dùng để test/chạy thủ công ngoài lịch cron (08:20 hằng ngày) — mirror POST /api/assets/alerts/run.
+      description: Dùng để test/chạy thủ công ngoài lịch cron (08:20 hằng ngày) — mirror POST /api/it-assets|medical-assets/alerts/run.
       responses:
         "200":
           description: OK
@@ -4772,206 +6513,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
 
   # ================= ASSET CATEGORIES =================
-  /api/assets/asset-categories:
-    post:
-      tags: [Asset Categories]
-      summary: Tạo danh mục tài sản (permission ASSET_CATEGORY_CREATE)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/CreateAssetCategoryRequest" }
-      responses:
-        "201":
-          description: Tạo thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message: { type: string }
-                  data: { $ref: "#/components/schemas/AssetCategory" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "409": { $ref: "#/components/responses/Conflict" }
-    get:
-      tags: [Asset Categories]
-      summary: Danh sách danh mục tài sản (permission ASSET_CATEGORY_VIEW)
-      parameters:
-        - $ref: "#/components/parameters/PageParam"
-        - name: limit
-          in: query
-          schema: { type: integer, minimum: 1, default: 10 }
-        - $ref: "#/components/parameters/KeywordParam"
-        - name: isActive
-          in: query
-          description: >
-            Mặc định `true` nếu không truyền (Asset Categories UI, mới thêm —
-            cùng pattern `isActive` của `GET /assets`). Truyền `false` để xem
-            danh mục đã xoá mềm (phục vụ khôi phục qua PATCH .../restore).
-          schema: { type: boolean }
-        - name: group
-          in: query
-          description: >
-            [DEV-081] Chỉ danh mục thuộc nhánh của nhóm này (mọi cấp con cháu,
-            KHÔNG gồm chính nó).
-          schema: { $ref: "#/components/schemas/ObjectIdRef" }
-        - name: level
-          in: query
-          description: >
-            [DEV-081] `leaf` = chỉ danh mục cấp cuối (không có con active —
-            nơi gắn tài sản), `group` = chỉ danh mục nhóm. Không truyền = tất cả.
-          schema: { type: string, enum: [leaf, group] }
-      responses:
-        "200":
-          description: Danh sách danh mục
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message: { type: string }
-                  data:
-                    type: array
-                    items: { $ref: "#/components/schemas/AssetCategory" }
-                  pagination: { $ref: "#/components/schemas/PaginationMeta" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-
   # [MỚI 2026-09-16, DEV-060] Xoá mềm hàng loạt — permission ASSET_CATEGORY_DELETE y hệt DELETE /:id.
-  /api/assets/asset-categories/bulk-delete:
-    post:
-      tags: [Asset Categories]
-      summary: Xoá mềm hàng loạt danh mục tài sản (permission ASSET_CATEGORY_DELETE)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
-      responses:
-        "200":
-          description: OK (có thể có phần tử `failed` nếu 1 vài danh mục còn tài sản/danh mục con tham chiếu)
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-
-  /api/assets/asset-categories/bulk-restore:
-    post:
-      tags: [Asset Categories]
-      summary: Khôi phục hàng loạt danh mục tài sản (permission ASSET_CATEGORY_UPDATE — dùng lại đúng permission của khôi phục từng dòng)
-      description: "[MỚI 2026-09-17, DEV-062]"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/BulkDeleteRequest" }
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/BulkDeleteResponse" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-
-  /api/assets/asset-categories/{id}:
-    get:
-      tags: [Asset Categories]
-      summary: Chi tiết danh mục tài sản (permission ASSET_CATEGORY_VIEW)
-      parameters: [{ $ref: "#/components/parameters/IdParam" }]
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message: { type: string }
-                  data: { $ref: "#/components/schemas/AssetCategory" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-    put:
-      tags: [Asset Categories]
-      summary: Cập nhật danh mục tài sản (permission ASSET_CATEGORY_UPDATE)
-      parameters: [{ $ref: "#/components/parameters/IdParam" }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/UpdateAssetCategoryRequest" }
-      responses:
-        "200":
-          description: Cập nhật thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message: { type: string }
-                  data: { $ref: "#/components/schemas/AssetCategory" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-    delete:
-      tags: [Asset Categories]
-      summary: Xoá mềm danh mục tài sản (permission ASSET_CATEGORY_DELETE)
-      parameters: [{ $ref: "#/components/parameters/IdParam" }]
-      responses:
-        "200":
-          description: Xoá thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties: { message: { type: string } }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /api/assets/asset-categories/{id}/permanent:
-    delete:
-      tags: [Asset Categories]
-      summary: Xoá vĩnh viễn danh mục tài sản (permission ASSET_CATEGORY_DELETE_PERMANENT)
-      parameters: [{ $ref: "#/components/parameters/IdParam" }]
-      responses:
-        "200":
-          description: Xoá vĩnh viễn thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties: { message: { type: string } }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /api/assets/asset-categories/{id}/restore:
-    patch:
-      tags: [Asset Categories]
-      summary: Khôi phục danh mục đã soft-delete (permission ASSET_CATEGORY_UPDATE)
-      parameters: [{ $ref: "#/components/parameters/IdParam" }]
-      responses:
-        "200":
-          description: Khôi phục thành công
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message: { type: string }
-                  data: { $ref: "#/components/schemas/AssetCategory" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
   # ================= DASHBOARD =================
   /api/dashboard/admin-summary:
     get:
@@ -5140,7 +6682,19 @@ paths:
   /api/dashboard/assets/summary:
     get:
       tags: [Dashboard]
-      summary: Tổng quan tài sản (permission DASHBOARD_READ)
+      summary: Tổng quan tài sản (permission DASHBOARD_READ; thêm quyền xem đúng loại khi có assetType)
+      description: >
+        [GĐ 6] Trả thêm `byAssetType` (cơ cấu theo loại CNTT / thiết bị y tế). `totalAssets`, `byStatus`,
+        `byCategory`, `byDepartment`, `totalPurchaseValue` tính theo loại khi có `assetType`; chỉ tính tài sản
+        đang hoạt động.
+      parameters:
+        - name: assetType
+          in: query
+          description: >
+            [MỚI GĐ 6] Lọc theo loại tài sản. Không truyền = tổng hợp cả hai loại (như trước). Có truyền thì ngoài
+            DASHBOARD_READ còn cần quyền xem đúng loại (IT_ASSET_VIEW / MEDICAL_ASSET_VIEW), thiếu -> 403; giá trị
+            khác IT/MEDICAL -> 400.
+          schema: { type: string, enum: [IT, MEDICAL] }
       responses:
         "200":
           description: OK
@@ -5166,6 +6720,13 @@ paths:
         - name: daysAhead
           in: query
           schema: { type: integer, minimum: 0, default: 30 }
+        - name: assetType
+          in: query
+          description: >
+            [MỚI GĐ 6] Lọc theo loại tài sản. Không truyền = tổng hợp cả hai loại (như trước). Có truyền thì ngoài
+            DASHBOARD_READ còn cần quyền xem đúng loại (IT_ASSET_VIEW / MEDICAL_ASSET_VIEW), thiếu -> 403; giá trị
+            khác IT/MEDICAL -> 400.
+          schema: { type: string, enum: [IT, MEDICAL] }
         - $ref: "#/components/parameters/PageParam"
         - $ref: "#/components/parameters/LimitParam"
       responses:
@@ -5197,6 +6758,13 @@ paths:
         - name: daysThreshold
           in: query
           schema: { type: integer, minimum: 0, default: 7 }
+        - name: assetType
+          in: query
+          description: >
+            [MỚI GĐ 6] Lọc theo loại tài sản. Không truyền = tổng hợp cả hai loại (như trước). Có truyền thì ngoài
+            DASHBOARD_READ còn cần quyền xem đúng loại (IT_ASSET_VIEW / MEDICAL_ASSET_VIEW), thiếu -> 403; giá trị
+            khác IT/MEDICAL -> 400.
+          schema: { type: string, enum: [IT, MEDICAL] }
         - $ref: "#/components/parameters/PageParam"
         - $ref: "#/components/parameters/LimitParam"
       responses:
@@ -6386,7 +7954,7 @@ paths:
       description: >
         Bình thường chạy tự động qua cron mỗi ngày 08:10 (giờ VN) — endpoint
         này để test/demo thủ công, mirror đúng
-        `POST /api/assets/medical-devices/alerts/run`. 2 mức: (1) vừa vượt
+        `POST /api/medical-assets/calibration-alerts/run`. 2 mức: (1) vừa vượt
         `slaDays` của bước đang pending → nhắc role của bước đó, 1 lần duy
         nhất; (2) vượt ≥ 2 lần `slaDays` mà vẫn chưa xử lý → escalate lên
         ADMIN, 1 lần duy nhất.
@@ -7254,6 +8822,14 @@ components:
       properties:
         _id: { $ref: "#/components/schemas/ObjectIdRef" }
         assetCode: { type: string }
+        assetType:
+          type: string
+          enum: [IT, MEDICAL]
+          description: >
+            [DEV-112] Loại tài sản (Thiết bị CNTT / Thiết bị y tế), backend tự gán
+            theo loại của DANH MỤC GỐC khi tạo; client không gửi được (bị bỏ qua).
+            Đổi `category` sang nhánh khác loại → 400. Danh mục không thuộc nhánh
+            nào → 400 khi tạo tài sản / nhập Excel (lỗi theo dòng).
         name: { type: string }
         category:
           oneOf:
@@ -7365,6 +8941,10 @@ components:
                 code: { type: string }
                 name: { type: string }
         defaultWarrantyMonths: { type: integer, nullable: true }
+        assetType:
+          type: string
+          enum: [IT, MEDICAL]
+          description: "[DEV-112] CHỈ có trên danh mục gốc; danh mục con kế thừa loại của gốc (không có trường này)."
         isActive: { type: boolean }
         deletedAt: { type: string, format: date-time, nullable: true }
         deletedBy: { $ref: "#/components/schemas/ObjectIdRef", nullable: true }
@@ -7382,7 +8962,14 @@ components:
           description: >
             [DEV-080] Cha phải active và KHÔNG đang chứa tài sản trực tiếp
             (tài sản chỉ gắn vào danh mục cấp cuối) — vi phạm → 400.
+            [DEV-112] Cha phải thuộc 1 nhánh (gốc có loại) — không → 400.
         defaultWarrantyMonths: { type: integer, minimum: 0 }
+        assetType:
+          type: string
+          enum: [IT, MEDICAL]
+          description: >
+            [DEV-112] BẮT BUỘC khi không có `parentCategory` (danh mục gốc) —
+            thiếu → 400. CẤM khi có `parentCategory` (con kế thừa) — gửi → 400.
 
     UpdateAssetCategoryRequest:
       type: object
@@ -7395,8 +8982,18 @@ components:
             [DEV-080] `null` = gỡ danh mục cha (đưa lên cấp gốc). Khi đặt cha:
             400 nếu cha là chính nó hoặc con/cháu của nó (vòng lặp), hoặc cha
             đang chứa tài sản trực tiếp.
+            [DEV-112] Đổi cha sang nhánh khác loại, hoặc gỡ cha mà chọn loại khác,
+            chỉ được khi nhánh (gồm con cháu, kể cả đã xoá mềm) không còn tài sản
+            nào (kể cả đã xoá mềm) — còn → 400.
         defaultWarrantyMonths: { type: integer, minimum: 0 }
         isActive: { type: boolean }
+        assetType:
+          type: string
+          enum: [IT, MEDICAL]
+          description: >
+            [DEV-112] Chỉ hợp lệ khi danh mục là/trở thành gốc (gỡ cha bằng
+            `parentCategory: null` thì BẮT BUỘC gửi). Gửi khi có cha → 400. Đổi
+            loại của gốc đang có tài sản → 400.
 
     AssignAssetRequest:
       type: object
@@ -7430,6 +9027,134 @@ components:
         bản pháp lý làm căn cứ phân loại lấy từ kiến thức chung của hệ
         thống, CHƯA được xác minh lại — cần bộ phận vật tư y tế/pháp lý xác
         nhận trước khi dùng làm căn cứ tuân thủ thật.
+
+    SoftwareLicenseType:
+      type: string
+      enum: [PERPETUAL, SUBSCRIPTION]
+      description: PERPETUAL = vĩnh viễn (không có hạn); SUBSCRIPTION = thuê bao (bắt buộc có hạn).
+
+    ItDeviceProfile:
+      type: object
+      description: Hồ sơ kỹ thuật thiết bị CNTT, 1-1 với Asset loại IT.
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        asset: { $ref: "#/components/schemas/ObjectIdRef" }
+        cpu: { type: string }
+        ram: { type: string }
+        storage: { type: string }
+        gpu: { type: string }
+        ipAddress: { type: string, description: IPv4 hoặc IPv6 hợp lệ }
+        macAddress: { type: string, description: "Chuẩn hoá AA:BB:CC:DD:EE:FF" }
+        hostname: { type: string }
+        vlan: { type: integer, minimum: 1, maximum: 4094 }
+        osName: { type: string }
+        osVersion: { type: string }
+        firmwareVersion: { type: string }
+        createdBy: { $ref: "#/components/schemas/ObjectIdRef" }
+        updatedBy: { $ref: "#/components/schemas/ObjectIdRef" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ItDeviceProfileWarning:
+      type: object
+      properties:
+        code: { type: string, enum: [DUPLICATE_IP] }
+        message: { type: string }
+        assets:
+          type: array
+          items:
+            type: object
+            properties:
+              _id: { $ref: "#/components/schemas/ObjectIdRef" }
+              assetCode: { type: string }
+              name: { type: string }
+
+    UpsertItDeviceProfileRequest:
+      type: object
+      description: Mọi trường tuỳ chọn nhưng phải gửi ít nhất một. `null` hoặc chuỗi rỗng xoá trường.
+      properties:
+        cpu: { type: string, nullable: true, maxLength: 200 }
+        ram: { type: string, nullable: true, maxLength: 200 }
+        storage: { type: string, nullable: true, maxLength: 200 }
+        gpu: { type: string, nullable: true, maxLength: 200 }
+        ipAddress: { type: string, nullable: true }
+        macAddress: { type: string, nullable: true, description: "AA:BB:CC:DD:EE:FF hoặc AA-BB-CC-DD-EE-FF" }
+        hostname: { type: string, nullable: true, maxLength: 100 }
+        vlan: { type: integer, nullable: true, minimum: 1, maximum: 4094 }
+        osName: { type: string, nullable: true, maxLength: 100 }
+        osVersion: { type: string, nullable: true, maxLength: 100 }
+        firmwareVersion: { type: string, nullable: true, maxLength: 100 }
+
+    SoftwareLicense:
+      type: object
+      description: >
+        Bản quyền phần mềm. KHÔNG có trường khoá bản quyền (Q-A2). `usedSeats`, `freeSeats`, `isExpired` tính khi đọc.
+        `assets` chỉ có ở chi tiết (đã populate), không có ở danh sách.
+      properties:
+        _id: { $ref: "#/components/schemas/ObjectIdRef" }
+        softwareName: { type: string }
+        edition: { type: string }
+        version: { type: string }
+        licenseType: { $ref: "#/components/schemas/SoftwareLicenseType" }
+        totalSeats: { type: integer, minimum: 1 }
+        usedSeats: { type: integer }
+        freeSeats: { type: integer }
+        isExpired: { type: boolean }
+        assets:
+          type: array
+          items:
+            type: object
+            properties:
+              _id: { $ref: "#/components/schemas/ObjectIdRef" }
+              assetCode: { type: string }
+              name: { type: string }
+              status: { $ref: "#/components/schemas/AssetStatus" }
+        purchaseDate: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        vendor:
+          type: object
+          properties:
+            _id: { $ref: "#/components/schemas/ObjectIdRef" }
+            name: { type: string }
+        contractOrOrderNumber: { type: string }
+        proofFileId: { $ref: "#/components/schemas/ObjectIdRef" }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateSoftwareLicenseRequest:
+      type: object
+      required: [softwareName, licenseType, totalSeats]
+      properties:
+        softwareName: { type: string, maxLength: 200 }
+        edition: { type: string, maxLength: 100 }
+        version: { type: string, maxLength: 100 }
+        licenseType: { $ref: "#/components/schemas/SoftwareLicenseType" }
+        totalSeats: { type: integer, minimum: 1 }
+        purchaseDate: { type: string, format: date }
+        expiresAt: { type: string, format: date, description: Bắt buộc với SUBSCRIPTION, không được có với PERPETUAL }
+        vendor: { $ref: "#/components/schemas/ObjectIdRef" }
+        contractOrOrderNumber: { type: string, maxLength: 100 }
+
+    UpdateSoftwareLicenseRequest:
+      type: object
+      description: Mọi trường tuỳ chọn nhưng phải gửi ít nhất một; `null` xoá trường tuỳ chọn.
+      properties:
+        softwareName: { type: string, maxLength: 200 }
+        edition: { type: string, nullable: true }
+        version: { type: string, nullable: true }
+        licenseType: { $ref: "#/components/schemas/SoftwareLicenseType" }
+        totalSeats: { type: integer, minimum: 1 }
+        purchaseDate: { type: string, format: date, nullable: true }
+        expiresAt: { type: string, format: date, nullable: true }
+        vendor: { $ref: "#/components/schemas/ObjectIdRef" }
+        contractOrOrderNumber: { type: string, nullable: true }
+
+    AssignSoftwareLicenseRequest:
+      type: object
+      required: [asset]
+      properties:
+        asset: { $ref: "#/components/schemas/ObjectIdRef" }
 
     MedicalDeviceProfile:
       type: object

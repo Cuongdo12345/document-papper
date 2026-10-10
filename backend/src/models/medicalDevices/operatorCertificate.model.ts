@@ -1,4 +1,4 @@
-// models/assets/operatorCertificate.model.ts
+// models/medicalDevices/operatorCertificate.model.ts
 //
 // MODULE MỚI (DEV-077) — xem giải thích đầy đủ ở
 // `interfaces/assets/operatorCertificate.interface.ts`.

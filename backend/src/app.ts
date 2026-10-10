@@ -13,16 +13,14 @@ import userRoutes from "./routes/users/user.routes";
 import userAuditRoutes from "./routes/users/userAudit.routes";
 import performanceRoutes from "./routes/performances/performance.routes";
 import dashboardRoutes from "./routes/dashboard/dashboard.route";
+import assetLookupRoutes from "./routes/assets/assetLookup.routes";
 import exportRoutes from "./routes/excel/excel.route";
 import uploadRoutes from "./routes/upload/upload.routes";
 import workflowRoutes from "./routes/documents/workflow.routes";
 import rbacRoutes from "./routes/rbac/rbac.routes";
 import notificationRoutes from "./routes/notifications/notification.routes";
-import assetCategoryRoutes from "./routes/assets/assetCategory.routes";
-import medicalDeviceRoutes from "./routes/assets/medicalDevice.routes";
-import assetMaintenancePlanRoutes from "./routes/assets/assetMaintenancePlan.routes";
-import assetRoutes from "./routes/assets/asset.routes";
-import operatorCertificateRoutes from "./routes/assets/operatorCertificate.routes";
+import { buildAssetModuleRouter, IT_ASSET_MODULE, MEDICAL_ASSET_MODULE } from "./routes/assets/assetModule.routes";
+import softwareLicenseRoutes from "./routes/itDevices/softwareLicense.routes";
 import inventoryRoutes from "./routes/inventory/inventory.routes";
 import vendorRoutes from "./routes/vendors/vendor.routes";
 import contractRoutes from "./routes/vendors/contract.routes";
@@ -131,18 +129,14 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/workflows", workflowRoutes);
 app.use("/api/rbac", rbacRoutes)
 app.use("/api/notifications", notificationRoutes)
-app.use("/api/assets/asset-categories", assetCategoryRoutes)
-app.use("/api/assets/medical-devices", medicalDeviceRoutes)
-// Roadmap B2 (2026-09-15) — PHẢI mount TRƯỚC "/api/assets" (assetRoutes)
-// bên dưới, cùng lý do assetCategoryRoutes/medicalDeviceRoutes: Express
-// khớp theo thứ tự đăng ký, "/api/assets" (path rộng hơn, có :id ở route
-// con) sẽ "nuốt" mất "/api/assets/maintenance-plans" nếu bị đăng ký trước.
-app.use("/api/assets/maintenance-plans", assetMaintenancePlanRoutes)
-app.use("/api/assets", assetRoutes)
-// DEV-077 — module MỚI, độc lập, không có prefix con nào khác trùng/lồng
-// (KHÁC "/api/assets/*" ở trên — chứng chỉ gắn theo user+danh mục thiết bị,
-// không theo 1 Asset cụ thể, không cần nằm trong namespace "/api/assets").
-app.use("/api/operator-certificates", operatorCertificateRoutes)
+// Tách module Tài sản (DEV-115 → DEV-120): 2 module theo loại. Lớp tương thích `/api/assets*` (và
+// `/api/assets/medical-devices|asset-categories|maintenance-plans`, `/api/operator-certificates`) đã GỠ ở Giai đoạn 8.
+app.use("/api/it-assets", buildAssetModuleRouter(IT_ASSET_MODULE))
+app.use("/api/medical-assets", buildAssetModuleRouter(MEDICAL_ASSET_MODULE))
+// DEV-116 (GĐ 5): danh mục bản quyền phần mềm, gán cho máy CNTT.
+app.use("/api/software-licenses", softwareLicenseRoutes)
+// GĐ 6 (DEV-118/119): tra cứu tài sản dùng chung cho Tài liệu/Hợp đồng/Thông báo — route DUY NHẤT còn lại dưới `/api/assets`.
+app.use("/api/assets/lookup-options", assetLookupRoutes)
 // Roadmap B3 (2026-09-15) — module MỚI, không có prefix con nào khác cần
 // mount trước (không giống các nhánh /api/assets/* ở trên).
 app.use("/api/inventory", inventoryRoutes)

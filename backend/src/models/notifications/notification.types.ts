@@ -63,6 +63,9 @@ export enum NotificationType {
   // còn ≤30 ngày tới hạn, reset lại khi sửa `endDate` — cùng pattern
   // `ASSET_WARRANTY_EXPIRING`.
   CONTRACT_EXPIRING = "CONTRACT_EXPIRING",
+  // DEV-116 (tách module Tài sản, GĐ 5) — bản quyền phần mềm sắp/đã hết hạn. Gửi 1 lần, reset khi sửa `expiresAt`
+  // (cùng pattern `CONTRACT_EXPIRING`). Trigger: `softwareLicenseAlerts.service.ts`.
+  SOFTWARE_LICENSE_EXPIRING = "SOFTWARE_LICENSE_EXPIRING",
 }
 
 /**
@@ -82,6 +85,8 @@ export enum NotificationResourceType {
   CONSUMABLE_ITEM = "ConsumableItem",
   // 🔗 Roadmap B4 (module Quản lý nhà cung cấp & hợp đồng bảo trì)
   CONTRACT = "Contract",
+  // 🔗 DEV-116 (bản quyền phần mềm)
+  SOFTWARE_LICENSE = "SoftwareLicense",
 }
 
 export enum NotificationChannel {

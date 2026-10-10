@@ -1,7 +1,7 @@
 // dto/assets.dto.ts
 import { z } from "zod";
 import { objectId } from "../common.dto";
-import { AssetStatus } from "../../models/assets/asset.model";
+import { AssetStatus, AssetType } from "../../models/assets/asset.model";
 
 /* =====================================================================
    ASSET CATEGORY
@@ -12,6 +12,8 @@ export const CreateAssetCategoryDTO = z.object({
   name: z.string().trim().min(1, "Tên danh mục không được để trống"),
   parentCategory: objectId("parentCategory không hợp lệ").optional(),
   defaultWarrantyMonths: z.coerce.number().int().min(0).optional(),
+  // DEV-112: bắt buộc với danh mục gốc, cấm với danh mục con (kiểm ở service).
+  assetType: z.nativeEnum(AssetType).optional(),
 });
 
 export const UpdateAssetCategoryDTO = z.object({
@@ -20,6 +22,8 @@ export const UpdateAssetCategoryDTO = z.object({
   parentCategory: objectId("parentCategory không hợp lệ").nullable().optional(),
   defaultWarrantyMonths: z.coerce.number().int().min(0).optional(),
   isActive: z.boolean().optional(),
+  // DEV-112: chỉ hợp lệ khi danh mục là/trở thành gốc (kiểm ở service).
+  assetType: z.nativeEnum(AssetType).optional(),
 });
 
 export const QueryAssetCategoryDTO = z.object({
@@ -114,6 +118,18 @@ export const QueryAssetDTO = z.object({
     .transform((v) => (v === undefined ? undefined : v === "true")),
   sortBy: z.string().default("createdAt"),
   order: z.enum(["asc", "desc"]).default("desc"),
+});
+
+/**
+ * Tra cứu tài sản dùng chung (ô chọn tài sản ở Tài liệu / Hợp đồng) — GĐ 6. Chỉ tài sản đang hoạt động,
+ * trần 100 dòng/trang.
+ */
+export const QueryAssetLookupDTO = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  keyword: z.string().trim().max(100).optional(),
+  assetType: z.nativeEnum(AssetType).optional(),
+  department: objectId("department không hợp lệ").optional(),
 });
 
 /* =====================================================================

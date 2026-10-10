@@ -10,6 +10,7 @@
 
 import mongoose from "mongoose";
 import { Asset } from "../../../models/assets/asset.model";
+import type { AssetType } from "../../../interfaces/assets/asset.interface";
 import {
   AssetMaintenancePlan,
 } from "../../../models/assets/assetMaintenancePlan.model";
@@ -189,7 +190,7 @@ export const cancelMaintenancePlanService = async (
  * asset — filter TRONG BỘ NHỚ sau khi populate (số lượng plan/tháng dự
  * kiến nhỏ, không cần `$lookup` aggregation).
  */
-export const getMaintenanceCalendarService = async (query: any) => {
+export const getMaintenanceCalendarService = async (query: any, assetType?: AssetType) => {
   const { month, year, department } = query;
 
   const monthStart = new Date(year, month - 1, 1);
@@ -200,15 +201,17 @@ export const getMaintenanceCalendarService = async (query: any) => {
   })
     .populate({
       path: "asset",
-      select: "assetCode name department",
+      select: "assetCode name department assetType",
       populate: { path: "department", select: "code name" },
     })
     .populate(PLAN_POPULATE)
     .sort({ scheduledDate: 1 });
 
+  // DEV-115: module theo loại chỉ thấy kế hoạch của tài sản thuộc loại mình.
+  const byType = assetType ? plans.filter((p: any) => p.asset?.assetType === assetType) : plans;
   const filtered = department
-    ? plans.filter((p: any) => p.asset?.department?._id?.toString() === department)
-    : plans;
+    ? byType.filter((p: any) => p.asset?.department?._id?.toString() === department)
+    : byType;
 
   return filtered.map(withIsOverdue);
 };

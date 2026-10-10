@@ -16,6 +16,8 @@ import ExcelJS from "exceljs";
 import { Buffer } from "buffer";
 import { Types } from "mongoose";
 import { Asset, AssetStatus } from "../../../models/assets/asset.model";
+import { AssetType } from "../../../interfaces/assets/asset.interface";
+import { ASSET_TYPE_LABELS, getCategoryRootType, UNTYPED_BRANCH_MESSAGE } from "../assetType.helper";
 import { AssetCategory } from "../../../models/assets/assetCategory.model";
 import Department from "../../../models/departments/department.model";
 import ApiError from "../../../shared/errors/ApiError";
@@ -35,6 +37,8 @@ import { deletedDepartmentMessage, isDepartmentDeleted } from "../../../shared/h
 export interface AssetImportOptions {
   dryRun?: boolean;
   fileName?: string;
+  /** DEV-115: module theo loại — dòng có danh mục thuộc nhánh khác bị báo lỗi theo dòng. */
+  assetType?: AssetType;
 }
 
 /**
@@ -76,11 +80,13 @@ const parseOptionalExcelDate = (value: any, fieldLabel: string): Date | undefine
 /* =========================================================================
    EXPORT ASSETS TO EXCEL
 ========================================================================= */
-export const exportAssetsExcelPRO = async (query: any, res: any) => {
+export const exportAssetsExcelPRO = async (query: any, res: any, assetType?: AssetType) => {
   try {
     const { department, category, status, keyword } = query;
 
     const filter: any = { isActive: true };
+    // DEV-115: module theo loại chỉ xuất tài sản của loại mình.
+    if (assetType) filter.assetType = assetType;
 
     if (department) {
       if (!Types.ObjectId.isValid(department)) {
@@ -280,7 +286,7 @@ export const importAssetsExcel = async (
   userId: any,
   options: AssetImportOptions = {},
 ) => {
-  const { dryRun = false, fileName = "unknown.xlsx" } = options;
+  const { dryRun = false, fileName = "unknown.xlsx", assetType: expectedType } = options;
 
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(fileBuffer as any);
@@ -342,6 +348,11 @@ export const importAssetsExcel = async (
     ).map(String),
   );
   const departmentMap = new Map(departments.map((d: any) => [d.code, d]));
+  // DEV-112: loại tài sản theo gốc danh mục — tính 1 lần cho mỗi danh mục trong file.
+  const categoryTypeMap = new Map<string, AssetType | undefined>();
+  for (const c of categories) {
+    categoryTypeMap.set(String(c._id), await getCategoryRootType(c._id));
+  }
 
   for (let i = 2; i <= sheet.rowCount; i++) {
     const row = sheet.getRow(i);
@@ -393,6 +404,18 @@ export const importAssetsExcel = async (
         });
         continue;
       }
+      const assetType = categoryTypeMap.get(String(category._id));
+      if (!assetType) {
+        result.errors.push({ row: i, message: `Danh mục ${categoryCode}: ${UNTYPED_BRANCH_MESSAGE}` });
+        continue;
+      }
+      if (expectedType && assetType !== expectedType) {
+        result.errors.push({
+          row: i,
+          message: `Danh mục ${categoryCode} không thuộc nhánh "${ASSET_TYPE_LABELS[expectedType]}" của module này`,
+        });
+        continue;
+      }
 
       const department = departmentMap.get(departmentCode);
       if (!department) {
@@ -428,6 +451,7 @@ export const importAssetsExcel = async (
 
       await Asset.create({
         assetCode,
+        assetType,
         category: category._id,
         department: department._id,
         name,

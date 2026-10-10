@@ -1,4 +1,5 @@
 import { PERMISSIONS } from "./permission.constant";
+import { ASSET_SPLIT_ROLE_PERMISSIONS } from "./assetSplitPermissions";
 
 //📌 ADMIN có full quyền
 //📌 Các role khác chỉ lấy phần cần
@@ -63,28 +64,14 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.USER_VIEW_DETAIL,
 
     //Quyền về tài sản/thiết bị IT — IT là bộ phận trực tiếp quản lý tài sản
-    PERMISSIONS.ASSET_VIEW,
-    PERMISSIONS.ASSET_VIEW_DETAIL,
-    PERMISSIONS.ASSET_CREATE,
-    PERMISSIONS.ASSET_UPDATE,
-    PERMISSIONS.ASSET_DELETE,
-    PERMISSIONS.ASSET_ASSIGN,
-    PERMISSIONS.ASSET_ALERTS_TRIGGER,
-    PERMISSIONS.ASSET_EXCEL_EXPORT,
-    PERMISSIONS.ASSET_EXCEL_IMPORT,
-    PERMISSIONS.ASSET_INVENTORY_CHECK,
     // Roadmap B2 (2026-09-15) — IT trực tiếp quản lý tài sản nên lên lịch/
     // theo dõi bảo trì chủ động được.
-    PERMISSIONS.ASSET_MAINTENANCE_PLAN_VIEW,
-    PERMISSIONS.ASSET_MAINTENANCE_PLAN_CREATE,
-    PERMISSIONS.ASSET_MAINTENANCE_PLAN_UPDATE,
-    // ASSET_DELETE_PERMANENT CỐ TÌNH KHÔNG gán ở đây — xoá vĩnh viễn tài
+    // IT_ASSET_DELETE_PERMANENT CỐ TÌNH KHÔNG gán cho IT — xoá vĩnh viễn tài
     // sản là thao tác rủi ro cao, chỉ role ADMIN (bypass toàn bộ permission
-    // check ở authorizePermission.middleware.ts) mới thực hiện được. Nếu
-    // sau này cần cho IT tự xoá vĩnh viễn, thêm dòng
-    // `PERMISSIONS.ASSET_DELETE_PERMANENT,` tại đây một cách CÓ CHỦ ĐÍCH.
+    // check ở authorizePermission.middleware.ts) mới thực hiện được (xem
+    // assetSplitPermissions.ts). Cần cho IT tự xoá vĩnh viễn thì thêm CÓ CHỦ ĐÍCH ở đó.
     // Roadmap B3 (2026-09-15) — IT cũng quản lý tài sản/vật tư nói chung,
-    // mirror đúng bộ quyền ASSET_* ở trên.
+    // mirror đúng bộ quyền IT_ASSET_* (assetSplitPermissions.ts).
     PERMISSIONS.CONSUMABLE_VIEW,
     PERMISSIONS.CONSUMABLE_CREATE,
     PERMISSIONS.CONSUMABLE_UPDATE,
@@ -97,13 +84,13 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.CONSUMABLE_REQUEST_UPDATE,
     PERMISSIONS.CONSUMABLE_REQUEST_FULFILL,
     // Nhóm vật tư (2026-09-16) — IT cũng quản lý danh mục nhóm vật tư, mirror
-    // đúng bộ quyền ASSET_CATEGORY_* ở dưới.
+    // đúng bộ quyền IT_ASSET_CATEGORY_* (assetSplitPermissions.ts).
     PERMISSIONS.CONSUMABLE_CATEGORY_VIEW,
     PERMISSIONS.CONSUMABLE_CATEGORY_CREATE,
     PERMISSIONS.CONSUMABLE_CATEGORY_UPDATE,
     PERMISSIONS.CONSUMABLE_CATEGORY_DELETE,
     // Roadmap B4 (2026-09-16) — IT cũng làm việc với NCC/hợp đồng bảo trì
-    // thiết bị CNTT, mirror đúng bộ quyền ASSET_*/CONSUMABLE_* ở trên.
+    // thiết bị CNTT, mirror đúng bộ quyền IT_ASSET_*/CONSUMABLE_*.
     PERMISSIONS.VENDOR_VIEW,
     PERMISSIONS.VENDOR_CREATE,
     PERMISSIONS.VENDOR_UPDATE,
@@ -114,33 +101,18 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     // Khôi phục hợp đồng đã huỷ (2026-09-16, DEV-058) — IT trực tiếp quản lý
     // hợp đồng thiết bị CNTT nên cũng được khôi phục khi huỷ nhầm.
     PERMISSIONS.CONTRACT_RESTORE,
-    PERMISSIONS.ASSET_CATEGORY_VIEW,
-    PERMISSIONS.ASSET_CATEGORY_CREATE,
-    PERMISSIONS.ASSET_CATEGORY_UPDATE,
-    PERMISSIONS.ASSET_CATEGORY_DELETE,
-    // ASSET_CATEGORY_DELETE_PERMANENT cũng CỐ TÌNH KHÔNG gán ở đây, cùng lý
-    // do với ASSET_DELETE_PERMANENT ở trên.
+    // IT_ASSET_CATEGORY_DELETE_PERMANENT cũng CỐ TÌNH KHÔNG gán ở đây, cùng lý
+    // do với IT_ASSET_DELETE_PERMANENT ở trên.
     
 
-    // Medical Device — module THẬT đang chạy (khác Equipment ở trên, xem
-    // cảnh báo chi tiết ở permission.constant.ts). IT là bộ phận quản lý
-    // hồ sơ tuân thủ pháp lý thiết bị y tế.
-    PERMISSIONS.MEDICAL_DEVICE_CREATE,
+    // Medical Device — IT chỉ XEM hồ sơ/chứng chỉ thiết bị y tế (tách module
+    // Tài sản, 2026-10-09: user chốt gỡ quyền ghi y tế của IT; việc tạo/sửa hồ
+    // sơ, ghi nhận kiểm định, cấp/thu hồi chứng chỉ, chạy tay cảnh báo kiểm
+    // định thuộc PHONG_VAT_TU_TTB — xem khối role đó bên dưới). Các quyền
+    // MEDICAL_DEVICE_CREATE/UPDATE/CALIBRATE/ALERTS_TRIGGER và
+    // OPERATOR_CERTIFICATE_CREATE/UPDATE/REVOKE CỐ TÌNH KHÔNG gán cho IT.
     PERMISSIONS.MEDICAL_DEVICE_VIEW,
-    PERMISSIONS.MEDICAL_DEVICE_UPDATE,
-    // Giai đoạn 2 — ghi nhận kiểm định là hành động có tính pháp lý, chỉ
-    // IT thực hiện (không gán cho USER).
-    PERMISSIONS.MEDICAL_DEVICE_CALIBRATE,
-    // Giai đoạn 3 — chạy tay cảnh báo kiểm định, chỉ IT (cùng nguyên tắc
-    // ASSET_ALERTS_TRIGGER).
-    PERMISSIONS.MEDICAL_DEVICE_ALERTS_TRIGGER,
-    // [MỚI, DEV-077] Theo dõi chứng chỉ vận hành — IT cấp/quản lý chứng chỉ
-    // (cùng bộ phận quản lý hồ sơ tuân thủ pháp lý thiết bị y tế ở trên).
     PERMISSIONS.OPERATOR_CERTIFICATE_VIEW,
-    PERMISSIONS.OPERATOR_CERTIFICATE_CREATE,
-    // [MỚI, DEV-078] Sửa/thu hồi/xoá — cùng nhóm được tin cậy tạo mới ở trên.
-    PERMISSIONS.OPERATOR_CERTIFICATE_UPDATE,
-    PERMISSIONS.OPERATOR_CERTIFICATE_REVOKE,
 
     // Dashboard: IT trực tiếp quản lý Document/Asset nên cần xem KPI.
     PERMISSIONS.DASHBOARD_READ,
@@ -178,6 +150,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     // thống. ADMIN có sẵn qua wildcard `Object.values(PERMISSIONS)` ở đầu
     // file, không cần liệt kê lại.
     PERMISSIONS.SYSTEM_DESIGN_VIEW,
+    // Tách module Tài sản (DEV-114, Giai đoạn 8 — DEV-120 đã gỡ ASSET_* / ASSET_CATEGORY_* cũ): quyền tài sản/danh mục/bản quyền lấy từ assetSplitPermissions.ts.
+    ...ASSET_SPLIT_ROLE_PERMISSIONS.IT,
   ],
   
   //Nơi cấp quyền nếu token trả về role check đk trong này
@@ -195,9 +169,6 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.USER_CHANGE_PASSWORD,
 
     // User thường chỉ được xem tài sản (vd: xem thiết bị mình đang dùng)
-    PERMISSIONS.ASSET_VIEW,
-    PERMISSIONS.ASSET_VIEW_DETAIL,
-    PERMISSIONS.ASSET_CATEGORY_VIEW,
     // Roadmap B3 (2026-09-15) — user thường được XEM tồn kho vật tư của khoa
     // mình (vd kiểm tra còn bao nhiêu vật tư trước khi xin cấp thêm), KHÔNG
     // được tạo/sửa vật tư hay tự nhập/xuất kho — đó là việc của Phòng Vật
@@ -223,7 +194,6 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     // KHÔNG đổi status/dữ liệu quan trọng — cho phép cả user thường thực
     // hiện (không chỉ IT), vì nhân viên khoa/phòng mới là người trực tiếp
     // cầm máy quét kiểm kê thiết bị của khoa mình.
-    PERMISSIONS.ASSET_INVENTORY_CHECK,
 
     // Medical Device: user thường chỉ xem hồ sơ tuân thủ (vd: xem thiết bị
     // mình đang vận hành có cần chứng chỉ vận hành riêng không).
@@ -242,6 +212,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.WORKFLOW_VIEW,
     PERMISSIONS.WORKFLOW_CANCEL,
     PERMISSIONS.WORKFLOW_COMPLETE,
+    // Tách module Tài sản (DEV-114, Giai đoạn 8 — DEV-120 đã gỡ ASSET_* / ASSET_CATEGORY_* cũ): quyền tài sản/danh mục/bản quyền lấy từ assetSplitPermissions.ts.
+    ...ASSET_SPLIT_ROLE_PERMISSIONS.USER,
   ],
    
 // ⚠️ GIAI ĐOẠN 3 (RBAC theo chức danh thật) — 3 role mới, PHỤC VỤ ĐÚNG 1
@@ -258,8 +230,6 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   // Trưởng khoa — duyệt đề xuất/báo cáo ở cấp khoa (bước đầu quy trình).
   TRUONG_KHOA: [
     PERMISSIONS.DOCUMENT_VIEW,
-    PERMISSIONS.ASSET_VIEW,
-    PERMISSIONS.ASSET_VIEW_DETAIL,
     PERMISSIONS.MEDICAL_DEVICE_VIEW,
     // [MỚI, DEV-077] Xem chú thích ở TRUONG_KHOA/khối role Giai đoạn 3 —
     // cùng logic MEDICAL_DEVICE_VIEW (xem, không tạo).
@@ -275,6 +245,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     // khác), không có lý do nghiệp vụ nào để loại trừ 4 role này. Bổ sung để
     // KHỚP với IT/USER đã có sẵn.
     PERMISSIONS.USER_CHANGE_PASSWORD,
+    // Tách module Tài sản (DEV-114, Giai đoạn 8 — DEV-120 đã gỡ ASSET_* / ASSET_CATEGORY_* cũ): quyền tài sản/danh mục/bản quyền lấy từ assetSplitPermissions.ts.
+    ...ASSET_SPLIT_ROLE_PERMISSIONS.TRUONG_KHOA,
   ],
 
   // Điều dưỡng trưởng — cùng cấp thẩm quyền với Trưởng khoa trong quy
@@ -283,8 +255,6 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   // ai thực sự duyệt (không gộp chung 1 role cho 2 chức danh khác nhau).
   DIEU_DUONG_TRUONG: [
     PERMISSIONS.DOCUMENT_VIEW,
-    PERMISSIONS.ASSET_VIEW,
-    PERMISSIONS.ASSET_VIEW_DETAIL,
     PERMISSIONS.MEDICAL_DEVICE_VIEW,
     // [MỚI, DEV-077] Xem chú thích ở TRUONG_KHOA — cùng logic.
     PERMISSIONS.OPERATOR_CERTIFICATE_VIEW,
@@ -294,6 +264,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.DASHBOARD_READ,
     // Xem chú thích ở TRUONG_KHOA (FE-14) — cùng lý do.
     PERMISSIONS.USER_CHANGE_PASSWORD,
+    // Tách module Tài sản (DEV-114, Giai đoạn 8 — DEV-120 đã gỡ ASSET_* / ASSET_CATEGORY_* cũ): quyền tài sản/danh mục/bản quyền lấy từ assetSplitPermissions.ts.
+    ...ASSET_SPLIT_ROLE_PERMISSIONS.DIEU_DUONG_TRUONG,
   ],
 
   // Ban Giám đốc — bước duyệt CUỐI CÙNG, thẩm quyền cao nhất trừ ADMIN hệ
@@ -302,8 +274,6 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   // tiếp tạo/sửa dữ liệu.
   BAN_GIAM_DOC: [
     PERMISSIONS.DOCUMENT_VIEW,
-    PERMISSIONS.ASSET_VIEW,
-    PERMISSIONS.ASSET_VIEW_DETAIL,
     PERMISSIONS.MEDICAL_DEVICE_VIEW,
     // [MỚI, DEV-077] Xem chú thích ở TRUONG_KHOA — cùng logic.
     PERMISSIONS.OPERATOR_CERTIFICATE_VIEW,
@@ -315,6 +285,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.AUDIT_VIEW_DASHBOARD,
     // Xem chú thích ở TRUONG_KHOA (FE-14) — cùng lý do.
     PERMISSIONS.USER_CHANGE_PASSWORD,
+    // Tách module Tài sản (DEV-114, Giai đoạn 8 — DEV-120 đã gỡ ASSET_* / ASSET_CATEGORY_* cũ): quyền tài sản/danh mục/bản quyền lấy từ assetSplitPermissions.ts.
+    ...ASSET_SPLIT_ROLE_PERMISSIONS.BAN_GIAM_DOC,
   ],
   // Phòng Vật tư - Trang thiết bị y tế — ở nhiều bệnh viện đây là bộ phận
   // TÁCH RIÊNG khỏi IT/CNTT (IT lo máy tính/phần mềm, Vật tư-TTB lo mua
@@ -368,22 +340,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.DEPARTMENT_VIEW,
     PERMISSIONS.USER_VIEW,
 
-    PERMISSIONS.ASSET_VIEW,
-    PERMISSIONS.ASSET_VIEW_DETAIL,
-    PERMISSIONS.ASSET_CREATE,
-    PERMISSIONS.ASSET_UPDATE,
-    PERMISSIONS.ASSET_DELETE,
-    PERMISSIONS.ASSET_ASSIGN,
-    PERMISSIONS.ASSET_ALERTS_TRIGGER,
-    PERMISSIONS.ASSET_EXCEL_EXPORT,
-    PERMISSIONS.ASSET_EXCEL_IMPORT,
-    PERMISSIONS.ASSET_INVENTORY_CHECK,
-    PERMISSIONS.ASSET_DISPOSE,
     // Roadmap B2 (2026-09-15) — Phòng Vật tư-TTB là bộ phận chủ động lên
     // lịch bảo trì thiết bị theo đúng nghiệp vụ roadmap mô tả.
-    PERMISSIONS.ASSET_MAINTENANCE_PLAN_VIEW,
-    PERMISSIONS.ASSET_MAINTENANCE_PLAN_CREATE,
-    PERMISSIONS.ASSET_MAINTENANCE_PLAN_UPDATE,
     // Roadmap B3 (2026-09-15) — Phòng Vật tư-TTB là bộ phận trực tiếp quản
     // lý vật tư tiêu hao (nhập/xuất kho hàng ngày, nhận cảnh báo tồn kho
     // thấp), đúng theo nghiệp vụ roadmap mô tả.
@@ -419,10 +377,6 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     // bộ phận trực tiếp ký/theo dõi hợp đồng nên cũng được khôi phục khi huỷ
     // nhầm.
     PERMISSIONS.CONTRACT_RESTORE,
-    PERMISSIONS.ASSET_CATEGORY_VIEW,
-    PERMISSIONS.ASSET_CATEGORY_CREATE,
-    PERMISSIONS.ASSET_CATEGORY_UPDATE,
-    PERMISSIONS.ASSET_CATEGORY_DELETE,
 
     PERMISSIONS.MEDICAL_DEVICE_CREATE,
     PERMISSIONS.MEDICAL_DEVICE_VIEW,
@@ -467,5 +421,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     // `importedBy: req.user._id` cho user không phải ADMIN — chỉ lộ đúng
     // lịch sử của chính role này, không xem được của người khác.
     PERMISSIONS.DOCUMENT_EXCEL_HISTORY,
+    // Tách module Tài sản (DEV-114, Giai đoạn 8 — DEV-120 đã gỡ ASSET_* / ASSET_CATEGORY_* cũ): quyền tài sản/danh mục/bản quyền lấy từ assetSplitPermissions.ts.
+    ...ASSET_SPLIT_ROLE_PERMISSIONS.PHONG_VAT_TU_TTB,
   ],
 };

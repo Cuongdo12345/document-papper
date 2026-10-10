@@ -21,6 +21,7 @@ import { registerWorkflowSlaAlertsCron } from "./workflowSlaAlerts.cron";
 import { registerConsumableAlertsCron } from "./consumableAlerts.cron";
 import { registerContractAlertsCron } from "./contractAlerts.cron";
 import { registerWeeklyReportCron } from "./weeklyReport.cron";
+import { registerSoftwareLicenseAlertsCron } from "./softwareLicenseAlerts.cron";
 
 export const registerCronJobs = () => {
   registerAssetAlertsCron();
@@ -28,5 +29,6 @@ export const registerCronJobs = () => {
   registerWorkflowSlaAlertsCron();
   registerConsumableAlertsCron();
   registerContractAlertsCron();
+  registerSoftwareLicenseAlertsCron();
   registerWeeklyReportCron();
 };

@@ -15,7 +15,7 @@
 import request from "supertest";
 import { startE2EDatabase, stopE2EDatabase } from "./setup";
 import { seedRbac, seedDepartments, seedUser } from "./seedTestData";
-import { Asset, AssetStatus } from "../../models/assets/asset.model";
+import { Asset, AssetStatus, AssetType } from "../../models/assets/asset.model";
 import { AssetCategory } from "../../models/assets/assetCategory.model";
 import WorkflowTemplate from "../../models/documents/workflowTemplate.model";
 
@@ -56,9 +56,10 @@ describe("E2E — Document (PROPOSE_REPAIR/CHECK_DAMAGE) → Workflow → Asset 
       departmentId: deptA,
     });
 
-    const category = await AssetCategory.create({ code: "MAY-IN", name: "Máy in (test)" });
+    const category = await AssetCategory.create({ code: "MAY-IN", name: "Máy in (test)", assetType: AssetType.IT });
     const asset = await Asset.create({
       category: category._id,
+      assetType: AssetType.IT,
       name: "Máy in phòng khám số 1 (test)",
       department: deptA,
       status: AssetStatus.IN_USE,

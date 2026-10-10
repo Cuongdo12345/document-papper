@@ -7,8 +7,10 @@
 
 import mongoose from "mongoose";
 import { Asset } from "../../../models/assets/asset.model";
-import { MedicalDeviceProfile } from "../../../models/assets/medicalDeviceProfile.model";
+import { MedicalDeviceProfile } from "../../../models/medicalDevices/medicalDeviceProfile.model";
 import ApiError from "../../../shared/errors/ApiError";
+import { AssetType } from "../../../interfaces/assets/asset.interface";
+import { resolveAssetType } from "../assetType.helper";
 import {
   MEDICAL_DEVICE_PROFILE_UPDATE_WHITELIST,
   pickWhitelisted,
@@ -43,6 +45,11 @@ export const createMedicalDeviceProfileService = async (
   const asset = await Asset.findOne({ _id: assetId, isActive: true });
   if (!asset) {
     throw ApiError.notFound("Không tìm thấy tài sản");
+  }
+  // DEV-112: hồ sơ thiết bị y tế chỉ cho tài sản thuộc nhánh Thiết bị y tế
+  // (trước đây gắn được vào cả máy CNTT — vd máy quét mã vạch TB-KD-2023-0003).
+  if ((await resolveAssetType(asset)) !== AssetType.MEDICAL) {
+    throw ApiError.badRequest("Chỉ tạo hồ sơ thiết bị y tế cho tài sản thuộc nhánh Thiết bị y tế");
   }
 
   const existed = await MedicalDeviceProfile.findOne({ asset: assetId });

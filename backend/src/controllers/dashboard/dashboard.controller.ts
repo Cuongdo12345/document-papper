@@ -29,6 +29,7 @@ import { getOverdueApprovalsListService } from "../../services/dashboard/workflo
 import { sendWeeklyReportsService } from "../../services/dashboard/weeklyReport.service";
 
 import ApiError from "../../shared/errors/ApiError";
+import { getAssetScope } from "../../middlewares/assetScope.middleware";
 import { parsePaginationQuery, parseOptionalDate } from "../../shared/utils/Queryparsing.util";
 import { catchAsync } from "../../shared/utils/catchAsync"; 
 import { getOrSetCache } from "../../shared/cache/memoryCache";
@@ -259,10 +260,12 @@ export const getDashboardDeviceStatsData = catchAsync(async (req: Request, res: 
 
 // 💻 ASSET SUMMARY — đếm theo status/category/department + tổng giá trị mua
 export const getAssetDashboardSummary = catchAsync(async (req: Request, res: Response) => {
+  // GĐ 6: `?assetType=IT|MEDICAL` đã được middleware `authorizeAssetTypeQuery` kiểm tra giá trị + quyền xem loại đó.
+  const assetType = getAssetScope(res);
   const data = await getOrSetCache(
-    "dashboard:assetSummary",
+    `dashboard:assetSummary:${assetType ?? "ALL"}`,
     DASHBOARD_CACHE_TTL_MS,
-    () => getAssetDashboardSummaryService(),
+    () => getAssetDashboardSummaryService(assetType),
   );
 
   res.json({ success: true, data });
@@ -270,6 +273,7 @@ export const getAssetDashboardSummary = catchAsync(async (req: Request, res: Res
 
 // ⚠️ ASSET SẮP HẾT HẠN BẢO HÀNH
 export const getAssetWarrantyExpiring = catchAsync(async (req: Request, res: Response) => {
+  const assetType = getAssetScope(res); // GĐ 6 — xem getAssetDashboardSummary
   const parsedDaysAhead = Number(req.query.daysAhead);
   const daysAhead = Number.isFinite(parsedDaysAhead) && parsedDaysAhead >= 0 ? parsedDaysAhead : 30;
 
@@ -285,9 +289,9 @@ export const getAssetWarrantyExpiring = catchAsync(async (req: Request, res: Res
   });
 
   const data = await getOrSetCache(
-    `dashboard:warrantyExpiring:${daysAhead}:${page}:${limit}`,
+    `dashboard:warrantyExpiring:${assetType ?? "ALL"}:${daysAhead}:${page}:${limit}`,
     DASHBOARD_CACHE_TTL_MS,
-    () => getWarrantyExpiringListService(daysAhead, { page, limit }),
+    () => getWarrantyExpiringListService(daysAhead, { page, limit }, assetType),
   );
 
   res.json({ success: true, ...data });
@@ -295,6 +299,7 @@ export const getAssetWarrantyExpiring = catchAsync(async (req: Request, res: Res
 
 // 🔧 ASSET BẢO TRÌ QUÁ HẠN
 export const getAssetMaintenanceOverdue = catchAsync(async (req: Request, res: Response) => {
+  const assetType = getAssetScope(res); // GĐ 6 — xem getAssetDashboardSummary
   const parsedDaysThreshold = Number(req.query.daysThreshold);
   const daysThreshold = Number.isFinite(parsedDaysThreshold) && parsedDaysThreshold >= 0 ? parsedDaysThreshold : 7;
 
@@ -308,9 +313,9 @@ export const getAssetMaintenanceOverdue = catchAsync(async (req: Request, res: R
   });
 
   const data = await getOrSetCache(
-    `dashboard:maintenanceOverdue:${daysThreshold}:${page}:${limit}`,
+    `dashboard:maintenanceOverdue:${assetType ?? "ALL"}:${daysThreshold}:${page}:${limit}`,
     DASHBOARD_CACHE_TTL_MS,
-    () => getMaintenanceOverdueListService(daysThreshold, { page, limit }),
+    () => getMaintenanceOverdueListService(daysThreshold, { page, limit }, assetType),
   );
 
   res.json({ success: true, ...data });

@@ -10,19 +10,19 @@
 // NGAY TỪ ĐẦU, không đợi phát hiện lỗi silent-failure qua thực tế như đã
 // từng xảy ra với module Asset).
 
-import { MedicalDeviceProfile } from "../../../models/assets/medicalDeviceProfile.model";
-import { OperatorCertificate } from "../../../models/assets/operatorCertificate.model";
+import { MedicalDeviceProfile } from "../../../models/medicalDevices/medicalDeviceProfile.model";
+import { OperatorCertificate } from "../../../models/medicalDevices/operatorCertificate.model";
 import {
   NotificationType,
   NotificationResourceType,
   NotificationPriority,
 } from "../../../models/notifications/notification.model";
-import { Role } from "../../../models/rbac/role.model";
-import { User } from "../../../models/users/user.model";
+import { AssetType } from "../../../interfaces/assets/asset.interface";
 import {
-  notifyUsersByRoleName,
+  notifyUsersByRoleNames,
   createNotification,
 } from "../../notifications/notification.service";
+import { ALERT_RECIPIENT_ROLES, hasValidAlertRecipients } from "../assetAlertRecipients";
 
 /** Số ngày trước hạn kiểm định để bắt đầu cảnh báo — đúng §3 tài liệu thiết kế. */
 const CALIBRATION_ALERT_DAYS_BEFORE = 30;
@@ -42,43 +42,17 @@ const LICENSE_ALERT_DAYS_BEFORE = 30;
 const OPERATOR_CERTIFICATE_ALERT_DAYS_BEFORE = 30;
 
 /**
- * Role nhận cảnh báo. ĐÃ CHỐT ở §9.3 tài liệu thiết kế: dùng lại role "IT"
- * hiện có, viết dạng constant để đổi sau này (nếu tách phòng ban Vật tư-
- * Trang thiết bị y tế riêng) chỉ mất 1 dòng, không phải sửa logic cron.
+ * Người nhận cảnh báo thiết bị y tế: Phòng Vật tư-TTB VÀ IT (tách module Tài sản, GĐ 6 — plan mục 4.5, Q-G; trước
+ * đó chỉ có IT). Mỗi user nhận 1 thông báo/sự kiện. Khai báo ở `assetAlertRecipients.ts`.
  */
-const ALERT_RECIPIENT_ROLE = "IT";
+const ALERT_RECIPIENT_ROLE_NAMES = ALERT_RECIPIENT_ROLES[AssetType.MEDICAL];
 
 /**
- * ⚠️ Kiểm tra có ÍT NHẤT 1 user hợp lệ để nhận cảnh báo hay không, TRƯỚC
- * KHI xử lý bất kỳ profile nào — mirror nguyên văn lý do đã giải thích ở
- * `assetAlerts.service.ts` (không lặp lại toàn bộ giải thích ở đây, xem
- * file đó): nếu không check trước, service vẫn sẽ set
- * `calibrationAlertSentAt = now` dù chưa từng gửi được cho ai, và cron sẽ
- * KHÔNG BAO GIỜ thử lại — silent failure nguy hiểm nhất.
+ * ⚠️ Kiểm tra có ÍT NHẤT 1 user hợp lệ để nhận cảnh báo hay không, TRƯỚC KHI xử lý bất kỳ profile nào — nếu không,
+ * service vẫn set `calibrationAlertSentAt = now` dù chưa từng gửi được cho ai và cron sẽ KHÔNG BAO GIỜ thử lại
+ * (silent failure). Lý do đầy đủ: xem `hasValidAlertRecipients`.
  */
-const hasValidRecipients = async (roleName: string): Promise<boolean> => {
-  const role = await Role.findOne({ name: roleName }).select("_id");
-  if (!role) {
-    console.warn(
-      `[medicalDeviceAlerts] Không tìm thấy role "${roleName}" trong DB — bỏ qua kiểm tra cảnh báo kiểm định để tránh đánh dấu "đã gửi" nhầm.`,
-    );
-    return false;
-  }
-
-  const recipientCount = await User.countDocuments({
-    role: role._id,
-    isActive: true,
-  });
-
-  if (recipientCount === 0) {
-    console.warn(
-      `[medicalDeviceAlerts] Role "${roleName}" chưa có user nào đang active — bỏ qua kiểm tra cảnh báo kiểm định để tránh đánh dấu "đã gửi" nhầm.`,
-    );
-    return false;
-  }
-
-  return true;
-};
+const hasValidRecipients = () => hasValidAlertRecipients(ALERT_RECIPIENT_ROLE_NAMES, "medicalDeviceAlerts");
 
 /**
  * 📌 CẢNH BÁO SẮP/ĐÃ QUÁ HẠN KIỂM ĐỊNH
@@ -97,7 +71,7 @@ const hasValidRecipients = async (roleName: string): Promise<boolean> => {
  * khứ do dữ liệu cũ.
  */
 export const checkCalibrationDueService = async () => {
-  if (!(await hasValidRecipients(ALERT_RECIPIENT_ROLE))) {
+  if (!(await hasValidRecipients())) {
     return { checked: 0, notified: 0 };
   }
 
@@ -132,7 +106,7 @@ export const checkCalibrationDueService = async () => {
     const isAlreadyOverdue = profile.nextCalibrationDueDate! < now;
     const departmentName = asset.department?.name ?? "";
 
-    await notifyUsersByRoleName(ALERT_RECIPIENT_ROLE, {
+    await notifyUsersByRoleNames(ALERT_RECIPIENT_ROLE_NAMES, {
       type: NotificationType.MEDICAL_DEVICE_CALIBRATION_DUE,
       title: isAlreadyOverdue
         ? "Thiết bị y tế đã quá hạn kiểm định"
@@ -170,7 +144,7 @@ export const checkCalibrationDueService = async () => {
  * lưu hành cần theo dõi — field này optional ở model).
  */
 export const checkLicenseExpiringService = async () => {
-  if (!(await hasValidRecipients(ALERT_RECIPIENT_ROLE))) {
+  if (!(await hasValidRecipients())) {
     return { checked: 0, notified: 0 };
   }
 
@@ -202,7 +176,7 @@ export const checkLicenseExpiringService = async () => {
     const isAlreadyExpired = profile.licenseExpiredAt! < now;
     const departmentName = asset.department?.name ?? "";
 
-    await notifyUsersByRoleName(ALERT_RECIPIENT_ROLE, {
+    await notifyUsersByRoleNames(ALERT_RECIPIENT_ROLE_NAMES, {
       type: NotificationType.MEDICAL_DEVICE_LICENSE_EXPIRING,
       title: isAlreadyExpired
         ? "Thiết bị y tế đã hết hạn giấy phép lưu hành"
@@ -235,7 +209,7 @@ export const checkLicenseExpiringService = async () => {
  * do bỏ qua asset inactive ở 2 hàm trên.
  */
 export const checkOperatorCertificateExpiringService = async () => {
-  if (!(await hasValidRecipients(ALERT_RECIPIENT_ROLE))) {
+  if (!(await hasValidRecipients())) {
     return { checked: 0, notified: 0 };
   }
 
@@ -276,7 +250,7 @@ export const checkOperatorCertificateExpiringService = async () => {
       : `Chứng chỉ vận hành thiết bị "${categoryName}" của ${user.fullName} (${user.username}) sẽ hết hạn vào ${cert.expiresAt.toLocaleDateString("vi-VN")}.`;
 
     await Promise.allSettled([
-      notifyUsersByRoleName(ALERT_RECIPIENT_ROLE, {
+      notifyUsersByRoleNames(ALERT_RECIPIENT_ROLE_NAMES, {
         type: NotificationType.OPERATOR_CERTIFICATE_EXPIRING,
         title,
         message,

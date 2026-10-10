@@ -11,6 +11,7 @@ import {
   getMaintenanceCalendarService,
 } from "../../services/assets/assetDevice/assetMaintenancePlan.service";
 import { catchAsync } from "../../shared/utils/catchAsync";
+import { getAssetScope } from "../../middlewares/assetScope.middleware";
 
 export const createMaintenancePlan = catchAsync(async (req: Request, res: Response) => {
   const plan = await createMaintenancePlanService(req.params.assetId, req.body, req.user?._id);
@@ -58,7 +59,7 @@ export const cancelMaintenancePlan = catchAsync(async (req: Request, res: Respon
 });
 
 export const getMaintenanceCalendar = catchAsync(async (req: Request, res: Response) => {
-  const plans = await getMaintenanceCalendarService(req.query);
+  const plans = await getMaintenanceCalendarService(req.query, getAssetScope(res));
 
   res.json({
     message: "Lấy lịch bảo trì thành công",

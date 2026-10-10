@@ -1,6 +1,8 @@
 // models/assets/asset.model.ts
 import { Schema, model, Types } from "mongoose";
-import type { IAsset } from "../../interfaces/assets/asset.interface";
+import { AssetType, type IAsset } from "../../interfaces/assets/asset.interface";
+
+export { AssetType };
 /* ===== ENUM ===== */
 
 export enum AssetStatus {
@@ -68,6 +70,14 @@ const AssetSchema = new Schema<IAsset>(
       index: true,
     },
 
+    // DEV-112 (tách module, GĐ 1): bắt buộc. Dữ liệu cũ được gán bằng
+    // `scripts/migrate-asset-type.ts` (chạy TRƯỚC khi deploy bản này).
+    assetType: {
+      type: String,
+      enum: Object.values(AssetType),
+      required: true,
+    },
+
     isActive: { type: Boolean, default: true },
 
     specs: {
@@ -99,5 +109,8 @@ AssetSchema.index({ name: "text", assetCode: "text", serialNumber: "text" });
  * (`document.model.ts`) cho nhất quán.
  */
 AssetSchema.index({ isActive: 1, deletedAt: 1, createdAt: -1 });
+
+// DEV-112: danh sách theo module (lọc loại + trạng thái, sắp mới nhất).
+AssetSchema.index({ assetType: 1, status: 1, createdAt: -1 });
 
 export const Asset = model<IAsset>("Asset", AssetSchema);

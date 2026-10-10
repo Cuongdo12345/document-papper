@@ -1,4 +1,4 @@
-// models/assets/calibrationRecord.model.ts
+// models/medicalDevices/calibrationRecord.model.ts
 //
 // GIAI ĐOẠN 2 — Quản lý Thiết bị Y tế: lịch sử các lần kiểm định/hiệu chuẩn,
 // dùng làm bằng chứng khi thanh tra. Thiết kế đầy đủ ở

@@ -2,6 +2,12 @@
 // 2026-09-17) Regression test CHỈ cho `bulkDeleteAssetCategoryService`/
 // `bulkRestoreAssetCategoryService` (mới thêm) — không backfill coverage cho
 // các hàm khác của `assetCategory.service.ts` (ngoài scope 2 task này).
+// DEV-112: loại của nhánh danh mục. Mặc định "IT" (giữ qua clearAllMocks);
+// test cần loại khác dùng mockResolvedValueOnce.
+jest.mock("../../assetType.helper", () => ({
+  ...jest.requireActual("../../assetType.helper"),
+  getCategoryRootType: jest.fn().mockResolvedValue("IT"),
+}));
 jest.mock("../../../../models/assets/assetCategory.model", () => ({
   AssetCategory: { findOne: jest.fn(), findById: jest.fn(), exists: jest.fn() },
 }));
@@ -12,6 +18,8 @@ jest.mock("../../../../models/assets/asset.model", () => ({
 import { AssetCategory } from "../../../../models/assets/assetCategory.model";
 import { Asset } from "../../../../models/assets/asset.model";
 import { bulkDeleteAssetCategoryService, bulkRestoreAssetCategoryService } from "../assetCategory.service";
+import { getCategoryRootType } from "../../assetType.helper";
+const mockedRootType = getCategoryRootType as jest.Mock;
 
 const mockedCategory = AssetCategory as any;
 const mockedAsset = Asset as any;
@@ -59,5 +67,17 @@ describe("bulkRestoreAssetCategoryService (DEV-062)", () => {
     expect(deletedDoc.isActive).toBe(true);
     expect(result.deletedIds).toEqual([CATEGORY_ID_1]);
     expect(result.failed).toEqual([{ id: CATEGORY_ID_2, message: "Danh mục này chưa bị xoá" }]);
+  });
+
+  it("DEV-112 — danh mục chưa thuộc nhánh nào (gốc cũ không có loại) → KHÔNG khôi phục", async () => {
+    const legacyDoc: any = { _id: CATEGORY_ID_1, isActive: false, save: jest.fn() };
+    mockedCategory.findById.mockResolvedValue(legacyDoc);
+    mockedRootType.mockResolvedValueOnce(undefined);
+
+    const result = await bulkRestoreAssetCategoryService([CATEGORY_ID_1]);
+
+    expect(legacyDoc.isActive).toBe(false);
+    expect(legacyDoc.save).not.toHaveBeenCalled();
+    expect(result.failed).toEqual([{ id: CATEGORY_ID_1, message: expect.stringContaining("không thuộc nhánh") }]);
   });
 });

@@ -38,11 +38,11 @@ describe("permission.cache", () => {
   it("2 user khác nhau có cache riêng biệt, không lẫn permission của nhau", async () => {
     mockedGetPermissions
       .mockResolvedValueOnce(["DOCUMENT_READ"])
-      .mockResolvedValueOnce(["ASSET_CREATE"]);
+      .mockResolvedValueOnce(["IT_ASSET_CREATE"]);
     const p1 = await getCachedPermissions("user-1");
     const p2 = await getCachedPermissions("user-2");
     expect(p1).toEqual(["DOCUMENT_READ"]);
-    expect(p2).toEqual(["ASSET_CREATE"]);
+    expect(p2).toEqual(["IT_ASSET_CREATE"]);
     expect(mockedGetPermissions).toHaveBeenCalledTimes(2);
   });
 

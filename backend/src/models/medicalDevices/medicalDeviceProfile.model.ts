@@ -1,4 +1,4 @@
-// models/assets/medicalDeviceProfile.model.ts
+// models/medicalDevices/medicalDeviceProfile.model.ts
 //
 // MODULE MỚI — Quản lý Thiết bị Y tế, Giai đoạn 1.
 //

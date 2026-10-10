@@ -6,6 +6,7 @@
 // import và expose ra, không chứa business logic của module Asset.
 
 import { Asset, AssetStatus } from "../../models/assets/asset.model";
+import type { AssetType } from "../../interfaces/assets/asset.interface";
 import { PipelineStage } from "mongoose";
 
 /**
@@ -13,12 +14,20 @@ import { PipelineStage } from "mongoose";
  * TRONG 1 LẦN aggregate duy nhất (dùng `$facet`, cùng pattern hiệu năng đã
  * áp dụng ở `dashboard.service.ts` — quét collection 1 lần thay vì N lần
  * cho N nhóm thống kê khác nhau).
+ *
+ * Tách module Tài sản, GĐ 6: `assetType` (tuỳ chọn) lọc theo loại CNTT / thiết bị y tế; không truyền = cả hai loại
+ * (tổng hợp như trước). Luôn trả thêm `byAssetType` để Dashboard tổng hợp hiện được cơ cấu theo loại.
  */
-export const getAssetDashboardSummaryService = async () => {
+export const getAssetDashboardSummaryService = async (assetType?: AssetType) => {
   const pipeline: PipelineStage[] = [
-    { $match: { isActive: true } },
+    { $match: { isActive: true, ...(assetType ? { assetType } : {}) } },
     {
       $facet: {
+        byAssetType: [
+          { $group: { _id: "$assetType", count: { $sum: 1 } } },
+          { $project: { _id: 0, assetType: "$_id", count: 1 } },
+          { $sort: { assetType: 1 } },
+        ],
         byStatus: [
           { $group: { _id: "$status", count: { $sum: 1 } } },
           { $project: { _id: 0, status: "$_id", count: 1 } },
@@ -99,6 +108,7 @@ export const getAssetDashboardSummaryService = async () => {
   const [result] = await Asset.aggregate(pipeline);
 
   return {
+    byAssetType: result?.byAssetType ?? [],
     byStatus: result?.byStatus ?? [],
     byCategory: result?.byCategory ?? [],
     byDepartment: result?.byDepartment ?? [],
@@ -121,6 +131,7 @@ export const getAssetDashboardSummaryService = async () => {
 export const getWarrantyExpiringListService = async (
   daysAhead = 30,
   { page: pageNumber, limit: pageSize }: { page: number; limit: number },
+  assetType?: AssetType,
 ) => {
   const skip = (pageNumber - 1) * pageSize;
 
@@ -131,6 +142,7 @@ export const getWarrantyExpiringListService = async (
     isActive: true,
     warrantyExpiredAt: { $lte: threshold },
     status: { $nin: [AssetStatus.DISPOSED, AssetStatus.LOST] },
+    ...(assetType ? { assetType } : {}),
   };
 
   const [data, total] = await Promise.all([
@@ -165,6 +177,7 @@ export const getWarrantyExpiringListService = async (
 export const getMaintenanceOverdueListService = async (
   daysThreshold = 7,
   { page: pageNumber, limit: pageSize }: { page: number; limit: number },
+  assetType?: AssetType,
 ) => {
   const skip = (pageNumber - 1) * pageSize;
 
@@ -175,6 +188,7 @@ export const getMaintenanceOverdueListService = async (
     isActive: true,
     status: AssetStatus.UNDER_MAINTENANCE,
     maintenanceStartedAt: { $lte: threshold },
+    ...(assetType ? { assetType } : {}),
   };
 
   const [assets, total] = await Promise.all([

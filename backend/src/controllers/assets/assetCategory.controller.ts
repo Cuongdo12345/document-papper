@@ -11,13 +11,14 @@ import {
   bulkRestoreAssetCategoryService,
 } from "../../services/assets/assetDevice/assetCategory.service";
 import { catchAsync } from "../../shared/utils/catchAsync";
+import { getAssetScope } from "../../middlewares/assetScope.middleware";
 
 /**
  * CREATE
  */
 export const createAssetCategory = catchAsync(
   async (req: Request, res: Response) => {
-    const category = await createAssetCategoryService(req.body);
+    const category = await createAssetCategoryService(req.body, getAssetScope(res));
 
     res.status(201).json({
       message: "Tạo danh mục tài sản thành công",
@@ -31,7 +32,7 @@ export const createAssetCategory = catchAsync(
  */
 export const getAllAssetCategories = catchAsync(
   async (req: Request, res: Response) => {
-    const result = await getAllAssetCategoriesService(req.query);
+    const result = await getAllAssetCategoriesService(req.query, getAssetScope(res));
 
     res.json({
       message: "Lấy danh sách danh mục tài sản thành công",
@@ -62,6 +63,7 @@ export const updateAssetCategory = catchAsync(
     const category = await updateAssetCategoryService(
       req.params.id,
       req.body,
+      getAssetScope(res),
     );
 
     res.json({
@@ -88,7 +90,7 @@ export const deleteAssetCategory = catchAsync(
  * BULK DELETE (xoá mềm hàng loạt — DEV-060, 2026-09-16)
  */
 export const bulkDeleteAssetCategories = catchAsync(async (req: Request, res: Response) => {
-  const result = await bulkDeleteAssetCategoryService(req.body.ids, req.user?._id);
+  const result = await bulkDeleteAssetCategoryService(req.body.ids, req.user?._id, getAssetScope(res));
 
   res.json({
     message: `Đã xoá ${result.deletedIds.length}/${req.body.ids.length} danh mục tài sản`,
@@ -127,7 +129,7 @@ export const restoreAssetCategory = catchAsync(
  * BULK RESTORE (khôi phục hàng loạt — DEV-062, 2026-09-17)
  */
 export const bulkRestoreAssetCategories = catchAsync(async (req: Request, res: Response) => {
-  const result = await bulkRestoreAssetCategoryService(req.body.ids);
+  const result = await bulkRestoreAssetCategoryService(req.body.ids, getAssetScope(res));
 
   res.json({
     message: `Đã khôi phục ${result.deletedIds.length}/${req.body.ids.length} danh mục tài sản`,

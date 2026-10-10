@@ -30,7 +30,7 @@ describe("permission.service — getUserEffectivePermissions (DEV-022/RV02-02)",
         role: {
           permissions: [{ name: "DOCUMENT_VIEW" }, { name: "DOCUMENT_DELETE" }],
         },
-        extraPermissions: [{ name: "ASSET_VIEW" }],
+        extraPermissions: [{ name: "IT_ASSET_VIEW" }],
         denyPermissions: [{ name: "DOCUMENT_DELETE" }],
       }),
     );
@@ -38,7 +38,7 @@ describe("permission.service — getUserEffectivePermissions (DEV-022/RV02-02)",
     const result = await getUserEffectivePermissions("u1");
 
     expect(result).toEqual(
-      expect.arrayContaining(["DOCUMENT_VIEW", "ASSET_VIEW"]),
+      expect.arrayContaining(["DOCUMENT_VIEW", "IT_ASSET_VIEW"]),
     );
     expect(result).not.toContain("DOCUMENT_DELETE");
   });

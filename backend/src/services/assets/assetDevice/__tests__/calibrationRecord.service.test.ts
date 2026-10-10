@@ -3,10 +3,10 @@
 // `certificateFileUrl` cũ (đường dẫn chết `/uploads/<filename>`, xem comment
 // gốc `calibrationRecord.service.ts`). Mock toàn bộ Model + `fs.existsSync`
 // — cùng cách `assetAssignment.service.test.ts` đã làm, không dùng DB thật.
-jest.mock("../../../../models/assets/medicalDeviceProfile.model", () => ({
+jest.mock("../../../../models/medicalDevices/medicalDeviceProfile.model", () => ({
   MedicalDeviceProfile: { findOne: jest.fn() },
 }));
-jest.mock("../../../../models/assets/calibrationRecord.model", () => ({
+jest.mock("../../../../models/medicalDevices/calibrationRecord.model", () => ({
   CalibrationRecord: { findOne: jest.fn() },
 }));
 jest.mock("../../../../models/uploadFiles/upload.model", () => ({
@@ -18,8 +18,8 @@ jest.mock("fs", () => ({
 }));
 jest.mock("../../../../shared/utils/withTransaction");
 
-import { MedicalDeviceProfile } from "../../../../models/assets/medicalDeviceProfile.model";
-import { CalibrationRecord } from "../../../../models/assets/calibrationRecord.model";
+import { MedicalDeviceProfile } from "../../../../models/medicalDevices/medicalDeviceProfile.model";
+import { CalibrationRecord } from "../../../../models/medicalDevices/calibrationRecord.model";
 import { Upload } from "../../../../models/uploadFiles/upload.model";
 import { withTransaction } from "../../../../shared/utils/withTransaction";
 import fs from "fs";

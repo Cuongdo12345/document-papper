@@ -48,8 +48,8 @@ describe("E2E — Hợp đồng: huỷ/khôi phục hàng loạt (DEV-087)", () 
     userToken = (await request(app).post("/api/auths/login").send({ username: "ct_user", password: PASSWORD })).body.data.accessToken;
 
     vendorId = (await admin().post("/api/vendors", { name: "NCC test hàng loạt" })).body.data._id;
-    const categoryId = (await admin().post("/api/assets/asset-categories", { code: "CT-LEAF", name: "Danh mục test" })).body.data._id;
-    const asset = await admin().post("/api/assets", { category: categoryId, department: deptId, name: "Máy test hợp đồng" });
+    const categoryId = (await admin().post("/api/it-assets/categories", { code: "CT-LEAF", name: "Danh mục test", assetType: "IT" })).body.data._id;
+    const asset = await admin().post("/api/it-assets", { category: categoryId, department: deptId, name: "Máy test hợp đồng" });
     expect(asset.status).toBe(201);
     assetId = asset.body.data._id;
   }, 60_000);

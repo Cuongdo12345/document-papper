@@ -10,6 +10,12 @@ jest.mock("../../../../models/assets/asset.model", () => {
   };
 });
 
+// DEV-116: xoá/xoá vĩnh viễn tài sản gọi hook trả slot bản quyền (chạm DB) — mock, kiểm riêng ở e2e.
+jest.mock("../../../itDevices/assetLifecycle.hooks", () => ({
+  releaseAssetFromSoftwareLicenses: jest.fn().mockResolvedValue(0),
+  deleteItDeviceProfileOfAsset: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { Asset, AssetStatus } from "../../../../models/assets/asset.model";
 import { bulkDeleteAssetService, bulkRestoreAssetService } from "../asset.service";
 
