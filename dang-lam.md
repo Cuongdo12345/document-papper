@@ -2,9 +2,6 @@
 
 Danh sách NGẮN, đọc đầu mỗi phiên. Cập nhật khi xong việc, khi user ra quyết định hoặc sửa Claude. Nhật ký chi tiết vẫn là `docs/SESSION_HANDOFF.md` (CLAUDE.md §30); quyết định/sửa lỗi gắn với dự án ghi ở `ghi-chu/`.
 
-## Đang theo dõi
-- DEV-121: lần chạy CI đầu tiên trên GitHub (workflow `CI`, push lên main 2026-11-02). Xanh → xoá dòng này; đỏ → xem log, sửa.
-
 ## Chưa commit
 - Hai thay đổi của user, Claude không động vào: docs/04_DATABASE_ANALYSIS.md (đã sửa), docs/32_PROJECT_FEATURE_GUIDE.md (file mới). User tự commit.
 
