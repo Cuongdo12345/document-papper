@@ -1,10 +1,33 @@
 # ĐỀ XUẤT LỘ TRÌNH PHÁT TRIỂN TÍNH NĂNG MỚI
 
+## Quy tắc dùng tài liệu này và trạng thái triển khai (chuyển nguyên văn từ CLAUDE.md §41, 2026-11-02)
+
+Tài liệu tổng hợp đề xuất tính năng phát triển tương lai (nghiệp vụ mới):
+
+```text
+docs/development/FEATURE_DEVELOPMENT_ROADMAP.md
+```
+
+> **[CẬP NHẬT 2026-09-18] — SỬA CLAIM SAI**: dòng gốc phía trên từng ghi "chưa cái nào được duyệt/implement" — KHÔNG còn đúng. NHÓM A (A1→A4) và NHÓM B1→B3 trong tài liệu này **ĐÃ được duyệt và implement xong** (`docs/development/tasks/DEV-050.md`→`DEV-056.md`), **B4** cũng ĐÃ xong (`DEV-057.md`, Vendor & Contract), **B6** cũng ĐÃ xong (`DEV-063.md`, Tìm kiếm toàn văn Document), **B5** cũng ĐÃ xong (`DEV-064.md`, Xuất PDF chính thức — "ký" là NỘI BỘ hệ thống, KHÔNG PHẢI chữ ký số CA hợp lệ pháp lý, user đã xác nhận sau khi được cảnh báo rủi ro), **B7** cũng ĐÃ xong (`DEV-065.md`, Báo cáo tuần tự động gửi email — opt-in THẬT qua `User.subscribedToWeeklyReport`, phát hiện gap ngoài phạm vi: hiện không có đường nào sửa `email` user đã tồn tại — **gap này ĐÃ ĐƯỢC KHẮC PHỤC ở `DEV-066.md`** (2026-09-18, mở `email` cho `CreateUserDTO`/`UpdateUserDTO`, chỉ ADMIN qua `PUT /users/:id`/tạo mới, CỐ TÌNH không mở self-service)). **B8** cũng ĐÃ xong (`DEV-067.md`, 2026-09-18, Dự trù/đề xuất mua vật tư tiêu hao hàng tháng — domain MỚI `ConsumableRequest`, KHÔNG có luồng duyệt, trạng thái riêng PENDING/FULFILLED/CANCELLED, KHÔNG tự sinh `ConsumableTransaction` khi đánh dấu đã mua; **CẦN gán permission `CONSUMABLE_REQUEST_*` qua UI "Phân quyền" mới dùng được trên DB hiện tại**, cùng pattern DEV-058). **C1** (NHÓM C) cũng ĐÃ xong (`DEV-068.md`, 2026-09-19, Xác thực 2 lớp qua email OTP cho ADMIN + 3 role duyệt cấp cao — opt-in tự chọn, KHÔNG có backup codes (chỉ ADMIN reset thủ công qua `USER_RESET_2FA`); phát hiện và sửa 2 bug thật: (1) `UserAudit.action` enum thiếu action mới qua smoke test, (2) `Permission` catalog trong DB dev thiếu 6 permission mới của DEV-065/067/068 khiến UI "Phân quyền" cắt mất cả nhóm WORKFLOW_* — đã seed lại + nâng `limit:100→300`. User đã tự gán `USER_RESET_2FA` cho ADMIN qua UI + verify UI trình duyệt thật thành công — C1 DONE hoàn toàn). **C2** cũng ĐÃ xong (`DEV-069.md`, 2026-09-19, Quản lý phiên đăng nhập — self-service cho MỌI role (`SessionsSection.tsx`) + ADMIN hỗ trợ xem/thu hồi phiên user khác (permission MỚI `SESSION_VIEW_ALL`/`SESSION_REVOKE_ALL`, mirror `USER_RESET_2FA`); `RefreshToken` thêm `userAgent`/`ip`; **tuân thủ CLAUDE.md Mục 18 MỚI** — viết E2E test thật (supertest+MongoDB in-memory) verify 403 cho route RBAC mới thay vì chỉ giả định; đã chủ động seed Permission catalog + thêm audit enum trước (rút kinh nghiệm DEV-068). **C3** cũng ĐÃ xong (`DEV-070.md`, 2026-09-19, Giám sát phiên đăng nhập toàn hệ thống — GỘP với ý tưởng user đề xuất "trang admin xem phiên của toàn bộ user", KHÁC hướng gốc "export mẫu thanh tra" vì user xác nhận chưa có mẫu cụ thể để bám vào): trang riêng `/app/sessions` (`SessionsMonitorPage.tsx`) cho ADMIN xem + thu hồi phiên của TẤT CẢ user, route mới `GET /users/sessions` DÙNG LẠI permission `SESSION_VIEW_ALL`/`SESSION_REVOKE_ALL` (không tạo permission mới); phần export audit chỉ cải thiện filter "Hành động" từ chọn 1 sang chọn nhiều (gap từ FE-11). **CẦN gán `SESSION_VIEW_ALL`/`SESSION_REVOKE_ALL` cho ADMIN qua UI "Phân quyền"** (đã làm xong — user tự gán từ DEV-069) và `CONSUMABLE_REQUEST_*` cho USER/IT/PHONG_VAT_TU_TTB (DEV-067) — **[CẬP NHẬT 2026-09-22] ĐÃ XONG**: verify trực tiếp DB dev phát hiện role `IT`/`USER`/`PHONG_VAT_TU_TTB` đều CHƯA có (chỉ `ADMIN` có, do được cấp mọi permission mặc định) — đã gán thật qua `assignPermissionsToRoleService` (đúng flow API `POST /roles/:id/assign-permissions`, có clear cache + notify user, không chỉnh DB thô): `IT`/`PHONG_VAT_TU_TTB` nhận đủ VIEW/CREATE/UPDATE/FULFILL, `USER` chỉ nhận VIEW/CREATE/UPDATE (đúng thiết kế DEV-067 — FULFILL là việc của Phòng Vật tư-TTB/IT sau khi mua thực tế). Còn lại CHƯA làm: NHÓM D. Trước khi dùng tài liệu này để lập kế hoạch hoặc đối chiếu trùng lặp đề xuất, PHẢI kiểm tra mục nào đã có task `DEV-0XX` tương ứng (xem `docs/00_PROJECT_MEMORY.md`) — không mặc định cả tài liệu là "chưa làm gì".
+
+Đây là NGUỒN THAM KHẢO khi cần lên kế hoạch nâng cấp/mở rộng tính năng cho phần CÒN LẠI, KHÔNG phải toàn bộ đang chờ thực hiện.
+
+Chỉ đọc tài liệu này khi:
+
+- Người dùng hỏi về roadmap tính năng tương lai.
+- Người dùng yêu cầu lên kế hoạch nâng cấp/mở rộng tính năng mới.
+- Cần đối chiếu 1 đề xuất tính năng mới có trùng với đề xuất đã ghi nhận hay không.
+
+Không đọc file này cho task bug-fix/refactor/security thông thường nếu không liên quan.
+
+Không tự động implement bất kỳ mục nào trong tài liệu này — chỉ bắt đầu khi người dùng chỉ định cụ thể mục nào.
+
+
 > **[CẬP NHẬT 2026-09-30]** File `ROADMAP_TOI_GO_LIVE.md` được nhắc ở tài liệu này (đoạn mở đầu và mục "Cách tôi đề xuất tiếp cận") **KHÔNG tồn tại trong repo và chưa từng được commit** (đã kiểm tra `git log --all`). Tài liệu có vai trò tương đương:
 > - vá lỗi / hoàn thiện: `docs/development/00_DEVELOPMENT_ROADMAP.md` (lịch sử, DEV-001→025) và `docs/31_BACKEND_CODE_REVIEW.md` (lỗi còn mở);
 > - go-live: `docs/development/PRODUCTION_DEPLOYMENT_PLAN.md` (PLANNED, chưa triển khai).
 >
-> Tình trạng các nhóm: Nhóm A, B và C đều đã có task (xem CLAUDE.md §41). Nhóm D chưa làm. Có 2 mục làm KHÁC bản gốc theo lựa chọn của user:
+> Tình trạng các nhóm: Nhóm A, B và C đều đã có task (xem mục "Quy tắc dùng tài liệu này và trạng thái triển khai" ngay bên dưới — trước đây ở CLAUDE.md §41). Nhóm D chưa làm. Có 2 mục làm KHÁC bản gốc theo lựa chọn của user:
 > - **B8** không có luồng duyệt (DEV-067);
 > - **C3** làm thành giám sát phiên toàn hệ thống (DEV-070). Phần "xuất audit theo mẫu thanh tra" chưa làm, vì chưa có mẫu cụ thể.
 

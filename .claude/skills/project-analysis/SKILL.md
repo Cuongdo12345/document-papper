@@ -5,7 +5,7 @@ description: Quy tắc làm việc với dự án Document Papper sau khi đã h
 
 # SKILL V3 — PROJECT KNOWLEDGE & DEVELOPMENT
 
-> **Rulebook đã rà soát khớp thực tế project đến: `DEV-120` / `FE-45` (2026-10-10; lần trước: `DEV-099` / `FE-40`, 2026-09-30; trước nữa: `DEV-056` / `FE-16`, 2026-09-16).** Nếu task mới nhất chênh lệch lớn so với 2 mốc này, đối chiếu lại §3/§8/§20 trước khi tin tuyệt đối.
+> **Rulebook đã rà soát khớp thực tế project đến: `DEV-120` / `FE-45` (2026-10-10; lần trước: `DEV-099` / `FE-40`, 2026-09-30; trước nữa: `DEV-056` / `FE-16`, 2026-09-16).** Nếu task mới nhất chênh lệch lớn so với 2 mốc này, đối chiếu lại §8, `docs/rules/KNOWLEDGE_BASE_MAP.md` (trước đây §3) và `CLAUDE.md` §30 (trước đây §20) trước khi tin tuyệt đối.
 
 ## 1. MỤC ĐÍCH
 
@@ -26,91 +26,22 @@ Mục tiêu hiện tại:
 
 ## 2. THỨ TỰ NGUỒN SỰ THẬT
 
-Ưu tiên:
+Bản chính: `CLAUDE.md` §3 *(gộp 2026-11-02)*.
 
-SOURCE CODE
->
-CONFIGURATION
->
-TESTS
->
-DATABASE/API DEFINITIONS
->
-CURRENT DOCUMENTATION
->
-HISTORICAL ANALYSIS
->
-COMMENTS
->
-ASSUMPTIONS
-
-Nếu tài liệu cũ khác source hiện tại:
-
-1. Kiểm tra source.
-2. Xác định thông tin cũ.
-3. Ghi nhận OUTDATED nếu cần.
-4. Cập nhật memory/tài liệu liên quan.
-
-Không được âm thầm coi historical analysis là hiện trạng.
+Cốt lõi: source code hiện tại > cấu hình > test > định nghĩa API/DB > tài liệu hiện hành > phân tích lịch sử > comment > giả định. Tài liệu cũ mâu thuẫn source → kiểm tra source, đánh dấu OUTDATED, cập nhật memory/tài liệu; không âm thầm coi historical analysis là hiện trạng.
 
 ---
 
 ## 3. KNOWLEDGE BASE
 
-Tài liệu chính:
+Danh sách tài liệu KHÔNG còn nhân đôi ở đây *(gộp 2026-11-02)*: nguồn duy nhất là `docs/rules/KNOWLEDGE_BASE_MAP.md` (cây tài liệu, tài liệu phát triển `docs/development/`, tài liệu frontend `docs/frontend/`, task `DEV-XXX` / `FE-XX`, `docs/rules/`).
 
-- `docs/00_PROJECT_MEMORY.md`
-- `docs/01_PROJECT_OVERVIEW.md`
-- `docs/02_ARCHITECTURE.md`
-- `docs/03_BACKEND_ANALYSIS.md`
-- `docs/04_DATABASE_ANALYSIS.md`
-- `docs/05_API_ANALYSIS.md`
-- `docs/07_AUTH_RBAC_ANALYSIS.md`
-- `docs/08_BUSINESS_LOGIC.md`
-- `docs/09_SECURITY_ANALYSIS.md`
-- `docs/10_PERFORMANCE_ANALYSIS.md`
-- `docs/11_TECHNICAL_DEBT.md`
-- `docs/12_ISSUES_AND_RISKS.md`
-- `docs/13_FINAL_PROJECT_REPORT.md`
+Cần nhớ ngay:
 
-**[CẬP NHẬT 2026-09-16]** `docs/06_FRONTEND_ANALYSIS.md` KHÔNG tồn tại — không phải thiếu sót, đã thay bằng hệ thống doc riêng `docs/frontend/` (xem bên dưới).
-
-Tài liệu bổ sung nếu tồn tại:
-
-- `docs/14_ANALYSIS_AUDIT.md`
-- `docs/15_ARCHITECTURE_REVIEW.md`
-- `docs/16_REFACTORING_PLAN.md`
-- `docs/17_SECURITY_HARDENING_PLAN.md`
-- `docs/18_TESTING_STRATEGY.md`
-- `docs/19_IMPROVEMENT_ROADMAP.md`
-- `docs/20_GLOBAL_SECURITY_REVIEW.md`
-- `docs/21_GLOBAL_ARCHITECTURE_REVIEW.md`
-- `docs/22_GLOBAL_TESTING_REVIEW.md`
-- `docs/23_CODE_REVIEW_ROADMAP.md`
-- `docs/30_DEVELOPMENT_COMPLETION_AUDIT.md`
-- `docs/31_BACKEND_CODE_REVIEW.md` — [2026-09-29] review toàn bộ backend (lỗi + hiệu năng), BR-01→BR-22 + 3 câu hỏi nghiệp vụ; mới nhất, đọc trước khi sửa lỗi backend
-- `docs/module-reviews/` — review chi tiết theo domain, index tại `docs/review-index/`
-
-**[CẬP NHẬT 2026-09-16]** Tài liệu phát triển sau-phân-tích (điều phối task-based development, chưa từng được liệt kê ở đây):
-
-- `docs/development/00_DEVELOPMENT_ROADMAP.md` — [CẬP NHẬT 2026-09-30] LỊCH SỬ, roadmap P0→P3 gốc chỉ gồm DEV-001→025 (đã DONE hết). Việc hiện tại/tiếp theo xem `docs/SESSION_HANDOFF.md` + `docs/31_BACKEND_CODE_REVIEW.md`
-- `docs/development/FEATURE_DEVELOPMENT_ROADMAP.md` — đề xuất tính năng, xem `docs/00_PROJECT_MEMORY.md` để biết mục nào ĐÃ implement trước khi coi là "chưa làm"
-- `docs/development/PRODUCTION_DEPLOYMENT_PLAN.md` — [2026-09-22] kế hoạch deploy production, trạng thái PLANNED, không tự ý bắt đầu Giai đoạn nào khi chưa được user chỉ định
-- `docs/development/DEV-001A_SUPER_ADMIN_IDENTITY_PLAN.md` — [2026-09-30] kế hoạch Super-Admin (`role.isSystemRole`), ĐÃ HOÀN TẤT, giữ làm lịch sử quyết định
-- `docs/development/ASSET_MODULE_SPLIT_PLAN.md` — [2026-10-10] kế hoạch tách module Tài sản thành Thiết bị CNTT / Thiết bị y tế (Giai đoạn 0→8), ĐÃ HOÀN TẤT (DEV-111→120, FE-42→45), giữ làm lịch sử quyết định
-- `docs/development/changes/`, `docs/development/decisions/` — [2026-09-30] hiện rỗng, chưa dùng
-
-**[CẬP NHẬT 2026-09-16]** Tài liệu frontend (thay cho `06_FRONTEND_ANALYSIS.md`):
-
-- `docs/frontend/FRONTEND_MEMORY.md` — index kiến thức frontend, vai trò tương đương PROJECT_MEMORY
-- `docs/frontend/API_REFERENCE.md`, `docs/frontend/ROUTE_PERMISSION_MAP.md`, `docs/frontend/AUTH_RBAC_MAP.md` — [2026-10-10] bản đồ API / route↔permission / RBAC phía frontend, cập nhật mỗi khi đổi route hoặc quyền
-- `docs/frontend/phases/` — [2026-09-30] ghi chú theo phase nhỏ, hiện có 1 file
-
-Task:
-
-- `docs/development/tasks/DEV-XXX.md` — task backend (quy ước thật đang dùng). Ngoại lệ hậu tố: `DEV-001A`, `DEV-009A` là task con/kế thừa của task gốc cùng số
-- `docs/frontend/tasks/FE-XX.md` — task frontend (quy ước thật đang dùng)
-- `docs/tasks/` — LEGACY, dừng ở `TASK-001`/`TASK-002`, không dùng tiếp
+- Điểm vào: `docs/00_PROJECT_MEMORY.md`; frontend: `docs/frontend/FRONTEND_MEMORY.md`; trạng thái hiện tại: `docs/SESSION_HANDOFF.md`.
+- `docs/06_FRONTEND_ANALYSIS.md` KHÔNG tồn tại (đã thay bằng `docs/frontend/`).
+- Task thật: `docs/development/tasks/DEV-XXX.md`, `docs/frontend/tasks/FE-XX.md`; `docs/tasks/` là LEGACY.
+- Khi tạo thư mục/file doc cấp cao mới: thêm con trỏ vào `docs/rules/KNOWLEDGE_BASE_MAP.md` (không thêm vào đây).
 
 Không đọc toàn bộ docs. Chỉ đọc tài liệu có liên quan.
 
@@ -316,159 +247,49 @@ SMALL
 
 ## 10. API RULES
 
-Khi sửa API, trace:
+Checklist đầy đủ (trace Route → Middleware → Controller → Service → DTO/Validation → Model → Response; endpoint, method, request, response, status code, authn/authz, validation, error handling, OpenAPI, frontend consumers) ở `docs/rules/ENGINEERING_CHECKLISTS.md` §16–§17 *(gộp 2026-11-02)*.
 
-`Route → Middleware → Controller → Service → DTO/Validation → Model → Response`
-
-Kiểm tra:
-
-- Endpoint
-- Method
-- Request
-- Response
-- Status code
-- Authentication
-- Authorization
-- Validation
-- Error handling
-- OpenAPI
-- Frontend consumers
-
-Source implementation là hiện trạng.
-
-Nếu contract thay đổi, cập nhật OpenAPI khi phù hợp.
+Cốt lõi: source implementation là hiện trạng; đổi contract thì cập nhật OpenAPI khi phù hợp và kiểm tra frontend consumers.
 
 ---
 
 ## 11. DATABASE RULES
 
-Trước thay đổi database:
+Checklist đầy đủ (model, field, quan hệ, index, query, transaction, backward compatibility, hiệu năng) ở `docs/rules/ENGINEERING_CHECKLISTS.md` §15 *(gộp 2026-11-02)*.
 
-Kiểm tra:
-
-- Model/schema
-- Fields
-- Relationships
-- Indexes
-- Queries
-- Aggregations
-- Transactions
-- Validation
-- Existing data assumptions
-
-Đánh giá:
-
-- Backward compatibility
-- Existing records
-- Performance
-- API impact
-- Transaction behavior
-
-Không destructive change nếu chưa được phép.
+Cốt lõi: KHÔNG thay đổi database kiểu destructive nếu chưa được phép.
 
 ---
 
 ## 12. AUTHENTICATION / RBAC
 
-Với chức năng protected:
+Bản chính: `CLAUDE.md` §18 *(gộp 2026-11-02)*.
 
-`Request → Authentication → User → Role → Permission → Resource → Authorization`
-
-Luôn kiểm tra cả:
-
-- Authentication
-- Authorization
-
-Không giả định:
-
-`Authenticated = Authorized`
-
-Tính năng MỚI (route/action mới có ý nghĩa bảo mật) — bắt buộc, không phải tuỳ chọn:
-
-- Phải có middleware permission/RBAC tương ứng, không kế thừa ngầm từ route lân cận.
-- Phải nêu rõ trong response: permission nào, gắn ở file:dòng nào.
-- Phải verify bằng user KHÔNG có quyền đó → xác nhận bị chặn (401/403).
-- "Security impact đã xét" ở §26 Quality Gate KHÔNG tính là đủ nếu thiếu 3 việc trên với tính năng mới.
+Cốt lõi: luôn kiểm tra cả Authentication lẫn Authorization (`Authenticated ≠ Authorized`). Route/tính năng MỚI có ý nghĩa bảo mật bắt buộc: (1) có middleware permission/RBAC riêng, không kế thừa ngầm; (2) nêu rõ permission nào, gắn ở file:dòng nào; (3) verify bằng user KHÔNG có quyền → bị chặn 401/403. Thiếu 3 việc này thì "Security impact đã xét" ở §26 Quality Gate KHÔNG tính là đủ.
 
 ---
 
 ## 13. BUSINESS LOGIC
 
-Chỉ kết luận dựa trên evidence.
+Quy tắc và mẫu ghi business rule (Rule ID, Rule, Evidence, File, Function/Class, Confidence) ở `docs/rules/ENGINEERING_CHECKLISTS.md` §19 *(gộp 2026-11-02)*.
 
-Dùng:
-
-- `CONFIRMED`
-- `INFERRED`
-- `UNKNOWN`
-
-Rule quan trọng:
-
-- Rule ID
-- Rule
-- Evidence
-- File
-- Function/Class
-- Confidence
-
-Không tự tạo business requirement.
+Cốt lõi: chỉ kết luận dựa trên evidence; dùng `CONFIRMED` / `INFERRED` / `UNKNOWN`; không tự tạo business requirement.
 
 ---
 
 ## 14. SECURITY
 
-Security review phải dựa trên source code.
+Checklist security và mẫu finding (`ID | Severity | Evidence | Source | Impact | Recommendation | Confidence`) ở `docs/rules/ENGINEERING_CHECKLISTS.md` §23 *(gộp 2026-11-02)*.
 
-Kiểm tra khi liên quan:
-
-- Authentication
-- Authorization/RBAC
-- JWT/refresh token
-- Password
-- Input validation
-- File upload/download
-- Path traversal
-- Injection
-- XSS
-- CORS/CSRF
-- Secrets
-- Error leakage
-- Sensitive data
-- Audit log
-
-Finding:
-
-`ID | Severity | Evidence | Source | Impact | Recommendation | Confidence`
-
-Không exploit trái phép.
+Cốt lõi: security review dựa trên source code; không exploit trái phép.
 
 ---
 
 ## 15. TEST SAU IMPLEMENTATION
 
-Dùng command thực tế từ `package.json`.
+Bản chính: `CLAUDE.md` §28 *(gộp 2026-11-02)*.
 
-Khi phù hợp:
-
-1. Test liên quan.
-2. Type check.
-3. Lint.
-4. Build backend (nếu đổi backend/).
-5. Build frontend: cd frontend && npm run build — bắt buộc nếu đổi bất kỳ gì trong frontend/.
-6. Kiểm tra runtime error.
-7. `git diff`.
-
-Không tự tạo command không có trong project.
-
-Nếu không test được, phải nói rõ:
-
-- Vì sao.
-- Đã thử gì.
-- Điều gì chưa được xác minh.
-
-Không nói "đã test" nếu chưa chạy test.
-
-Không skip/disable/comment-out test đang FAIL để né lỗi (kể cả .skip()/.only() che test fail). Test fail không rõ nguyên nhân → báo rõ test nào, lỗi gì, nghi ngờ do đâu. Chỉ skip/xoá khi user xác nhận test không còn hợp lệ.
+Cốt lõi: dùng command thực tế từ `package.json`, không tự bịa; sửa `frontend/` thì bắt buộc `cd frontend && npm run build`; không nói "đã test" nếu chưa chạy; không skip/disable/comment-out test đang FAIL.
 
 ---
 
@@ -506,53 +327,17 @@ Tìm:
 
 ## 17. GIT SAFETY
 
-Trước sửa:
+Bản chính: `CLAUDE.md` §27 *(gộp 2026-11-02)*.
 
-`git status`
-`git branch`
-
-Sau sửa:
-
-`git diff`
-
-Không tự:
-
-- reset
-- force push
-- rewrite history
-- checkout branch khác
-- xóa untracked files
-- commit
-
-nếu chưa được user cho phép.
+Cốt lõi: `git status` + `git branch` trước khi sửa, `git diff` sau khi sửa; không tự reset / force push / rewrite history / checkout branch khác / xoá untracked / commit nếu chưa được user cho phép.
 
 ---
 
 ## 18. FILE UPLOAD / EXPORT
 
-Khi task liên quan file:
+Checklist upload/download/export (MIME, extension, size, filename, storage, path traversal, access control, cleanup, streaming, memory) ở `docs/rules/ENGINEERING_CHECKLISTS.md` §22 *(gộp 2026-11-02)*.
 
-Kiểm tra:
-
-- MIME
-- Extension
-- Size
-- Filename
-- Storage
-- Path traversal
-- Access control
-- Cleanup
-- Streaming
-- Memory
-
-Export:
-
-- Excel
-- PDF
-- CSV
-- Large dataset
-
-Đặc biệt chú ý memory và performance.
+Cốt lõi: export lớn (Excel/PDF/CSV) phải chú ý memory và performance.
 
 ---
 
@@ -580,37 +365,9 @@ Không cập nhật tài liệu bằng assumption.
 
 ## 20. SESSION HANDOFF
 
-Dùng:
+Bản chính: `CLAUDE.md` §30; mẫu các trường: `docs/rules/SESSION_HANDOFF_TEMPLATE.md` *(gộp 2026-11-02)*.
 
-`docs/SESSION_HANDOFF.md`
-
-khi:
-
-- Task chưa hoàn thành.
-- Cần tiếp tục session sau.
-- Context/session sắp kết thúc.
-- Có trạng thái quan trọng cần bàn giao.
-- Task VỪA DONE trọn vẹn trong cùng phiên — đây là điều kiện quan trọng nhất trên thực tế nhưng dễ bị bỏ qua nhất, vì 4 điều kiện trên đều ngầm hiểu "task còn dở". Đã có bằng chứng SESSION_HANDOFF.md từng đứng yên 28+ task backend/12+ task frontend chỉ vì mỗi task đều DONE gọn trong 1 phiên. Chỉ cần cập nhật ngắn phần Current Task/Status/Next Action, không cần chép lại toàn bộ narrative.
-
-Tối thiểu:
-
-- Current Task
-- Status
-- Objective
-- Completed
-- Current Understanding
-- Files Analyzed
-- Files Modified
-- Important Functions
-- API Impact
-- Database Impact
-- Security Impact
-- Tests
-- Known Problems
-- Unresolved Questions
-- Exact Next Action
-
-`Exact Next Action` phải là hành động cụ thể.
+Cốt lõi: cập nhật `docs/SESSION_HANDOFF.md` sau MỌI task, kể cả task DONE trọn vẹn trong cùng phiên (trước đây file này đứng yên 28+ task backend / 12+ task frontend vì chỉ cập nhật khi task còn dở); `Exact Next Action` phải là hành động cụ thể.
 
 ---
 
@@ -632,58 +389,25 @@ Không dựng lại knowledge từ conversation history nếu docs đã có.
 
 ## 22. EVIDENCE STANDARD
 
-Finding quan trọng phải có:
+Chuẩn đầy đủ (ví dụ mẫu) ở `docs/rules/EVIDENCE_AND_QUALITY.md` §34 *(gộp 2026-11-02)*.
 
-`FILE + FUNCTION/CLASS + OBSERVED BEHAVIOR`
-
-Ví dụ:
-
-File:
-`backend/src/services/documents/document.service.ts`
-
-Function:
-`createDocumentService()`
-
-Observed:
-Service tạo Document và thực hiện thêm logic notification.
-
-Impact:
-Business responsibility bị coupling.
-
-Confidence:
-HIGH
-
-Không dùng kết luận mơ hồ như:
-
-"Code có vẻ không tối ưu."
+Cốt lõi: finding quan trọng = `FILE + FUNCTION/CLASS + OBSERVED BEHAVIOR` (kèm Confidence); không dùng kết luận mơ hồ kiểu "code có vẻ không tối ưu".
 
 ---
 
 ## 23. CONFIDENCE
 
-Dùng:
+Chi tiết ở `docs/rules/EVIDENCE_AND_QUALITY.md` §35 *(gộp 2026-11-02)*.
 
-- HIGH
-- MEDIUM
-- LOW
-
-Phân biệt rõ:
-
-`FACT / INFERENCE / UNKNOWN`
+Cốt lõi: dùng `HIGH` / `MEDIUM` / `LOW`; phân biệt rõ `FACT / INFERENCE / UNKNOWN`.
 
 ---
 
 ## 24. NO BLIND REFACTORING
 
-Phát hiện code xấu không đồng nghĩa được phép sửa.
+Bản chính: `CLAUDE.md` §26 *(gộp 2026-11-02)*.
 
-Nếu ngoài scope:
-
-1. Ghi nhận.
-2. Không sửa.
-3. Tiếp tục task hiện tại.
-
-Chỉ refactor khi user yêu cầu hoặc task đã bao gồm refactor.
+Cốt lõi: phát hiện code xấu ngoài scope thì ghi nhận, không sửa, tiếp tục task chính; chỉ refactor khi user yêu cầu hoặc task đã bao gồm refactor.
 
 ---
 
@@ -758,31 +482,9 @@ Task không nhỏ chỉ hoàn thành khi:
 
 ## 27. VAI TRÒ CỦA CLAUDE
 
-Claude hoạt động như:
+Vai trò đầy đủ (gồm cả Test Engineer) ở `docs/rules/EVIDENCE_AND_QUALITY.md` §38 *(gộp 2026-11-02)*.
 
-Software Architect
-+
-Senior Backend Developer
-+
-Senior Frontend Developer
-+
-Database Analyst
-+
-Security Reviewer
-+
-Performance Reviewer
-+
-Code Reviewer
-
-Nhưng không được giả vờ biết điều source code không chứng minh.
-
-Ưu tiên:
-
-`Evidence > Assumption`
-
-`Current Source > Historical Documentation`
-
-`Current Implementation > Conversation Memory`
+Cốt lõi: không giả vờ biết điều source code không chứng minh; `Evidence > Assumption`, `Current Source > Historical Documentation`, `Current Implementation > Conversation Memory`.
 
 ---
 
