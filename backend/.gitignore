@@ -4,7 +4,10 @@ node_modules
 dist
 coverage
 logs
-scripts
+# scripts/ chứa script vận hành (seed/migrate) — không theo dõi, TRỪ bước build bắt buộc bên dưới
+# (CI và máy chủ production clone repo về phải build được: `npm run build` gọi file này).
+scripts/*
+!scripts/copy-static-assets.js
 uploads
 luong-du-lieu-DMS.html
 *.log

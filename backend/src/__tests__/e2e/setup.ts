@@ -59,6 +59,12 @@ export const startE2EDatabase = async (): Promise<void> => {
 
 /** Đóng kết nối + tắt in-memory server. Gọi trong `afterAll`. */
 export const stopE2EDatabase = async (): Promise<void> => {
+  // DEV-121: ghi nốt bộ đệm log hiệu năng TRƯỚC khi ngắt DB — giống graceful shutdown thật
+  // (`config/database/database.shutdown.ts`). Thiếu bước này, bộ hẹn giờ 10 giây của
+  // `performanceLogBuffer` ghi vào DB đã tắt, in lỗi sau khi test xong → Jest đặt mã thoát 1
+  // dù mọi test PASS. Import động để không nạp module app trước khi `startE2EDatabase` đặt env.
+  const { flushPerformanceLogBuffer } = await import("../../shared/performance/performanceLogBuffer");
+  await flushPerformanceLogBuffer();
   await mongoose.connection.dropDatabase();
   await mongoose.disconnect();
   await replSet?.stop();

@@ -6,3 +6,4 @@ Quy ước: `[còn hiệu lực]` hoặc `[CŨ]`. Khi một ghi chú hết đún
 - [còn hiệu lực] `quyet-dinh-tran-claude-md.md` — CLAUDE.md không vượt 600 dòng; chi tiết để ở docs/rules/, CLAUDE.md chỉ giữ một dòng chỉ đường.
 - [còn hiệu lực] `bo-cuc-docs-rules.md` — bố cục CLAUDE.md / docs/rules/ / SKILL.md; mục SKILL.md cố ý giữ nguyên.
 - [còn hiệu lực] `tach-module-tai-san-da-xong.md` — GĐ 0→8 đã xong và đã push; chưa triển khai production (đến khi xong thì ghi chú này thành CŨ).
+- [còn hiệu lực] `ci-toi-thieu.md` — CI chạy khi push main + PR (typecheck/unit/build, lint/vitest/build), KHÔNG có job e2e (user chốt); 2 lỗi đã sửa khi bật CI.

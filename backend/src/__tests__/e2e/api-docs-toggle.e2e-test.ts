@@ -14,6 +14,14 @@ import request from "supertest";
 
 const loadApp = async (env: Record<string, string | undefined>) => {
   jest.resetModules();
+  // DEV-121: test này không có DB và nạp app nhiều lần; bộ đệm log hiệu năng thật sẽ để lại bộ hẹn giờ
+  // 10 giây chạy SAU khi file test xong (giữa lúc file khác đang chạy) → Jest báo "import after the Jest
+  // environment has been torn down" và đặt mã thoát 1 dù mọi test PASS. Thay bằng bản giả: test chỉ
+  // kiểm /api-docs bật/tắt, không cần log hiệu năng.
+  jest.doMock("../../shared/performance/performanceLogBuffer", () => ({
+    pushPerformanceLog: jest.fn(),
+    flushPerformanceLogBuffer: jest.fn(async () => undefined),
+  }));
   process.env.JWT_SECRET ??= "e2e-test-jwt-secret";
   process.env.JWT_REFRESH_SECRET ??= "e2e-test-jwt-refresh-secret";
   process.env.CLIENT_URL ??= "http://localhost:5173";

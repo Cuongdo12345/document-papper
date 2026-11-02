@@ -1,0 +1,61 @@
+# CI tối thiểu (2026-11-02): typecheck + unit test + build cho backend; lint + unit test + build cho frontend.
+# Chưa gồm: e2e backend (chờ xử lý lỗi mã thoát 1 khi chạy toàn bộ) và Playwright (ảnh baseline là win32,
+# không so được trên runner Linux). Không cần secret: unit test backend dùng mock, không đọc .env.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (typecheck, unit test, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Unit test
+        run: npm test
+      - name: Build
+        run: npm run build
+
+  frontend:
+    name: Frontend (lint, unit test, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Unit test
+        run: npm test
+      - name: Build (gồm typecheck tsc -b)
+        run: npm run build

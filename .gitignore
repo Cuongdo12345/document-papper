@@ -4,6 +4,8 @@ node_modules
 dist
 coverage
 logs
-scripts
+# Mọi thư mục scripts/ (vd backend/scripts) — chỉ bỏ qua NỘI DUNG để backend/.gitignore
+# giữ lại được bước build bắt buộc (scripts/copy-static-assets.js).
+**/scripts/*
 uploads
 *.log
