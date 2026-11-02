@@ -2,11 +2,8 @@
 
 Danh sách NGẮN, đọc đầu mỗi phiên. Cập nhật khi xong việc, khi user ra quyết định hoặc sửa Claude. Nhật ký chi tiết vẫn là `docs/SESSION_HANDOFF.md` (CLAUDE.md §30); quyết định/sửa lỗi gắn với dự án ghi ở `ghi-chu/`.
 
-## Chưa push
-- 2 commit local: tái cấu trúc rulebook (CLAUDE.md, SKILL.md, docs/rules/, FEATURE_DEVELOPMENT_ROADMAP.md) và bộ nhớ (dang-lam.md, ghi-chu/). Chờ user bảo push.
-
 ## Chưa commit
-- Hai thay đổi KHÔNG phải của Claude, chưa rõ chủ: docs/04_DATABASE_ANALYSIS.md, docs/32_PROJECT_FEATURE_GUIDE.md (không đưa vào commit của Claude).
+- Hai thay đổi của user, Claude không động vào: docs/04_DATABASE_ANALYSIS.md (đã sửa), docs/32_PROJECT_FEATURE_GUIDE.md (file mới). User tự commit.
 
 ## Chờ user
 - Triển khai production (docs/development/PRODUCTION_DEPLOYMENT_PLAN.md và DEV-120 mục 2).
