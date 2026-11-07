@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "playwright:install": "playwright install --with-deps chromium",
     "test:visual": "playwright test",
+    "test:roles": "playwright test --project=roles-setup --project=roles --project=roles-teardown --no-deps",
     "test:visual:update": "playwright test --update-snapshots"
   },
   "dependencies": {

@@ -438,6 +438,7 @@ Xem đầy đủ `docs/30_DEVELOPMENT_COMPLETION_AUDIT.md` Mục 8-9. Đáng ch�
     - FE-43: hồ sơ thiết bị CNTT (`ItDeviceSection`) + bản quyền phần mềm (`/app/software-licenses`, gán máy, chứng từ).
     - FE-44: chỗ dùng chéo — ô chọn tài sản (Tài liệu/Hợp đồng) qua `lookup-options`, Dashboard hai tab CNTT/y tế, link thông báo/tài liệu/hợp đồng đúng module, `AssetNameLink`.
     - FE-45 (Giai đoạn 8, dọn dẹp): gỡ 20 quyền cũ `ASSET_*`/`ASSET_CATEGORY_*` khỏi `constants/permissions.ts` (backend gỡ route cũ + quyền cũ ở DEV-120), test chống thêm lại; `/app/assets*` vẫn chuyển hướng (`LegacyAssetsRedirect`).
+    - FE-46 (2026-11-02): Playwright theo role — `e2e/roles/` (setup/teardown qua API + đăng nhập UI thật cho IT, PHONG_VAT_TU_TTB, USER; 58 test sidebar/chặn URL `/403`/nút theo quyền, bảng kỳ vọng viết tay từ kế hoạch tách module). `playwright.config.ts` có thêm project `roles-setup`/`roles`/`roles-teardown` chạy sau `chromium`; `npm run test:roles` chạy riêng nhóm này. Backend Playwright (`startPlaywrightServer.ts`) tắt `authRateLimiter` (bộ test đã dùng ~99/100 lượt). Trọn bộ 86/86 PASS; đột biến cố ý bị bắt. Chi tiết: `docs/frontend/tasks/FE-46.md`.
 
 ## 12. Liên kết toàn bộ tài liệu FE
 

@@ -7,3 +7,4 @@ Quy ước: `[còn hiệu lực]` hoặc `[CŨ]`. Khi một ghi chú hết đún
 - [còn hiệu lực] `bo-cuc-docs-rules.md` — bố cục CLAUDE.md / docs/rules/ / SKILL.md; mục SKILL.md cố ý giữ nguyên.
 - [còn hiệu lực] `tach-module-tai-san-da-xong.md` — GĐ 0→8 đã xong và đã push; chưa triển khai production (đến khi xong thì ghi chú này thành CŨ).
 - [còn hiệu lực] `ci-toi-thieu.md` — CI chạy khi push main + PR (typecheck/unit/build, lint/vitest/build), KHÔNG có job e2e (user chốt); 2 lỗi đã sửa khi bật CI.
+- [còn hiệu lực] `playwright-theo-role.md` — Playwright theo role (IT, Vật tư-TTB, USER), `npm run test:roles`; backend Playwright tắt bộ giới hạn đăng nhập theo lựa chọn của user.

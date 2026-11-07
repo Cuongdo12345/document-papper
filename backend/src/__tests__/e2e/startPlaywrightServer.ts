@@ -38,6 +38,15 @@ async function main(): Promise<void> {
   // Playwright dùng thay vì port dev mặc định.
   process.env.CLIENT_URL = `http://localhost:${FRONTEND_PORT}`;
 
+  // FE-46: tắt bộ giới hạn đăng nhập/làm mới token (`authRateLimiter`, 100 lượt/15 phút/IP) CHỈ ở backend Playwright.
+  // Mỗi lần mở trang trong test tốn 1 lượt làm mới token; bộ Playwright trọn bộ (nhóm ADMIN + nhóm theo role) đã dùng
+  // ~99/100 lượt, thêm test là dính 429. Phải vá TRƯỚC khi nạp `app` — các file route đọc `authRateLimiter` lúc được nạp.
+  // Không đổi code production. Bộ đếm theo IP vẫn được kiểm ở `trust-proxy.e2e-test.ts` (Jest, không qua file này);
+  // việc trả 429 khi vượt ngưỡng thì hiện chưa có test tự động nào.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- cần gán lại export của module trước khi app nạp nó.
+  const rateLimiterModule = require("../../middlewares/authRateLimiter.middleware");
+  rateLimiterModule.authRateLimiter = (_req: unknown, _res: unknown, next: () => void) => next();
+
   await startE2EDatabase();
   const roleIds = await seedRbac();
   await seedUser({

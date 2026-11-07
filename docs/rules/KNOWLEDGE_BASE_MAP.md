@@ -49,6 +49,7 @@ docs/
 ├── 23_CODE_REVIEW_ROADMAP.md
 ├── 30_DEVELOPMENT_COMPLETION_AUDIT.md
 ├── 31_BACKEND_CODE_REVIEW.md   # [2026-09-29] review toàn bộ backend (lỗi + hiệu năng), BR-01→BR-22 + 3 câu hỏi nghiệp vụ; mới nhất, thay trạng thái OPEN cũ của review-index/ — đọc trước khi sửa lỗi backend
+├── 32_PROJECT_FEATURE_GUIDE.md # [SỐNG, 2026-10-23] mô tả TOÀN BỘ module hiện tại (làm gì, tính năng chính, liên kết) — tra khi cần nắm nhanh tính năng; khác 01_PROJECT_OVERVIEW (đóng băng từ Phase 01). Cập nhật khi thêm module (§36)
 ├── module-reviews/      # review chi tiết theo domain (Auth, RBAC, Documents, Assets...), xem index tại review-index/
 ├── review-index/        # CODE_REVIEW_INDEX.md, CODE_REVIEW_SUMMARY.md
 └── SESSION_HANDOFF.md

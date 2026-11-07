@@ -37,11 +37,35 @@ export default defineConfig({
   globalSetup: "./e2e/global-setup.ts",
   use: {
     baseURL: BASE_URL,
-    storageState: AUTH_STATE_PATH,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    // Nhóm ADMIN (a11y, visual, asset-split): dùng phiên ADMIN từ `globalSetup`, chạy trên DB còn trống.
+    {
+      name: "chromium",
+      testIgnore: ["**/roles/**"],
+      use: { ...devices["Desktop Chrome"], storageState: AUTH_STATE_PATH },
+    },
+    // FE-46 — nhóm theo role (IT, Vật tư-TTB, USER). Chạy SAU `chromium` (dependencies) vì tạo thêm khoa/phòng + người dùng
+    // làm lệch ảnh baseline Dashboard/Người dùng; `roles-teardown` dọn lại khi xong (kể cả khi spec lỗi).
+    // Chạy riêng nhóm này (bỏ qua `chromium` cho nhanh): `npm run test:roles`. Thứ tự project dưới đây (setup → roles →
+    // teardown) cũng là thứ tự chạy khi dùng `--no-deps`.
+    {
+      name: "roles-setup",
+      testMatch: ["**/roles/roles.setup.ts"],
+      dependencies: ["chromium"],
+      teardown: "roles-teardown",
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "roles",
+      testMatch: ["**/roles/*.spec.ts"],
+      dependencies: ["roles-setup"],
+      use: { ...devices["Desktop Chrome"] },
+    },
+    { name: "roles-teardown", testMatch: ["**/roles/roles.teardown.ts"], use: { ...devices["Desktop Chrome"] } },
+  ],
   webServer: [
     {
       command: "npm run test:e2e:server",
