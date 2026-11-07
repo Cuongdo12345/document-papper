@@ -53,7 +53,7 @@ Xác định từ `backend/package.json` — **chỉ liệt kê những gì có 
 ### Database / ODM
 - MongoDB
 - Mongoose (`mongoose: ^9.1.5`) — ODM
-- `mongoose-to-swagger` — sinh Swagger schema từ Mongoose model
+- `mongoose-to-swagger` — sinh Swagger schema từ Mongoose model **[CẬP NHẬT 2026-11-02, DEV-122]** (đã gỡ khỏi dependencies, không được dùng)
 
 ### Authentication
 - JWT (`jsonwebtoken: ^9.0.3`) — access + refresh token (theo README)
@@ -64,13 +64,13 @@ Xác định từ `backend/package.json` — **chỉ liệt kê những gì có 
 - Zod (`zod: ^4.3.6`)
 
 ### API Documentation
-- Swagger/OpenAPI (`swagger-jsdoc`, `swagger-ui-express`, file `src/docs/openAPI.yaml` ~160K)
+- Swagger/OpenAPI (`swagger-jsdoc` — **[CẬP NHẬT 2026-11-02, DEV-122]** đã gỡ, chỉ còn `swagger-ui-express` + `yamljs` —, file `src/docs/openAPI.yaml` ~160K)
 
 ### Xử lý file / Export
 - ExcelJS (`exceljs: ^4.4.0`) — export Excel
-- `docx: ^9.6.1` — export Word
+- `docx: ^9.6.1` — export Word **[CẬP NHẬT 2026-11-02, DEV-122]** (đã gỡ, chưa từng có tính năng export Word)
 - Multer (`multer: ^2.1.0`) — upload file
-- `file-saver`, `qrcode`
+- `file-saver` (**[CẬP NHẬT 2026-11-02, DEV-122]** đã gỡ), `qrcode`
 
 ### Khác
 - `node-cron: ^4.6.0` — job định kỳ (cron)

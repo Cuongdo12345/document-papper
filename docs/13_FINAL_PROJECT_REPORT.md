@@ -60,8 +60,8 @@ Trước khi tổng hợp, đối chiếu `00_PROJECT_MEMORY.md` với các tài
 | **Database** | MongoDB + Mongoose (`^9.1.5`) | Single database, 21 model tại Phase 01 → **31 model** sau DEV-057→070 (DEV-071, xem `04_DATABASE_ANALYSIS.md`); cần replica set cho transaction (UNKNOWN đã verify ở production hay chưa) |
 | **Authentication** | JWT (`jsonwebtoken ^9.0.3`) + `bcrypt ^6.0.0` | Access + Refresh token; RBAC + ABAC theo model (ABAC dead runtime) |
 | **Validation** | Zod (`^4.3.6`) | DTO layer, một số route bị comment out |
-| **API Docs** | Swagger/OpenAPI (`swagger-jsdoc`, `swagger-ui-express`), `openAPI.yaml` (~160K) | Khớp gần hoàn hảo với implementation |
-| **File processing** | ExcelJS (`^4.4.0`), `docx ^9.6.1`, Multer (`^2.1.0`), `qrcode` | Export streaming tốt; import có N+1 transaction |
+| **API Docs** | Swagger/OpenAPI (`swagger-jsdoc` đã gỡ ở DEV-122, `swagger-ui-express`), `openAPI.yaml` (~160K) | Khớp gần hoàn hảo với implementation |
+| **File processing** | ExcelJS (`^4.4.0`), ~~`docx ^9.6.1`~~ (đã gỡ ở DEV-122, chưa từng dùng), Multer (`^2.1.0`), `qrcode` | Export streaming tốt; import có N+1 transaction |
 | **Khác** | `node-cron`, `nodemailer`, `helmet`, `cors`, `compression`, `cookie-parser`, `morgan`, `express-rate-limit` | Cron alert Asset/Medical Device; email fire-and-forget |
 | **Testing** | `ts-jest` (cấu hình có, **0 test case**) | Zero test coverage — ISS-07 |
 | **Deployment** | Không có Dockerfile/docker-compose/CI-CD | README nhắc script backup/seed không tồn tại thực tế trong `scripts/` |
