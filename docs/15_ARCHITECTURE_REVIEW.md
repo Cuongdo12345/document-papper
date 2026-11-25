@@ -1,5 +1,7 @@
 # Phase 15 — Architecture Review
 
+> **[TÀI LIỆU LỊCH SỬ — rà soát đồng bộ 2026-11-25]** Nội dung phản ánh thời điểm phân tích/review, KHÔNG viết lại theo code hiện tại; chỗ sai về cấu trúc hiện tại có ghi chú `[CẬP NHẬT 2026-11-25]` ngay tại chỗ. Thay đổi lớn từ đó: có frontend (FE-00, 2026-09-05); có CI GitHub Actions (DEV-121); module Tài sản tách thành Thiết bị CNTT, Thiết bị y tế và Bản quyền phần mềm (DEV-111→120). **Bảng đổi tên khi đọc tài liệu này:** route `/api/assets*` → `/api/it-assets` / `/api/medical-assets` (route cũ đã gỡ, chỉ còn `/api/assets/lookup-options`); `/api/assets/medical-devices/:assetId/...` → `/api/medical-assets/:assetId/...`; `/api/assets/asset-categories` → `/api/{it,medical}-assets/categories`; quyền `ASSET_*` → `IT_ASSET_*` / `MEDICAL_ASSET_*`, `ASSET_CATEGORY_*` → `IT_ASSET_CATEGORY_*` / `MEDICAL_ASSET_CATEGORY_*`. Số liệu tại lần rà soát: 34 model (14 thư mục), 142 permission, 7 role, 21 mount `/api/*`, 7 cron job. Tra hiện trạng: `32_PROJECT_FEATURE_GUIDE.md` (module), `04_DATABASE_ANALYSIS.md` (DB), `frontend/API_REFERENCE.md` (API), `frontend/AUTH_RBAC_MAP.md` (quyền), `00_PROJECT_MEMORY.md` (chỉ mục task); source code là nguồn sự thật.
+
 > Ngày: 2026-08-31. Đánh giá kiến trúc CURRENT STATE dựa trên historical analysis (Phase 02/03/05), `docs/14_ANALYSIS_AUDIT.md`, và source code hiện tại. KHÔNG phân tích lại toàn bộ project, KHÔNG refactor, KHÔNG sửa source.
 >
 > **Quan hệ với `docs/21_GLOBAL_ARCHITECTURE_REVIEW.md`** (đã tồn tại, viết 2026-08-31 trước phase này): tài liệu đó tổng hợp kiến trúc từ 8 module code review (REVIEW-00→16), theo 11 hạng mục riêng (Layer Violations, Coupling, Cohesion...). Phase 15 này đọc TRỰC TIẾP `02_ARCHITECTURE.md`/`03_BACKEND_ANALYSIS.md`/`05_API_ANALYSIS.md` (không đọc lại `06_FRONTEND_ANALYSIS.md` vì file này KHÔNG TỒN TẠI — xem Mục 4) theo đúng cấu trúc 18 mục được yêu cầu, và bổ sung các finding MỚI rút ra trực tiếp từ 2 tài liệu Phase 03/05 chưa từng được đưa vào `21_GLOBAL_ARCHITECTURE_REVIEW.md` (đánh số tiếp `ARCH-27` trở đi). Finding trùng với tài liệu đó được THAM CHIẾU LẠI bằng ID gốc (`ARCH-01`→`ARCH-26`), không lặp lại toàn văn.
@@ -62,6 +64,9 @@ Xem Mục 8 (Configuration) — nhiều vị trí thiếu đồng bộ giữa `.
 ## 5. API Boundary Review
 
 Trace: `Frontend (không tồn tại) → API Client (không tồn tại) → HTTP → Backend Route → Middleware → Controller → Service`. Vì không có frontend, boundary thực tế bắt đầu từ HTTP request bất kỳ (client ngoài phạm vi repo).
+
+> **[CẬP NHẬT 2026-11-25]** Không còn đúng: đã có frontend `frontend/` (React + Vite + Tailwind, từ FE-00 ngày 2026-09-05) — kiến thức frontend ở `docs/frontend/FRONTEND_MEMORY.md`.
+
 
 ### 5.1 Boundary Route↔Middleware — vấn đề chính: Service tin tưởng ngầm Middleware ĐÃ chạy đúng (ARCH-27, HIGH — MỚI)
 

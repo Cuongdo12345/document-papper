@@ -1,5 +1,7 @@
 # 03 — BACKEND ANALYSIS
 
+> **[TÀI LIỆU LỊCH SỬ — rà soát đồng bộ 2026-11-25]** Nội dung phản ánh thời điểm phân tích/review, KHÔNG viết lại theo code hiện tại; chỗ sai về cấu trúc hiện tại có ghi chú `[CẬP NHẬT 2026-11-25]` ngay tại chỗ. Thay đổi lớn từ đó: có frontend (FE-00, 2026-09-05); có CI GitHub Actions (DEV-121); module Tài sản tách thành Thiết bị CNTT, Thiết bị y tế và Bản quyền phần mềm (DEV-111→120). **Bảng đổi tên khi đọc tài liệu này:** route `/api/assets*` → `/api/it-assets` / `/api/medical-assets` (route cũ đã gỡ, chỉ còn `/api/assets/lookup-options`); `/api/assets/medical-devices/:assetId/...` → `/api/medical-assets/:assetId/...`; `/api/assets/asset-categories` → `/api/{it,medical}-assets/categories`; quyền `ASSET_*` → `IT_ASSET_*` / `MEDICAL_ASSET_*`, `ASSET_CATEGORY_*` → `IT_ASSET_CATEGORY_*` / `MEDICAL_ASSET_CATEGORY_*`. Số liệu tại lần rà soát: 34 model (14 thư mục), 142 permission, 7 role, 21 mount `/api/*`, 7 cron job. Tra hiện trạng: `32_PROJECT_FEATURE_GUIDE.md` (module), `04_DATABASE_ANALYSIS.md` (DB), `frontend/API_REFERENCE.md` (API), `frontend/AUTH_RBAC_MAP.md` (quyền), `00_PROJECT_MEMORY.md` (chỉ mục task); source code là nguồn sự thật.
+
 > Phase: 03 — Backend Analysis
 > Phạm vi: CHỈ backend (entry point, routes, controllers, services, models, middleware, validators, utilities, error handling, logging, configuration, external services, auth/authorization). Không phân tích Database schema chi tiết (Phase 04), không phân tích API inventory đầy đủ (Phase 05), không đánh giá security nghiêm trọng theo mức độ (Phase 09).
 > Nguồn: source code thực tế tại commit `f4ce8e9` (branch `main`), re-clone xác nhận khớp commit với `00_PROJECT_MEMORY.md`.
@@ -190,6 +192,9 @@ Xác nhận lại chi tiết Phase 02 bằng code thực tế: `Map<userId, {per
 | `PERF_SAMPLE_RATE` | Performance | Optional, default `0.1`, dùng bởi `performanceMiddleware` |
 | `DASHBOARD_CACHE_TTL_MS` | Dashboard | Được khai báo trong `.env.example` nhưng CHƯA xác minh nơi dùng ở phase này (thuộc domain Dashboard, ngoài phạm vi đọc sâu Phase 03 — dashboard.service.ts chưa đọc) |
 | `MONGO_MAX_POOL_SIZE`, `MONGO_MIN_POOL_SIZE` | Database | **CONFIRMED discrepancy**: được dùng thực tế trong `database.ts` (default 20/2) nhưng **KHÔNG xuất hiện trong `.env.example`** — thiếu tài liệu hoá, người vận hành đọc `.env.example` sẽ không biết 2 biến này tồn tại. |
+
+> **[CẬP NHẬT 2026-11-25]** Không còn đúng: đã có frontend `frontend/` (React + Vite + Tailwind, từ FE-00 ngày 2026-09-05) — kiến thức frontend ở `docs/frontend/FRONTEND_MEMORY.md`.
+
 
 ### 7.2 Dead code trong configuration
 

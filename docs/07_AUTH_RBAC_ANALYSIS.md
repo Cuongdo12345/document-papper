@@ -1,5 +1,7 @@
 # 07 — AUTHENTICATION & RBAC ANALYSIS
 
+> **[TÀI LIỆU LỊCH SỬ — rà soát đồng bộ 2026-11-25]** Nội dung phản ánh thời điểm phân tích/review, KHÔNG viết lại theo code hiện tại; chỗ sai về cấu trúc hiện tại có ghi chú `[CẬP NHẬT 2026-11-25]` ngay tại chỗ. Thay đổi lớn từ đó: có frontend (FE-00, 2026-09-05); có CI GitHub Actions (DEV-121); module Tài sản tách thành Thiết bị CNTT, Thiết bị y tế và Bản quyền phần mềm (DEV-111→120). **Bảng đổi tên khi đọc tài liệu này:** route `/api/assets*` → `/api/it-assets` / `/api/medical-assets` (route cũ đã gỡ, chỉ còn `/api/assets/lookup-options`); `/api/assets/medical-devices/:assetId/...` → `/api/medical-assets/:assetId/...`; `/api/assets/asset-categories` → `/api/{it,medical}-assets/categories`; quyền `ASSET_*` → `IT_ASSET_*` / `MEDICAL_ASSET_*`, `ASSET_CATEGORY_*` → `IT_ASSET_CATEGORY_*` / `MEDICAL_ASSET_CATEGORY_*`. Số liệu tại lần rà soát: 34 model (14 thư mục), 142 permission, 7 role, 21 mount `/api/*`, 7 cron job. Tra hiện trạng: `32_PROJECT_FEATURE_GUIDE.md` (module), `04_DATABASE_ANALYSIS.md` (DB), `frontend/API_REFERENCE.md` (API), `frontend/AUTH_RBAC_MAP.md` (quyền), `00_PROJECT_MEMORY.md` (chỉ mục task); source code là nguồn sự thật.
+
 > Phase: 07 — Authentication & RBAC Analysis
 > Phạm vi: Authentication (login/logout/register/password/token) + Authorization (RBAC + ABAC) end-to-end. Không phân tích Business Logic ngoài phạm vi auth (Phase 08), không đánh giá security toàn hệ thống theo mức độ (Phase 09 — ở đây chỉ nêu finding trong phạm vi auth/RBAC).
 > Nguồn: re-clone tại thời điểm Phase 07 — commit `f4ce8e9083e16c01177f53a3871b66cfde4133b8` ("update", 2026-08-24 13:53:38 +0700) — **khớp chính xác** với commit đã ghi nhận Phase 01–06, không có thay đổi.
@@ -14,6 +16,7 @@
 - Password: `bcrypt`, cost factor **10**, dùng nhất quán ở mọi nơi hash password (register, change password, reset password — CONFIRMED, đếm đủ 5 lệnh `bcrypt.hash(..., 10)`).
 - Không có OAuth/SSO/MFA/2FA — chỉ username + password.
 - Không có frontend trong repo (Phase 06) — mọi phân tích "storage phía client" trong tài liệu này là N/A, chỉ phân tích những gì API trả về.
+  - **[CẬP NHẬT 2026-11-25]** Không còn đúng: đã có frontend `frontend/` (React + Vite + Tailwind, từ FE-00 ngày 2026-09-05) — kiến thức frontend ở `docs/frontend/FRONTEND_MEMORY.md`.
 
 ---
 
@@ -190,6 +193,9 @@ Bổ sung củng cố phát hiện này:
 | `BAN_GIAM_DOC` | Giống `TRUONG_KHOA` + thêm `AUDIT_VIEW`, `AUDIT_VIEW_DASHBOARD` (bước duyệt cuối, thẩm quyền cao nhất trừ ADMIN) |
 | `PHONG_VAT_TU_TTB` | Tương đương `IT` cho phần Asset/Medical Device (thêm `ASSET_DISPOSE`), cộng thêm tham gia Workflow approve/reject — KHÔNG có quyền Document/Department |
 
+> **[CẬP NHẬT 2026-11-25]** Bảng role này đã cũ: hiện có 7 role (thêm `USER`). Quyền tài sản đã tách theo module (DEV-114): `IT` quản lý Thiết bị CNTT + Bản quyền phần mềm, `PHONG_VAT_TU_TTB` quản lý Thiết bị y tế, mỗi bên chỉ XEM module kia. Xem `docs/development/ASSET_MODULE_SPLIT_PLAN.md` mục 4.4.
+
+
 **Lưu ý riêng (CONFIRMED từ chính source, không suy diễn)**: comment trong `rolePermission.map.ts` tại nhóm `USER` tự ghi rằng đã **XOÁ** `ROLE_CREATE` khỏi danh sách quyền USER vì đó là "lỗi cấu hình nghiêm trọng" từng tồn tại trước đó — cho thấy nhóm phát triển đã từng phát hiện và tự sửa 1 lỗ hổng leo thang quyền tương tự trong chính file cấu hình "trên giấy" này (dù file chưa từng chạy thật).
 
 ### 6.3 Permission ↔ Route mapping
@@ -203,6 +209,9 @@ Bổ sung củng cố phát hiện này:
 ## 7. Frontend Authorization
 
 **N/A — không có frontend trong repo** (Phase 06). Không có `PermissionGuard`, route guard, hay bất kỳ logic ẩn/hiện UI theo quyền nào để phân tích. Toàn bộ authorization thực thi **CHỈ ở backend**.
+
+> **[CẬP NHẬT 2026-11-25]** Không còn đúng: frontend đã có lớp ẩn/hiện theo quyền — `ProtectedRoute` (chặn route → `/403`), `PermissionGuard` (ẩn nút), sidebar lọc theo quyền; có Playwright kiểm theo role (FE-46). Đây chỉ là lớp UX, backend vẫn là ranh giới bảo mật. Xem `docs/frontend/AUTH_RBAC_MAP.md`, `ROUTE_PERMISSION_MAP.md`.
+
 
 ---
 

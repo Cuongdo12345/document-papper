@@ -1,5 +1,7 @@
 # 08 — BUSINESS LOGIC ANALYSIS
 
+> **[TÀI LIỆU LỊCH SỬ — rà soát đồng bộ 2026-11-25]** Nội dung phản ánh thời điểm phân tích/review, KHÔNG viết lại theo code hiện tại; chỗ sai về cấu trúc hiện tại có ghi chú `[CẬP NHẬT 2026-11-25]` ngay tại chỗ. Thay đổi lớn từ đó: có frontend (FE-00, 2026-09-05); có CI GitHub Actions (DEV-121); module Tài sản tách thành Thiết bị CNTT, Thiết bị y tế và Bản quyền phần mềm (DEV-111→120). **Bảng đổi tên khi đọc tài liệu này:** route `/api/assets*` → `/api/it-assets` / `/api/medical-assets` (route cũ đã gỡ, chỉ còn `/api/assets/lookup-options`); `/api/assets/medical-devices/:assetId/...` → `/api/medical-assets/:assetId/...`; `/api/assets/asset-categories` → `/api/{it,medical}-assets/categories`; quyền `ASSET_*` → `IT_ASSET_*` / `MEDICAL_ASSET_*`, `ASSET_CATEGORY_*` → `IT_ASSET_CATEGORY_*` / `MEDICAL_ASSET_CATEGORY_*`. Số liệu tại lần rà soát: 34 model (14 thư mục), 142 permission, 7 role, 21 mount `/api/*`, 7 cron job. Tra hiện trạng: `32_PROJECT_FEATURE_GUIDE.md` (module), `04_DATABASE_ANALYSIS.md` (DB), `frontend/API_REFERENCE.md` (API), `frontend/AUTH_RBAC_MAP.md` (quyền), `00_PROJECT_MEMORY.md` (chỉ mục task); source code là nguồn sự thật.
+
 > Phase: 08 — Business Logic Analysis
 > Phạm vi: business domain, entities, actors, business rules, workflow, status machine, side-effects. Không phân tích lại kiến trúc/API/DB chi tiết (đã ở Phase 02-05), không đánh giá security theo mức độ (Phase 09).
 > Nguồn: source code thực tế tại commit `f4ce8e9083e16c01177f53a3871b66cfde4133b8` (branch `main`), re-clone xác nhận khớp commit với `00_PROJECT_MEMORY.md`.
@@ -317,6 +319,9 @@ Không có field `status` enum riêng cho profile — chỉ có `lastCalibration
 | **Người quản lý tài sản** (role có `ASSET_*` permission) | RBAC coarse-grained | Theo permission cụ thể (`ASSET_CREATE`, `ASSET_ASSIGN`...) | CRUD Asset, Assign/Transfer/Return | Asset (không có ownership/department-scoping riêng ở tầng Service — UNKNOWN nếu có check department nào khác, ngoài phạm vi đọc sâu Phase 08) |
 | **Nhân viên kiểm định** (role có `MEDICAL_DEVICE_CALIBRATE`) | RBAC coarse-grained | Permission-based | Ghi nhận `CalibrationRecord` | 1 `MedicalDeviceProfile` cụ thể |
 
+> **[CẬP NHẬT 2026-11-25]** Quyền `ASSET_*` đã thay bằng `IT_ASSET_*` / `MEDICAL_ASSET_*` (DEV-114→120).
+
+
 **Lưu ý (CONFIRMED, kế thừa Phase 07)**: RBAC Matrix thiết kế "trên giấy" (`ROLE_PERMISSIONS`) liệt kê 6 role nghiệp vụ cụ thể (`IT`, `USER`, `TRUONG_KHOA`, `DIEU_DUONG_TRUONG`, `BAN_GIAM_DOC`, `PHONG_VAT_TU_TTB`) nhưng KHÔNG có cơ chế đảm bảo đây là dữ liệu Role/Permission thật trong DB — bảng actor ở trên chỉ mô tả actor Ở MỨC CODE (dựa vào permission constant + check role.name), không khẳng định role nào trong DB thật đang giữ actor nào.
 
 ---
@@ -338,6 +343,9 @@ User action: Ghi nhận kiểm định thiết bị y tế
                  best-effort (Rule MD4)
 → Response: {success, data: record}
 ```
+
+> **[CẬP NHẬT 2026-11-25]** Đường dẫn hiện tại: `POST /api/medical-assets/:assetId/calibration-records`.
+
 
 ---
 

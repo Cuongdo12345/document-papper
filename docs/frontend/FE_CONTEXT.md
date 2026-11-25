@@ -24,7 +24,7 @@ JWT thuần (không cookie), `accessToken` trả JSON body 8h, `refreshToken` 7 
 
 ## 6. RBAC
 
-~75 permission (`permission.constant.ts`), 6 role. FE permission check CHỈ là UX guard, backend là ranh giới thật. 2 case đặc biệt PHẢI biết: (a) `USER_VIEW`/`USER_VIEW_DETAIL` hiện 0 role giữ; (b) ABAC/Policy CRUD hoạt động nhưng KHÔNG có tác dụng runtime. Chi tiết: `AUTH_RBAC_MAP.md`.
+142 permission (`permission.constant.ts`), 7 role (**[CẬP NHẬT 2026-11-25]** trước ghi ~75 / 6). FE permission check CHỈ là UX guard, backend là ranh giới thật. 2 case đặc biệt PHẢI biết: (a) `USER_VIEW` do `IT`, `PHONG_VAT_TU_TTB` giữ, `USER_VIEW_DETAIL` do `IT` giữ (trước đây 0 role giữ); (b) ABAC/Policy chỉ có tác dụng runtime ở 3 route xem chi tiết Document (DEV-009A), các nơi khác chưa. Chi tiết: `AUTH_RBAC_MAP.md`.
 
 ## 7. Document domain
 

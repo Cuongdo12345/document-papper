@@ -1,5 +1,7 @@
 # 10 — PERFORMANCE ANALYSIS
 
+> **[TÀI LIỆU LỊCH SỬ — rà soát đồng bộ 2026-11-25]** Nội dung phản ánh thời điểm phân tích/review, KHÔNG viết lại theo code hiện tại; chỗ sai về cấu trúc hiện tại có ghi chú `[CẬP NHẬT 2026-11-25]` ngay tại chỗ. Thay đổi lớn từ đó: có frontend (FE-00, 2026-09-05); có CI GitHub Actions (DEV-121); module Tài sản tách thành Thiết bị CNTT, Thiết bị y tế và Bản quyền phần mềm (DEV-111→120). **Bảng đổi tên khi đọc tài liệu này:** route `/api/assets*` → `/api/it-assets` / `/api/medical-assets` (route cũ đã gỡ, chỉ còn `/api/assets/lookup-options`); `/api/assets/medical-devices/:assetId/...` → `/api/medical-assets/:assetId/...`; `/api/assets/asset-categories` → `/api/{it,medical}-assets/categories`; quyền `ASSET_*` → `IT_ASSET_*` / `MEDICAL_ASSET_*`, `ASSET_CATEGORY_*` → `IT_ASSET_CATEGORY_*` / `MEDICAL_ASSET_CATEGORY_*`. Số liệu tại lần rà soát: 34 model (14 thư mục), 142 permission, 7 role, 21 mount `/api/*`, 7 cron job. Tra hiện trạng: `32_PROJECT_FEATURE_GUIDE.md` (module), `04_DATABASE_ANALYSIS.md` (DB), `frontend/API_REFERENCE.md` (API), `frontend/AUTH_RBAC_MAP.md` (quyền), `00_PROJECT_MEMORY.md` (chỉ mục task); source code là nguồn sự thật.
+
 > Phase: 10 — Performance Analysis
 > Phạm vi: bottleneck/performance risk dựa trên source code (Database, Backend, API, Frontend, File Processing). KHÔNG benchmark (chưa có môi trường đo), KHÔNG khẳng định hệ thống thực tế chậm nếu chưa đo.
 > Nguồn: re-clone tại thời điểm Phase 10 — commit `f4ce8e9083e16c01177f53a3871b66cfde4133b8` ("update", 2026-08-24 13:53:38 +0700) — **khớp chính xác** với `00_PROJECT_MEMORY.md`, không có thay đổi.
@@ -49,6 +51,9 @@
 ### PERF-04 — 7/21 model không có index ngoài `_id` (kế thừa Phase 04 §10)
 > **[CẬP NHẬT DEV-071, 2026-09-21]** "21" là tổng model tại thời điểm Phase 04/10. Sau `DEV-057`→`070` tổng
 > hiện là **31 model**; danh sách 7 model thiếu index dưới đây KHÔNG đổi (cả 10 model mới đều CÓ index), nên
+
+> **[CẬP NHẬT 2026-11-25]** Hiện có 34 model; chỉ số index của 3 model thêm sau DEV-071 chưa được rà lại trong tài liệu này.
+
 > tỷ lệ thực tế nay là **7/31 (≈23%)**, giảm so với 7/21 (≈33%) — xem `docs/04_DATABASE_ANALYSIS.md` §10.
 - **Area**: Database / Missing Index (tổng hợp)
 - **Evidence**: `RefreshToken`, `Role`, `Permission`, `Policy`, `WorkflowTemplate`, `WorkflowInstance`, `Upload`.
@@ -191,6 +196,9 @@
 ## 4. FRONTEND
 
 **N/A** — không có frontend trong repo (xác nhận từ Phase 06, giữ nguyên qua các phase). Không có gì để phân tích cho mục Rendering/Large lists/Bundle/Lazy loading.
+
+> **[CẬP NHẬT 2026-11-25]** Không còn đúng: đã có frontend `frontend/` (React + Vite + Tailwind, từ FE-00 ngày 2026-09-05) — kiến thức frontend ở `docs/frontend/FRONTEND_MEMORY.md`. Mục này chưa được phân tích lại cho frontend.
+
 
 ---
 

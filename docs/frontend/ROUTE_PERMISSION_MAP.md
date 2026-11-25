@@ -29,7 +29,7 @@ Access (role thực tế hiện giữ permission đó — xem AUTH_RBAC_MAP.md M
 | `/documents/:id` | Chi tiết + workflow | `GET /documents/:id`, `GET /workflows/document/:id` | `DOCUMENT_VIEW` (route guard) — xem ghi chú | **[CẬP NHẬT 2026-09-06]** KHÔNG guard bằng `DOCUMENT_VIEW_DETAIL` ở tầng route nữa: permission đó đã bị gỡ khỏi RBAC của 5 role thường ở DEV-009A (chỉ còn cấp qua ABAC Policy theo TỪNG document, không nằm trong `user.permissions[]` tĩnh) — guard tĩnh cũ chặn CỨNG mọi non-admin dù backend cho phép (đã xác nhận + sửa, xem `docs/development/tasks/DEV-030.md`). Backend (`GET /documents/:id`) là ranh giới thật (RBAC ADMIN bypass + ABAC same-department); FE chỉ hiển thị lỗi 403 qua `ErrorState` nếu backend từ chối. |
 | `/workflows/pending` | Hộp thư chờ duyệt | `GET /workflows/pending` | `WORKFLOW_VIEW` | |
 | `/workflows/templates` | Quản trị mẫu quy trình | `POST /workflows/templates` | `WORKFLOW_TEMPLATE_CREATE` | Thường ADMIN/IT |
-| `/users` | Danh sách User | `GET /users` | `USER_VIEW` | ⚠️ **0 role hiện giữ → chỉ ADMIN xem được thực tế**, xem `AUTH_RBAC_MAP.md` |
+| `/users` | Danh sách User | `GET /users` | `USER_VIEW` | **[CẬP NHẬT 2026-11-25]** `IT`, `PHONG_VAT_TU_TTB` và ADMIN xem được (trước đây 0 role giữ). Xem `AUTH_RBAC_MAP.md` |
 | `/users/:id` | Chi tiết User | `GET /users/:id` | `USER_VIEW_DETAIL` | ⚠️ như trên |
 | `/profile` | Thông tin cá nhân | `GET/PATCH /users/me` | authenticate | Mọi user |
 | `/departments` | Danh sách Khoa/Phòng | `GET /departments` | `DEPARTMENT_VIEW` | |

@@ -1,5 +1,7 @@
 # 12 — ISSUES & RISKS ANALYSIS (RISK REGISTER)
 
+> **[TÀI LIỆU LỊCH SỬ — rà soát đồng bộ 2026-11-25]** Nội dung phản ánh thời điểm phân tích/review, KHÔNG viết lại theo code hiện tại; chỗ sai về cấu trúc hiện tại có ghi chú `[CẬP NHẬT 2026-11-25]` ngay tại chỗ. Thay đổi lớn từ đó: có frontend (FE-00, 2026-09-05); có CI GitHub Actions (DEV-121); module Tài sản tách thành Thiết bị CNTT, Thiết bị y tế và Bản quyền phần mềm (DEV-111→120). **Bảng đổi tên khi đọc tài liệu này:** route `/api/assets*` → `/api/it-assets` / `/api/medical-assets` (route cũ đã gỡ, chỉ còn `/api/assets/lookup-options`); `/api/assets/medical-devices/:assetId/...` → `/api/medical-assets/:assetId/...`; `/api/assets/asset-categories` → `/api/{it,medical}-assets/categories`; quyền `ASSET_*` → `IT_ASSET_*` / `MEDICAL_ASSET_*`, `ASSET_CATEGORY_*` → `IT_ASSET_CATEGORY_*` / `MEDICAL_ASSET_CATEGORY_*`. Số liệu tại lần rà soát: 34 model (14 thư mục), 142 permission, 7 role, 21 mount `/api/*`, 7 cron job. Tra hiện trạng: `32_PROJECT_FEATURE_GUIDE.md` (module), `04_DATABASE_ANALYSIS.md` (DB), `frontend/API_REFERENCE.md` (API), `frontend/AUTH_RBAC_MAP.md` (quyền), `00_PROJECT_MEMORY.md` (chỉ mục task); source code là nguồn sự thật.
+
 > Phase: 12 — Issues & Risks Analysis
 > Phạm vi: TỔNG HỢP risk register từ toàn bộ evidence đã CONFIRMED/INFERRED ở Phase 01–11. KHÔNG tìm lỗi mới, KHÔNG phân tích sâu thêm, KHÔNG suy đoán ngoài evidence đã có, KHÔNG sửa source code.
 > Nguồn: `00_PROJECT_MEMORY.md`, `02_ARCHITECTURE.md`, `03_BACKEND_ANALYSIS.md`, `04_DATABASE_ANALYSIS.md`, `05_API_ANALYSIS.md`, `06_FRONTEND_ANALYSIS.md` (N/A), `07_AUTH_RBAC_ANALYSIS.md`, `08_BUSINESS_LOGIC.md`, `09_SECURITY_ANALYSIS.md`, `10_PERFORMANCE_ANALYSIS.md`, `11_TECHNICAL_DEBT.md` — tất cả tại commit `f4ce8e9083e16c01177f53a3871b66cfde4133b8`.
@@ -23,6 +25,9 @@
 | Performance | 1 | 4 |
 | Deployment | 1 | 5 |
 | Maintainability | 1 | 4 |
+
+> **[CẬP NHẬT 2026-11-25]** Không còn đúng: đã có frontend `frontend/` (React + Vite + Tailwind, từ FE-00 ngày 2026-09-05) — kiến thức frontend ở `docs/frontend/FRONTEND_MEMORY.md`. Mục này chưa được phân tích lại cho frontend.
+
 
 *(Một issue có thể được tham chiếu chéo giữa Security và category kỹ thuật gốc — vd SEC-05 xuất hiện ở cả Security lẫn Authorization; đếm ở bảng trên theo category chính được gán.)*
 

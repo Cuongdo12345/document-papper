@@ -1,5 +1,7 @@
 # Phase 18 — Testing Strategy
 
+> **[TÀI LIỆU LỊCH SỬ — rà soát đồng bộ 2026-11-25]** Nội dung phản ánh thời điểm phân tích/review, KHÔNG viết lại theo code hiện tại; chỗ sai về cấu trúc hiện tại có ghi chú `[CẬP NHẬT 2026-11-25]` ngay tại chỗ. Thay đổi lớn từ đó: có frontend (FE-00, 2026-09-05); có CI GitHub Actions (DEV-121); module Tài sản tách thành Thiết bị CNTT, Thiết bị y tế và Bản quyền phần mềm (DEV-111→120). **Bảng đổi tên khi đọc tài liệu này:** route `/api/assets*` → `/api/it-assets` / `/api/medical-assets` (route cũ đã gỡ, chỉ còn `/api/assets/lookup-options`); `/api/assets/medical-devices/:assetId/...` → `/api/medical-assets/:assetId/...`; `/api/assets/asset-categories` → `/api/{it,medical}-assets/categories`; quyền `ASSET_*` → `IT_ASSET_*` / `MEDICAL_ASSET_*`, `ASSET_CATEGORY_*` → `IT_ASSET_CATEGORY_*` / `MEDICAL_ASSET_CATEGORY_*`. Số liệu tại lần rà soát: 34 model (14 thư mục), 142 permission, 7 role, 21 mount `/api/*`, 7 cron job. Tra hiện trạng: `32_PROJECT_FEATURE_GUIDE.md` (module), `04_DATABASE_ANALYSIS.md` (DB), `frontend/API_REFERENCE.md` (API), `frontend/AUTH_RBAC_MAP.md` (quyền), `00_PROJECT_MEMORY.md` (chỉ mục task); source code là nguồn sự thật.
+
 > Quy ước: **CONFIRMED** = evidence trực tiếp trong source/git history. **INFERRED** = suy luận hợp lý, chưa chạy runtime. **UNKNOWN** = chưa đủ evidence.
 > Phạm vi: đánh giá testing hiện tại + xây chiến lược test theo risk thực tế. KHÔNG viết test hàng loạt, KHÔNG sửa source, KHÔNG cài dependency trong phase này.
 
@@ -177,6 +179,7 @@ Thứ tự đề xuất, ưu tiên khôi phục trước khi mở rộng:
 - **Integration (~25-30%)**: cho các luồng có transaction/cascade thật mà mock Model che giấu lỗi (workflow→Asset sync, hard-delete referential integrity, Department disable→Asset sync) — dùng `mongodb-memory-server`.
 - **API (~10-15%)**: hợp đồng Route↔Middleware↔Controller, đặc biệt các route có `validateQuery`/`validateParams` bị comment (`ARCH-27`/`ARCH-29`) — lỗi tầng này KHÔNG thể phát hiện bằng Unit test.
 - **E2E (0%, không đề xuất trong giai đoạn này)**: repo không có frontend (Phase 06 N/A) — E2E thực (browser) không áp dụng; nếu có API-consumer thật (mobile/web riêng) thì đó là phạm vi ngoài project này.
+  - **[CẬP NHẬT 2026-11-25]** Đã thay đổi: có e2e API bằng Jest + supertest + MongoDB in-memory (`backend/src/__tests__/e2e/`) và e2e trình duyệt bằng Playwright (`frontend/e2e/`, gồm a11y, visual, kiểm theo role FE-46).
 
 **Trình tự theo thời gian** (gắn với sequence đã có ở `docs/16_REFACTORING_PLAN.md`):
 

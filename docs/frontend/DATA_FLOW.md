@@ -1,6 +1,6 @@
 # DATA FLOW
 
-> `FRONTEND_RECOMMENDATION` — mô tả luồng dữ liệu đề xuất, khớp `STATE_MAPPING.md`/`API_LAYER` đã phân tích, chưa implement.
+> **[CẬP NHẬT 2026-11-25]** **ĐÃ IMPLEMENT.** Ban đầu là `FRONTEND_RECOMMENDATION` (đề xuất trước khi có code). Đã đối chiếu với code frontend (`src/api/axios.ts`, `lib/queryClient.ts`, hook trong `features/*/hooks/`): các luồng dưới đây khớp thực tế, trừ các điểm có ghi chú `[CẬP NHẬT 2026-11-25]`.
 
 ## 1. Luồng đọc dữ liệu (query)
 
@@ -65,7 +65,7 @@ accessToken → Zustand (in-memory)
 refreshToken → localStorage
 user → Zustand + React Query cache ["users","me"] (seed sẵn, tránh gọi lại /users/me ngay)
  ↓
-Redirect /dashboard (hoặc route đích nếu có redirect-after-login)
+Redirect /app (Dashboard)
 
 --- Mọi request tiếp theo ---
 Request → interceptor gắn Authorization: Bearer accessToken
@@ -86,6 +86,9 @@ POST /auths/logout (revoke server-side) → dù thành công hay lỗi đều:
  → redirect /login
 ```
 
+> **[CẬP NHẬT 2026-11-25]** Thực tế response bọc trong `data`: `{message, data: {accessToken, refreshToken, user}}`. Nếu user bật 2FA (DEV-068), `data` chỉ là `{requiresTwoFactor, username}` → màn nhập mã OTP (`useVerifyLoginOtp`) rồi mới nhận token. Sau đăng nhập chuyển tới `/app` (không phải `/dashboard`).
+
+
 ## 4. Luồng đặc thù — Workflow approve (liên domain)
 
 ```
@@ -105,13 +108,16 @@ invalidateQueries(["assets","detail", relatedAssetId])  ← NẾU document.subTy
                                                             DOCUMENT_DOMAIN_MAP.md Mục 2)
 ```
 
+> **[CẬP NHẬT 2026-11-25]** Thực tế (`features/documents/hooks/useWorkflowActions.ts`): sau duyệt/từ chối invalidate `["workflows","pending"]`, `["documents","list"]`, và nếu biết documentId thì thêm `["workflows","byDocument",id]`, `["documents","detail",id]`. KHÔNG invalidate cache tài sản; trang tài sản vẫn có dữ liệu mới khi mở lại vì `staleTime: 0` (`lib/queryClient.ts`).
+
+
 ## 5. Luồng file (upload/download)
 
 ```
 Upload:
 <input type=file multiple> → FormData("files", file[]) → axios POST /upload
  (Content-Type để axios TỰ set multipart boundary, KHÔNG set thủ công)
- → onSuccess: invalidateQueries(["uploads","list"])
+ → onSuccess: invalidateQueries(["files","list"])
 
 Download/Export (Excel):
 Click "Xuất Excel" → axios GET .../export {responseType:"blob"}
@@ -122,4 +128,4 @@ Click "Xuất Excel" → axios GET .../export {responseType:"blob"}
 
 ## 6. Ghi chú
 
-- Mọi luồng trên là **RECOMMENDED**, dựa trên hành vi API đã xác nhận ở `API_REFERENCE.md`/`ERROR_HANDLING.md`/`AUTH_RBAC_MAP.md` — chưa implement, có thể điều chỉnh khi code thật phát sinh chi tiết chưa lường trước.
+- Ban đầu là **RECOMMENDED**; **[CẬP NHẬT 2026-11-25]** đã implement và đối chiếu với code (xem ghi chú đầu file).

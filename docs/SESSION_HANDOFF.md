@@ -932,6 +932,8 @@ CẬP NHẬT TÀI LIỆU
 >   **Next:** chờ user: commit + push (CI sẽ chạy lại); các ưu tiên còn lại: đưa script deploy vào git, BR-16, Playwright theo role, deploy production. Danh sách ngắn: `dang-lam.md`. KHÔNG tự bắt đầu.
 > - **[CẬP NHẬT 2026-11-02, `FE-46.md`]** Playwright theo role (IT, Phòng Vật tư-TTB, USER): `frontend/e2e/roles/` + project `roles-*` trong `playwright.config.ts` + script `npm run test:roles`; backend Playwright tắt `authRateLimiter` (user chọn; bộ test đã dùng ~99/100 lượt). Trọn bộ Playwright **86/86 PASS** (trước 26); build/typecheck/lint/vitest đạt; đột biến cố ý bị bắt; dọn dẹp dữ liệu kiểm chứng sạch.
 >   **Next:** chờ user: commit + push (DEV-122 và FE-46 đang chưa commit); các ưu tiên còn lại: đưa script deploy vào git, BR-16, deploy production. Danh sách ngắn: `dang-lam.md`. KHÔNG tự bắt đầu.
+> - **[CẬP NHẬT 2026-11-25, `DEV-123.md`]** Đồng bộ tài liệu phân tích với code: sửa `AUTH_RBAC_MAP`/`FE_CONTEXT`/`ROUTE_PERMISSION_MAP`/`DATA_FLOW`/`00_PROJECT_MEMORY`; banner lịch sử + ghi chú tại chỗ cho `docs/01`→`31` (trừ `04`). DEV-122 và FE-46 đã commit + push (`4025a05`, `d5931c7`, CI xanh).
+>   **Next:** chờ user: commit DEV-123; lập kế hoạch tài liệu sơ đồ luồng dữ liệu (user đã yêu cầu, chờ sau khi đồng bộ xong — đầu vào: `luong-du-lieu-DMS.html`, `frontend/DATA_FLOW.md`, trang System Design). KHÔNG tự bắt đầu.
 > - **Next Task**: chưa được user chỉ định cho phiên kế tiếp. Ứng viên còn treo (không bắt buộc): báo cáo
 >   tuân thủ mẫu Bộ Y tế cho thiết bị y tế (cần mẫu cụ thể trước); UI test nhánh CHẶN gán thiết bị cho
 >   user chưa đủ điều kiện (đã test ở tầng service, chưa qua UI thật — cần ≥2 user trong môi trường test);

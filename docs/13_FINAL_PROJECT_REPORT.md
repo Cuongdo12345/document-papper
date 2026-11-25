@@ -1,5 +1,7 @@
 # 13 — FINAL PROJECT REPORT
 
+> **[TÀI LIỆU LỊCH SỬ — rà soát đồng bộ 2026-11-25]** Nội dung phản ánh thời điểm phân tích/review, KHÔNG viết lại theo code hiện tại; chỗ sai về cấu trúc hiện tại có ghi chú `[CẬP NHẬT 2026-11-25]` ngay tại chỗ. Thay đổi lớn từ đó: có frontend (FE-00, 2026-09-05); có CI GitHub Actions (DEV-121); module Tài sản tách thành Thiết bị CNTT, Thiết bị y tế và Bản quyền phần mềm (DEV-111→120). **Bảng đổi tên khi đọc tài liệu này:** route `/api/assets*` → `/api/it-assets` / `/api/medical-assets` (route cũ đã gỡ, chỉ còn `/api/assets/lookup-options`); `/api/assets/medical-devices/:assetId/...` → `/api/medical-assets/:assetId/...`; `/api/assets/asset-categories` → `/api/{it,medical}-assets/categories`; quyền `ASSET_*` → `IT_ASSET_*` / `MEDICAL_ASSET_*`, `ASSET_CATEGORY_*` → `IT_ASSET_CATEGORY_*` / `MEDICAL_ASSET_CATEGORY_*`. Số liệu tại lần rà soát: 34 model (14 thư mục), 142 permission, 7 role, 21 mount `/api/*`, 7 cron job. Tra hiện trạng: `32_PROJECT_FEATURE_GUIDE.md` (module), `04_DATABASE_ANALYSIS.md` (DB), `frontend/API_REFERENCE.md` (API), `frontend/AUTH_RBAC_MAP.md` (quyền), `00_PROJECT_MEMORY.md` (chỉ mục task); source code là nguồn sự thật.
+
 > Phase: 13 — Final Project Report
 > Phạm vi: TỔNG HỢP toàn bộ 12 phase phân tích trước (01–12). KHÔNG phân tích lại source code từ đầu; chỉ quay lại source khi cần verify 1 finding quan trọng bị nghi ngờ mâu thuẫn.
 > Nguồn: `00_PROJECT_MEMORY.md`, `01_PROJECT_OVERVIEW.md` → `12_ISSUES_AND_RISKS.md`, tất cả tại commit `f4ce8e9083e16c01177f53a3871b66cfde4133b8` (branch `main`, "update", 2026-08-24).
@@ -33,6 +35,7 @@ Trước khi tổng hợp, đối chiếu `00_PROJECT_MEMORY.md` với các tài
 **Mức độ hoàn thiện**:
 - Backend **implement đầy đủ về mặt tính năng** cho toàn bộ domain nêu trong README (Document, Workflow, Asset, Medical Device, RBAC/ABAC theo mô hình, Dashboard, Excel import/export).
 - **Không có frontend** trong repo tại thời điểm phân tích — đây là dự án backend-only/API service. (Phase 01, Phase 06)
+  - **[CẬP NHẬT 2026-11-25]** Không còn đúng: đã có frontend `frontend/` (React + Vite + Tailwind, từ FE-00 ngày 2026-09-05) — kiến thức frontend ở `docs/frontend/FRONTEND_MEMORY.md`.
 - **Zero test coverage**: có cấu hình Jest đầy đủ nhưng không có 1 file test nào trong source. (Phase 01 §Testing, ISS-07)
 - **Không có Docker/CI-CD** nào trong repo. (Phase 01)
 - OpenAPI documentation **gần như hoàn hảo** so với implementation thực tế: 116/116 endpoint và 87/87 path khớp giữa `openAPI.yaml` và route thực tế. (Phase 05 §9)
@@ -65,6 +68,9 @@ Trước khi tổng hợp, đối chiếu `00_PROJECT_MEMORY.md` với các tài
 | **Khác** | `node-cron`, `nodemailer`, `helmet`, `cors`, `compression`, `cookie-parser`, `morgan`, `express-rate-limit` | Cron alert Asset/Medical Device; email fire-and-forget |
 | **Testing** | `ts-jest` (cấu hình có, **0 test case**) | Zero test coverage — ISS-07 |
 | **Deployment** | Không có Dockerfile/docker-compose/CI-CD | README nhắc script backup/seed không tồn tại thực tế trong `scripts/` |
+
+> **[CẬP NHẬT 2026-11-25]** Bảng trên đã cũ ở 2 dòng: hiện có 34 model trong 14 thư mục domain; đã có CI GitHub Actions (DEV-121), vẫn chưa có Dockerfile/docker-compose.
+
 
 ---
 
@@ -310,6 +316,9 @@ Chống account-enumeration/timing attack nhất quán; whitelist JWT `HS256`; `
 
 **Frontend issues**: N/A (không có frontend).
 
+> **[CẬP NHẬT 2026-11-25]** Không còn đúng: đã có frontend `frontend/` (React + Vite + Tailwind, từ FE-00 ngày 2026-09-05) — kiến thức frontend ở `docs/frontend/FRONTEND_MEMORY.md`. Mục này chưa được phân tích lại cho frontend.
+
+
 **File processing**: Export Excel (Document, Asset) dùng cursor + `ExcelJS.stream.xlsx.WorkbookWriter` streaming — **thiết kế tốt** (PERF-11). Import thì có N+1 transaction/ghi tuần tự như trên.
 
 **Điểm thiết kế hiệu năng tốt** (đối trọng, Phase 10 §7): export streaming đúng chuẩn; `syncDepartmentFromExcel` dùng `insertMany({ordered:false})`; `performanceLogBuffer.ts` batch + sampling giảm tải ghi log; giới hạn `MAX_IMPORT_ROWS/MAX_SYNC_ROWS=5000` chặn trường hợp cực đoan; Dashboard dùng `Promise.all` song song hoá aggregate; email trong `createNotification` fire-and-forget không chặn luồng chính.
@@ -484,6 +493,7 @@ Cấu hình `.env` theo `.env.example` (`PORT`, `MONGO_URI` bắt buộc — fai
 - **Hard-delete Document/Asset không check tham chiếu** — cẩn trọng tuyệt đối khi dùng tính năng xoá theo tháng.
 - **`withTransaction` yêu cầu replica set** — nếu deploy môi trường mới không phải replica set, các luồng dùng transaction sẽ lỗi.
 - Thứ tự mount route `/api/assets/*` là bắt buộc (sub-path phải mount trước path tổng quát).
+  - **[CẬP NHẬT 2026-11-25]** Không còn áp dụng: các route `/api/assets/*` này đã gỡ ở DEV-120 (xem bảng đổi tên ở banner đầu file).
 
 ---
 
@@ -509,6 +519,9 @@ document-manager (backend-only, Node.js/TS/Express 5/MongoDB)
 ```
 
 **5 điều quan trọng nhất cần nhớ**: (1) không có frontend, (2) ABAC chết ở runtime, (3) 1 lỗ hổng leo thang đặc quyền CRITICAL đang tồn tại (`PUT /users/:id`), (4) pagination Documents hỏng hoàn toàn, (5) zero test coverage.
+
+> **[CẬP NHẬT 2026-11-25]** Đã thay đổi: (1) đã có frontend (FE-00); (2) ABAC đã bật thật ở 3 route xem chi tiết Document (DEV-009A); (3) lỗ hổng `PUT /users/:id` đã sửa ở TASK-001 (endpoint này không còn gán được role hệ thống ADMIN). Các điểm còn lại xem trạng thái ở `00_PROJECT_MEMORY.md`.
+
 
 ---
 

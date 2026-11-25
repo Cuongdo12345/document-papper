@@ -1,5 +1,7 @@
 # 02 — ARCHITECTURE ANALYSIS
 
+> **[TÀI LIỆU LỊCH SỬ — rà soát đồng bộ 2026-11-25]** Nội dung phản ánh thời điểm phân tích/review, KHÔNG viết lại theo code hiện tại; chỗ sai về cấu trúc hiện tại có ghi chú `[CẬP NHẬT 2026-11-25]` ngay tại chỗ. Thay đổi lớn từ đó: có frontend (FE-00, 2026-09-05); có CI GitHub Actions (DEV-121); module Tài sản tách thành Thiết bị CNTT, Thiết bị y tế và Bản quyền phần mềm (DEV-111→120). **Bảng đổi tên khi đọc tài liệu này:** route `/api/assets*` → `/api/it-assets` / `/api/medical-assets` (route cũ đã gỡ, chỉ còn `/api/assets/lookup-options`); `/api/assets/medical-devices/:assetId/...` → `/api/medical-assets/:assetId/...`; `/api/assets/asset-categories` → `/api/{it,medical}-assets/categories`; quyền `ASSET_*` → `IT_ASSET_*` / `MEDICAL_ASSET_*`, `ASSET_CATEGORY_*` → `IT_ASSET_CATEGORY_*` / `MEDICAL_ASSET_CATEGORY_*`. Số liệu tại lần rà soát: 34 model (14 thư mục), 142 permission, 7 role, 21 mount `/api/*`, 7 cron job. Tra hiện trạng: `32_PROJECT_FEATURE_GUIDE.md` (module), `04_DATABASE_ANALYSIS.md` (DB), `frontend/API_REFERENCE.md` (API), `frontend/AUTH_RBAC_MAP.md` (quyền), `00_PROJECT_MEMORY.md` (chỉ mục task); source code là nguồn sự thật.
+
 > Phase: 02 — Architecture Analysis
 > Phạm vi: chỉ phân tích KIẾN TRÚC (không đánh giá chất lượng code, không phân tích nghiệp vụ chi tiết ngoài mức cần thiết để hiểu kiến trúc).
 > Nguồn: source code thực tế tại commit `f4ce8e9` (branch `main`).
@@ -25,6 +27,9 @@ Controller (theo domain) → Service (business logic) → Model (Mongoose) → M
         ▼
 Response JSON chuẩn hoá { success, message, data }
 ```
+
+> **[CẬP NHẬT 2026-11-25]** Không còn đúng: đã có frontend `frontend/` (React + Vite + Tailwind, từ FE-00 ngày 2026-09-05) — kiến thức frontend ở `docs/frontend/FRONTEND_MEMORY.md`.
+
 
 Đặc điểm kiến trúc tổng thể:
 - **Không phải microservices** — 1 process Node.js duy nhất (`server.ts`), 1 kết nối MongoDB dùng chung cho toàn bộ domain.
@@ -96,7 +101,13 @@ Danh sách route mount (`app.ts`):
 | `/api/vendors` | `routes/vendors/vendor.routes.ts` **[BỔ SUNG DEV-071]** — Roadmap B4 |
 | `/api/contracts` | `routes/vendors/contract.routes.ts` **[BỔ SUNG DEV-071]** — Roadmap B4 |
 
+> **[CẬP NHẬT 2026-11-25]** Bảng mount này đã cũ: route `/api/assets*` đã gỡ ở DEV-120 (chỉ còn `/api/assets/lookup-options`), thay bằng `/api/it-assets` và `/api/medical-assets` (cùng router factory `buildAssetModuleRouter` trong `routes/assets/assetModule.routes.ts`) và `/api/software-licenses`. Hiện có 21 mount `/api/*` trong `backend/src/app.ts`; danh sách endpoint ở `docs/frontend/API_REFERENCE.md`.
+
+
 Lưu ý thứ tự mount: `/api/assets/asset-categories`, `/api/assets/medical-devices`, `/api/assets/maintenance-plans` được mount **trước** `/api/assets` — bắt buộc, nếu không Express sẽ khớp nhầm các path con này vào router `assetRoutes` tổng quát hơn.
+
+> **[CẬP NHẬT 2026-11-25]** Không còn áp dụng: các route `/api/assets/*` này đã gỡ ở DEV-120 (xem bảng đổi tên ở banner đầu file).
+
 
 **[CẬP NHẬT DEV-071, 2026-09-21]** Bảng trên đã lỗi thời (dừng ở 15 route file/13 prefix cũ) — đối chiếu
 lại trực tiếp `app.ts` xác nhận đủ. Không thấy mount riêng cho 2FA (`TwoFactorOtp`)/Xuất PDF
@@ -324,6 +335,9 @@ Xác định từ dependency thực tế (`package.json`, Phase 01) — **không
 | File export | ExcelJS, `docx` | Sinh file server-side, không gọi API ngoài. |
 | QR Code | `qrcode` | Sinh QR nội bộ (không rõ dùng ở domain nào cụ thể — cần đọc thêm ở phase Assets/Documents). |
 | Upload lưu trữ | Multer | Lưu file — cần xác minh ở phase sau: lưu local disk hay cloud storage (S3, v.v.) — Phase 01 không xác nhận có SDK cloud storage nào trong dependencies. |
+
+> **[CẬP NHẬT 2026-11-25]** `docx` chưa từng được dùng và đã gỡ khỏi dependency (DEV-122); xuất file hiện dùng ExcelJS (Excel) và pdfmake (PDF tài liệu).
+
 
 **Không có**: payment gateway, SMS gateway, third-party auth (OAuth/SSO), message queue (Kafka/RabbitMQ), external API tích hợp (ERP, HIS, v.v.), CDN, search engine (Elasticsearch).
 

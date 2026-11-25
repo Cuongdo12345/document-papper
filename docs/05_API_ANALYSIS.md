@@ -1,5 +1,7 @@
 # 05 — API ANALYSIS
 
+> **[TÀI LIỆU LỊCH SỬ — rà soát đồng bộ 2026-11-25]** Nội dung phản ánh thời điểm phân tích/review, KHÔNG viết lại theo code hiện tại; chỗ sai về cấu trúc hiện tại có ghi chú `[CẬP NHẬT 2026-11-25]` ngay tại chỗ. Thay đổi lớn từ đó: có frontend (FE-00, 2026-09-05); có CI GitHub Actions (DEV-121); module Tài sản tách thành Thiết bị CNTT, Thiết bị y tế và Bản quyền phần mềm (DEV-111→120). **Bảng đổi tên khi đọc tài liệu này:** route `/api/assets*` → `/api/it-assets` / `/api/medical-assets` (route cũ đã gỡ, chỉ còn `/api/assets/lookup-options`); `/api/assets/medical-devices/:assetId/...` → `/api/medical-assets/:assetId/...`; `/api/assets/asset-categories` → `/api/{it,medical}-assets/categories`; quyền `ASSET_*` → `IT_ASSET_*` / `MEDICAL_ASSET_*`, `ASSET_CATEGORY_*` → `IT_ASSET_CATEGORY_*` / `MEDICAL_ASSET_CATEGORY_*`. Số liệu tại lần rà soát: 34 model (14 thư mục), 142 permission, 7 role, 21 mount `/api/*`, 7 cron job. Tra hiện trạng: `32_PROJECT_FEATURE_GUIDE.md` (module), `04_DATABASE_ANALYSIS.md` (DB), `frontend/API_REFERENCE.md` (API), `frontend/AUTH_RBAC_MAP.md` (quyền), `00_PROJECT_MEMORY.md` (chỉ mục task); source code là nguồn sự thật.
+
 > Phase: 05 — API Analysis
 > Phạm vi: CHỈ API (inventory endpoint thực tế, mapping route→controller→service→DB, request/response, auth/authz mapping, error handling, so sánh với `openAPI.yaml`). Không phân tích lại Database schema chi tiết (Phase 04), không phân tích RBAC/Policy chuyên sâu (Phase 07), không đánh giá security theo mức độ (Phase 09).
 > Nguồn: source code thực tế tại commit `f4ce8e9` (branch `main`), re-clone xác nhận khớp commit với `00_PROJECT_MEMORY.md`. Đối chiếu với `backend/src/docs/openAPI.yaml` (4245 dòng).
@@ -119,6 +121,9 @@
 **Xác nhận lại phát hiện Phase 03** bằng cách đọc toàn bộ file: comment đầu `workflow.routes.ts` nói "CHỦ ĐÍCH KHÔNG THÊM `authorizePermission`" (ghi chú lịch sử), nhưng thực tế **TẤT CẢ 9/9 route đều có `authorizePermission` gắn đầy đủ** — comment không phản ánh đúng trạng thái hiện tại của chính file này (CONFIRMED, không phải suy diễn).
 
 ### 2.8 Assets (`/api/assets`) — 19 endpoint, route: `asset.routes.ts`
+
+> **[CẬP NHẬT 2026-11-25]** Mục 2.8→2.10 và mọi mục `/api/assets/*` khác mô tả route/quyền CŨ, đã gỡ ở DEV-120. Hiện tại: `/api/it-assets`, `/api/medical-assets` với quyền `IT_ASSET_*` / `MEDICAL_ASSET_*` (+ `*_CATEGORY_*`); hồ sơ y tế, kiểm định, chứng chỉ vận hành ở `/api/medical-assets/:assetId/profile`, `/:assetId/calibration-records`, `/operator-certificates`. Bảng hiện hành: `docs/frontend/API_REFERENCE.md`.
+
 
 | Method | Path | Auth | Ghi chú |
 |---|---|---|---|

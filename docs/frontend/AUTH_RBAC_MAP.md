@@ -49,16 +49,19 @@ Error behavior:      forgot-password KHÔNG BAO GIỜ báo lỗi "user không t�
 
 ### 2.1 Permission catalog
 
-Nguồn DUY NHẤT: `PERMISSIONS` object (`backend/src/shared/constants/permission.constant.ts`) — **75 permission** (đếm trực tiếp). FE copy chính xác giá trị string, KHÔNG tự đặt permission mới.
+Nguồn DUY NHẤT: `PERMISSIONS` object (`backend/src/shared/constants/permission.constant.ts`) — **142 permission** (đếm trực tiếp; **[CẬP NHẬT 2026-11-25]** trước ghi 75). FE copy chính xác giá trị string, KHÔNG tự đặt permission mới.
 
 Nhóm permission theo domain (tên nhóm, không liệt kê lại từng permission — xem `API_REFERENCE.md` cho permission gắn từng endpoint):
 `USER_*` (8), `ROLE_*` (5), `PERMISSION_*` (4), `POLICY_*` (4, ABAC — xem Mục 2.4), `DOCUMENT_*` (5) + `DOCUMENT_EXCEL_*`/`EXCEL_DEPARTMENT_SYNC` (5), `WORKFLOW_*` (7), `DEPARTMENT_*` (5), `AUDIT_*` (3), `SYSTEM_*` (2), `DASHBOARD_READ` (1), [`ASSET_*` (15) và `ASSET_CATEGORY_*` (5) — quyền CŨ, **ĐÃ GỠ ở Giai đoạn 8 (DEV-120/FE-45, 2026-10-09)** khỏi code, role và catalog]; **[MỚI FE-42/43, 2026-10-09] 46 quyền tách module:** `IT_ASSET_*` (15: VIEW, VIEW_DETAIL, CREATE, UPDATE, DELETE, DELETE_PERMANENT, ASSIGN, DISPOSE, ALERTS_TRIGGER, EXCEL_EXPORT, EXCEL_IMPORT, INVENTORY_CHECK, MAINTENANCE_PLAN_VIEW/CREATE/UPDATE), `IT_ASSET_CATEGORY_*` (5), `MEDICAL_ASSET_*` (15), `MEDICAL_ASSET_CATEGORY_*` (5), `SOFTWARE_LICENSE_*` (6: VIEW, CREATE, UPDATE, DELETE, ASSIGN, ALERTS_TRIGGER) — role IT nhận toàn bộ bộ CNTT + bản quyền và chỉ XEM thiết bị y tế; Phòng Vật tư-TTB toàn bộ bộ y tế và chỉ XEM CNTT; chi tiết `docs/development/tasks/DEV-114.md`. `MEDICAL_DEVICE_*` (5; [DEV-117] IT chỉ còn `MEDICAL_DEVICE_VIEW`, 4 quyền ghi chỉ Vật tư-TTB/ADMIN), Upload (`UPLOAD_FILES`/`VIEW_FILES`/`VIEW_FILE_DETAIL`/`DELETE_FILE`, 4), `PERFORMANCE_VIEW` (1).
 
+> **[CẬP NHẬT 2026-11-25]** Số lượng theo nhóm ở dòng trên đếm từ lúc còn 75 permission. Đếm lại từ `permission.constant.ts` (tổng 142): `USER_*` (10), `SESSION_*` (2), `ROLE_*` (5), `PERMISSION_*` (4), `POLICY_*` (4), `DOCUMENT_*` (11), `EXCEL_DEPARTMENT_SYNC` (1), `WORKFLOW_*` (8), `DEPARTMENT_*` (6), `AUDIT_*` (3), `SYSTEM_*` (3), `DASHBOARD_*` (2), `MEDICAL_DEVICE_*` (5), `OPERATOR_CERTIFICATE_*` (4), file: `UPLOAD_FILES`, `VIEW_FILES`, `VIEW_FILE_DETAIL`, `DELETE_FILE` (4), `PERFORMANCE_*` (1), `NOTIFICATION_*` (2), `CONSUMABLE_*` (13), `VENDOR_*` (3), `CONTRACT_*` (5), `IT_ASSET_*` (20, gồm 5 `IT_ASSET_CATEGORY_*`), `MEDICAL_ASSET_*` (20, gồm 5 `MEDICAL_ASSET_CATEGORY_*`), `SOFTWARE_LICENSE_*` (6).
+
+
 ### 2.2 Roles hiện có
 
-6 role trong `rolePermission.map.ts`: `ADMIN` (toàn bộ `PERMISSIONS` + `SYSTEM_ADMIN`), `IT`, `TRUONG_KHOA`, `DIEU_DUONG_TRUONG`, `BAN_GIAM_DOC`, `PHONG_VAT_TU_TTB`.
+7 role trong `rolePermission.map.ts`: `ADMIN` (toàn bộ `PERMISSIONS` + `SYSTEM_ADMIN`), `IT`, `TRUONG_KHOA`, `DIEU_DUONG_TRUONG`, `BAN_GIAM_DOC`, `PHONG_VAT_TU_TTB`, `USER` (**[CẬP NHẬT 2026-11-25]** trước ghi 6 role, thiếu `USER`).
 
-**UNKNOWN**: permission cụ thể của 5 role non-ADMIN không liệt kê đầy đủ ở đây (dài, chi tiết theo domain) — FE nên đọc `user.permissions` trả về từ API thực tế (`/users/me`) thay vì hard-code theo role name, vì đây chính là mục đích của model permission-based (không phải role-based) ở FE.
+**UNKNOWN**: permission cụ thể của 6 role non-ADMIN không liệt kê đầy đủ ở đây (dài, chi tiết theo domain) — FE nên đọc `user.permissions` trả về từ API thực tế (`/users/me`) thay vì hard-code theo role name, vì đây chính là mục đích của model permission-based (không phải role-based) ở FE.
 
 ### 2.3 Cơ chế xác định quyền (authorization pipeline)
 
@@ -82,12 +85,16 @@ Request
 
 `POLICY_VIEW/CREATE/UPDATE/DELETE` — API `/api/rbac/policies*` **TỒN TẠI VÀ HOẠT ĐỘNG** (CRUD Policy bình thường, permission check bình thường). Nhưng **cơ chế ABAC runtime (`enablePolicies`) CHƯA được bật ở bất kỳ route nghiệp vụ nào** (`grep "enablePolicies" routes/**` → 0 kết quả, xác nhận DEV-009A PAUSED). Nghĩa là: tạo/sửa/xoá Policy qua UI vẫn lưu được vào DB, nhưng **KHÔNG có tác dụng gì tới authorization thật của bất kỳ request nào khác**.
 
+> **[CẬP NHẬT 2026-11-25]** **KHÔNG CÒN ĐÚNG.** Từ DEV-009A (2026-09-06) ABAC runtime đã bật ở 3 route Document: `GET /api/documents/:id`, `/:id/versions`, `/:id/export-pdf` (`enablePolicies: true`, resource `document`, action `view_detail` — `backend/src/routes/documents/document.route.ts`). Policy có resource/action này CÓ tác dụng thật; Policy cho resource/action khác vẫn chưa có route nào đọc tới.
+
+
 `FRONTEND_RECOMMENDATION`: cân nhắc ẩn hoặc gắn nhãn "Beta/chưa áp dụng" cho UI quản trị Policy, tránh gây hiểu lầm cho người quản trị rằng Policy đang có hiệu lực.
 
 ### 2.5 Case đặc biệt cần FE biết (không phải bug, là inconsistency đã document ở backend)
 
 - `user.denyPermissions` — field tồn tại trong `User` model, dùng để TRỪ bớt quyền so với role. Nhưng **KHÔNG có tác dụng với user có `role.isSystemRole===true` hoặc `role.name==="ADMIN"`** vì ADMIN bypass chạy TRƯỚC khi đọc `denyPermissions` (RV02-02, cố ý giữ nguyên, xem `docs/development/tasks/DEV-022.md`). FE hiển thị UI "gán denyPermissions cho 1 user" nên cảnh báo rõ: field này vô nghĩa nếu user đó có role ADMIN.
 - **0 role hiện giữ `USER_VIEW`/`USER_VIEW_DETAIL`** — `GET /api/users`, `GET /api/users/:id` sẽ 403 với MỌI user không phải ADMIN, dù về mặt thiết kế permission là generic. FE-04 (trang Users) cần coi đây là màn hình ADMIN-only trên thực tế cho tới khi có quyết định nghiệp vụ khác.
+  - **[CẬP NHẬT 2026-11-25]** **KHÔNG CÒN ĐÚNG**: `USER_VIEW` do `IT`, `PHONG_VAT_TU_TTB` giữ; `USER_VIEW_DETAIL` do `IT` giữ (`rolePermission.map.ts`), ngoài ADMIN.
 
 ## 3. Endpoint × Permission bảng đầy đủ
 
